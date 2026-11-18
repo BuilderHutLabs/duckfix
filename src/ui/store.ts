@@ -19,6 +19,8 @@ import { DEFAULT_THRESHOLDS } from '../orientation/policy';
 import { exportFileName, exportPdf } from '../export/exportPdf';
 import { browserRasterizer } from '../export/rasterize';
 import { shareOrDownload } from '../export/share';
+import { createMetrics } from '../diagnostics/metrics';
+import { indexedDbSession, type SessionStorage, type StoredSession } from '../storage/session';
 import { strings } from './strings';
 
 export type Phase = 'home' | 'analyzing' | 'review';
@@ -36,6 +38,9 @@ export interface AppState {
   busy: 'opening' | 'exporting' | null;
   error: string | null;
   deskew: boolean;
+  /** A document from an earlier visit is stored and can be restored (shown on Home). */
+  restorable: boolean;
+  diagnostics: boolean;
 }
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
@@ -48,6 +53,7 @@ export interface StoreDeps {
   share: typeof shareOrDownload;
   forgetPdf(fileId: string): Promise<void>;
   storage: StorageLike | null;
+  session: SessionStorage | null;
 }
 
 function browserStorage(): StorageLike | null {
@@ -67,11 +73,13 @@ function browserDeps(): StoreDeps {
     share: shareOrDownload,
     forgetPdf,
     storage: browserStorage(),
+    session: indexedDbSession,
   };
 }
 
 const DESKEW_KEY = 'wduck.deskew';
 const ANALYZE = { concurrency: 2, maxSide: ANALYSIS_MAX_SIDE } as const;
+const SAVE_DOC_DELAY_MS = 500;
 
 /**
  * Applies an analysis result to one history state. Unanalyzed pages start at rotation 0 and only
@@ -110,6 +118,14 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
   let history: History<Doc> = createHistory<Doc>({ pages: [] });
   let session: Session = { controller: new AbortController(), runs: 0 };
   let detector: Promise<OrientationDetector> | null = null;
+  let metrics = createMetrics();
+  /** Session found in storage at startup, until restored or discarded. */
+  let stored: StoredSession | null = null;
+  /** Set once storage was cleared/overwritten: a startup load still in flight is stale then. */
+  let storedReplaced = false;
+  /** Last doc handed to session storage, and the pending debounced save. */
+  let persistedDoc: Doc = history.present;
+  let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
   const readDeskew = (): boolean => {
     try {
@@ -132,6 +148,41 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     busy: null,
     error: null,
     deskew: readDeskew(),
+    restorable: false,
+    diagnostics: false,
+  };
+
+  const cancelDocSave = () => {
+    if (saveTimer !== null) clearTimeout(saveTimer);
+    saveTimer = null;
+  };
+
+  const saveDocNow = () => {
+    cancelDocSave();
+    persistedDoc = history.present;
+    void deps.session?.saveDoc(persistedDoc);
+  };
+
+  /** Stores the doc 500 ms after the last change, while a document is open. */
+  const scheduleDocSave = () => {
+    if (!deps.session || state.sources.size === 0 || history.present === persistedDoc) return;
+    cancelDocSave();
+    saveTimer = setTimeout(saveDocNow, SAVE_DOC_DELAY_MS);
+  };
+
+  /** Stores doc + sources at once (the source set changed). */
+  const saveAll = () => {
+    cancelDocSave();
+    persistedDoc = history.present;
+    void deps.session?.save({ doc: persistedDoc, sources: [...state.sources.values()] });
+  };
+
+  const clearStored = () => {
+    cancelDocSave();
+    stored = null;
+    storedReplaced = true;
+    persistedDoc = history.present;
+    void deps.session?.clear();
   };
 
   /** Publishes a new snapshot; doc/canUndo/canRedo always come from the history. */
@@ -143,6 +194,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       canUndo: history.canUndo,
       canRedo: history.canRedo,
     };
+    scheduleDocSave();
     listeners.forEach((l) => l());
   };
 
@@ -186,6 +238,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         },
         (a) => {
           if (!current()) return;
+          metrics.record(a);
           history.mapAll((d) => mergeAnalysis(d, a));
           set({ progress: { ...state.progress, done: state.progress.done + 1 } });
         },
@@ -222,6 +275,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     load(doc: Doc, sources: SourceFile[]) {
       closeSession();
       history = createHistory(doc);
+      persistedDoc = doc;
+      metrics = createMetrics();
       set({
         phase: 'review',
         sources: new Map(sources.map((s) => [s.id, s])),
@@ -230,16 +285,19 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         selecting: false,
         filterFlagged: false,
         busy: null,
+        restorable: false,
       });
       void runAnalysis(doc.pages);
     },
 
     async open(files: File[]) {
       if (files.length === 0 || state.busy) return;
-      set({ busy: 'opening', error: null });
+      clearStored(); // a new file replaces the stored document
+      set({ busy: 'opening', error: null, restorable: false });
       try {
         const { sources, pages } = await deps.importFiles(files);
         actions.load({ pages }, sources);
+        saveAll();
       } catch (e) {
         set({ busy: null, error: errorMessage(e) });
       }
@@ -248,6 +306,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     goHome() {
       closeSession();
       history = createHistory<Doc>({ pages: [] });
+      clearStored();
       set({
         phase: 'home',
         sources: new Map(),
@@ -301,6 +360,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         sources.forEach((s) => all.set(s.id, s));
         history.push(insertPages(history.present, at, pages));
         set({ sources: all, busy: null });
+        saveAll();
         void runAnalysis(pages);
       } catch (e) {
         if (own === session) set({ busy: null, error: errorMessage(e) });
@@ -358,7 +418,45 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     dismissError() {
       set({ error: null });
     },
+
+    /** Reopens the document stored by an earlier visit and finishes analyzing its pages. */
+    restore() {
+      const s = stored;
+      stored = null;
+      if (s) actions.load(s.doc, s.sources);
+    },
+
+    /** "Zacznij od nowa": forgets the stored document. */
+    discardStored() {
+      clearStored();
+      set({ restorable: false });
+    },
+
+    /** Writes a pending debounced doc save now (the page is being hidden / may be killed). */
+    flushSession() {
+      if (saveTimer !== null) saveDocNow();
+    },
+
+    openDiagnostics() {
+      set({ diagnostics: true });
+    },
+
+    closeDiagnostics() {
+      set({ diagnostics: false });
+    },
+
+    /** Metrics report for the open document (analysis results since it was opened or restored). */
+    metricsReport(device: string): string {
+      return metrics.report(history.present, device);
+    },
   };
+
+  void deps.session?.load().then((s) => {
+    // ignore when the user already opened (or closed) something while it loaded
+    if (!s || storedReplaced || state.phase !== 'home' || state.busy) return;
+    stored = s;
+    set({ restorable: true });
+  }, () => {});
 
   return {
     ...actions,

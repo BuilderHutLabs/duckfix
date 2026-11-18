@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { isFlagged, useAppStore } from './store';
 import { strings } from './strings';
+import { useSecretTaps } from './Diagnostics';
 
 export function Toolbar() {
   const s = useAppStore();
   const flagged = s.doc.pages.filter(isFlagged).length;
+  const onCounterTap = useSecretTaps(s.openDiagnostics);
 
   if (s.selecting) {
     const n = s.selection.size;
@@ -39,7 +41,10 @@ export function Toolbar() {
         ✕
       </button>
       <div className="toolbar-check">
-        <span className={flagged ? 'toolbar-text flag-text' : 'toolbar-text'}>{strings.toCheck(flagged)}</span>
+        {/* 5 taps on the counter open the diagnostics screen (Home: the title) */}
+        <span className={flagged ? 'toolbar-text flag-text' : 'toolbar-text'} onClick={onCounterTap}>
+          {strings.toCheck(flagged)}
+        </span>
         {(flagged > 0 || s.filterFlagged) && (
           <button
             type="button"

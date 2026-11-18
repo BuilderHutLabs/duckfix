@@ -18,6 +18,9 @@ export const strings = {
   close: 'Zamknij',
   confirmClose: 'Zamknąć dokument? Niezapisane zmiany przepadną.',
 
+  restoreSession: 'Wróć do ostatniego dokumentu',
+  startOver: 'Zacznij od nowa',
+
   analyzing: (done: number, total: number) => `Analizuję ${done}/${total}`,
   toCheck: (n: number) => `${n} ${plural(n, 'strona', 'strony', 'stron')} do sprawdzenia`,
   showOnlyFlagged: 'Pokaż tylko te',
@@ -50,6 +53,11 @@ export const strings = {
   autoRotated: 'Obrócona automatycznie',
   selected: 'zaznaczona',
   thumbError: 'Nie można wyświetlić',
+
+  diagTitle: 'Diagnostyka',
+  copy: 'Kopiuj',
+  copied: 'Skopiowano',
+  share: 'Udostępnij',
 
   dismiss: 'OK',
   errors: {

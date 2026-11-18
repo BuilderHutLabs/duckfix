@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AppStoreProvider, createAppStore, useAppStore, type AppStore } from './store';
 import { Home } from './Home';
 import { Toolbar } from './Toolbar';
 import { Progress } from './Progress';
 import { ReviewGrid } from './ReviewGrid';
+import { Diagnostics, DIAG_HASH } from './Diagnostics';
 import { strings } from './strings';
 import './app.css';
 
@@ -17,7 +18,44 @@ export function App({ store }: { store?: AppStore }) {
 }
 
 function Shell() {
-  const { phase } = useAppStore();
+  const { phase, diagnostics, openDiagnostics, closeDiagnostics, flushSession } = useAppStore();
+
+  // URL hash #diag opens the diagnostics screen (on load and when the hash changes)
+  useEffect(() => {
+    const check = () => {
+      if (window.location.hash === DIAG_HASH) openDiagnostics();
+    };
+    check();
+    window.addEventListener('hashchange', check);
+    return () => window.removeEventListener('hashchange', check);
+  }, [openDiagnostics]);
+
+  // iOS may kill a hidden tab without warning: write the pending session save right away
+  useEffect(() => {
+    const flush = () => {
+      if (document.visibilityState === 'hidden') flushSession();
+    };
+    document.addEventListener('visibilitychange', flush);
+    window.addEventListener('pagehide', flushSession);
+    return () => {
+      document.removeEventListener('visibilitychange', flush);
+      window.removeEventListener('pagehide', flushSession);
+    };
+  }, [flushSession]);
+
+  if (diagnostics) {
+    return (
+      <Diagnostics
+        onClose={() => {
+          if (window.location.hash === DIAG_HASH) {
+            window.history.replaceState(null, '', window.location.pathname + window.location.search);
+          }
+          closeDiagnostics();
+        }}
+      />
+    );
+  }
+
   return (
     <>
       {phase === 'home' ? (
