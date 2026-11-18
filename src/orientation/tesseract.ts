@@ -44,11 +44,22 @@ export async function createTesseractDetector(opts: TesseractDetectorOptions): P
     gzip: false,
   };
 
-  const osdWorkers: Worker[] = await Promise.all(
+  const settled = await Promise.allSettled(
     Array.from({ length: Math.max(1, opts.workers) }, () =>
       createWorker('osd', OEM.TESSERACT_ONLY, { ...paths, legacyCore: true, legacyLang: true }),
     ),
   );
+  const osdWorkers: Worker[] = [];
+  let failure: { reason: unknown } | null = null;
+  for (const r of settled) {
+    if (r.status === 'fulfilled') osdWorkers.push(r.value);
+    else failure ??= { reason: r.reason };
+  }
+  if (failure) {
+    // Do not leak the WASM heaps of workers that did start.
+    await Promise.allSettled(osdWorkers.map((w) => w.terminate()));
+    throw failure.reason;
+  }
 
   // Free-worker queue: callers wait for a worker to be released.
   const free = [...osdWorkers];
@@ -85,7 +96,17 @@ export async function createTesseractDetector(opts: TesseractDetectorOptions): P
       let best = candidates[0];
       let bestScore = -1;
       for (const candidate of candidates) {
-        const { data } = await w.recognize(rotatedCopy(canvas, candidate));
+        const copy = rotatedCopy(canvas, candidate);
+        let data;
+        try {
+          ({ data } = await w.recognize(copy));
+        } finally {
+          // iOS Safari keeps canvas backing stores alive until the size is zeroed.
+          if (copy !== canvas) {
+            copy.width = 0;
+            copy.height = 0;
+          }
+        }
         const words = data.words ?? [];
         const score = words.length
           ? words.reduce((s, x) => s + x.confidence, 0) / words.length
