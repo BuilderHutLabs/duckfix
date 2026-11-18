@@ -73,7 +73,7 @@ describe('app store', () => {
     expect(store.getState().phase).toBe('analyzing');
     expect(store.getState().doc.pages).toHaveLength(1);
     expect(store.getState().progress).toEqual({ done: 0, total: 1 });
-    expect(vi.mocked(analyzePages).mock.calls[0][3]).toMatchObject({ concurrency: 2, maxSide: 1400, deskew: true });
+    expect(vi.mocked(analyzePages).mock.calls[0][3]).toMatchObject({ concurrency: 2, maxSide: 2000, deskew: true });
 
     ctl.onResult!(result('n1', { rotation: 90, flags: [] }));
     expect(store.getState().doc.pages[0].rotation).toBe(90);

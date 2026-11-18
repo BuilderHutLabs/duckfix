@@ -12,7 +12,7 @@ import { createHistory, type History } from '../model/history';
 import { importFiles, type SourceFile } from '../import/importFiles';
 import { ImportError } from '../import/errors';
 import { forgetPdf, releaseCanvas, renderPage } from '../imaging/render';
-import { analyzePages, canvasToGrayImage, type PageAnalysis } from '../pipeline/analyze';
+import { ANALYSIS_MAX_SIDE, analyzePages, canvasToGrayImage, type PageAnalysis } from '../pipeline/analyze';
 import { createTesseractDetector } from '../orientation/tesseract';
 import type { OrientationDetector } from '../orientation/detector';
 import { DEFAULT_THRESHOLDS } from '../orientation/policy';
@@ -71,7 +71,7 @@ function browserDeps(): StoreDeps {
 }
 
 const DESKEW_KEY = 'wduck.deskew';
-const ANALYZE = { concurrency: 2, maxSide: 1400 } as const;
+const ANALYZE = { concurrency: 2, maxSide: ANALYSIS_MAX_SIDE } as const;
 
 /**
  * Applies an analysis result to one history state. Unanalyzed pages start at rotation 0 and only

@@ -182,7 +182,7 @@ describe('home', () => {
     expect(vi.mocked(deps.analyzePages).mock.calls[0][3]).toMatchObject({
       deskew: false,
       concurrency: 2,
-      maxSide: 1400,
+      maxSide: 2000,
     });
     expect(deps.importFiles).toHaveBeenCalledWith([file]);
   });
