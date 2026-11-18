@@ -112,6 +112,9 @@ async function analyzeOne(
   }
 }
 
+/** Longest side (px) of the analysis render. Measured in Chrome on test-mixed.pdf: OSD at 1400 px confused 90°/270° (conf ≤ 4.4), 1000 px gave conf 0, 2000 px got all pages right (conf 13–16, ~0.6 s/page). */
+export const ANALYSIS_MAX_SIDE = 2000;
+
 /** Analyzes pages concurrently, skipping already analyzed ones (resume). */
 export async function analyzePages(
   pages: Page[],
