@@ -16,13 +16,16 @@ export const MIN_SKEW_SCORE = 1.25;
  * Estimates page skew by projection-profile analysis.
  *
  * Sign convention: `angleDeg` is the clockwise rotation (in degrees, as seen
- * on screen) to apply to the page so its text lines become horizontal. A page
- * whose text is tilted counter-clockwise by d (visually up to the right, as
- * produced by `syntheticTextPage(w, h, d)`) yields `angleDeg ~= -d`.
+ * on screen, y axis down) to apply to the page so its text lines become
+ * horizontal. A page whose content was rotated clockwise by d (canvas
+ * `ctx.rotate(+d)`, text running down to the right, as produced by
+ * `syntheticTextPage(w, h, d)`) yields `angleDeg ~= -d`; rotating it clockwise
+ * by `angleDeg` straightens it.
  *
  * Method: downscale to <= 800 px wide, binarize with Otsu, then for each
- * candidate tilt theta project dark pixels onto the line normal
- * (v = x sin(theta) + y cos(theta)) and rank by the sum of squared bin counts
+ * candidate angle theta project dark pixels onto the axis
+ * v = x sin(theta) + y cos(theta), which is constant along lines whose content
+ * was rotated by -theta, so the best theta is itself the clockwise correction and rank by the sum of squared bin counts
  * (proportional to variance, as total ink is constant). Coarse search at 1
  * degree over [-maxDeg, maxDeg] (maxDeg clamped to 20), refined at 0.1.
  *
@@ -80,7 +83,7 @@ export function estimateSkew(
   coarseScores.sort((x, y) => x - y);
   const median = coarseScores[coarseScores.length >> 1];
   const confidence = median > 0 ? bestScore / median : 0;
-  return { angleDeg: bestDeg === 0 ? 0 : -bestDeg, score: confidence };
+  return { angleDeg: bestDeg, score: confidence };
 }
 
 /** Downscales to <= MAX_WIDTH (box average) and returns coordinates of Otsu-dark pixels. */
