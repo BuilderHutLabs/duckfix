@@ -1,0 +1,385 @@
+import { createContext, createElement, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react';
+import {
+  applyAnalysis,
+  deletePages,
+  insertPages,
+  movePage,
+  rotatePages,
+  type Doc,
+  type Page,
+} from '../model/document';
+import { createHistory, type History } from '../model/history';
+import { importFiles, type SourceFile } from '../import/importFiles';
+import { ImportError } from '../import/errors';
+import { forgetPdf, releaseCanvas, renderPage } from '../imaging/render';
+import { analyzePages, canvasToGrayImage, type PageAnalysis } from '../pipeline/analyze';
+import { createTesseractDetector } from '../orientation/tesseract';
+import type { OrientationDetector } from '../orientation/detector';
+import { DEFAULT_THRESHOLDS } from '../orientation/policy';
+import { exportFileName, exportPdf } from '../export/exportPdf';
+import { browserRasterizer } from '../export/rasterize';
+import { shareOrDownload } from '../export/share';
+import { strings } from './strings';
+
+export type Phase = 'home' | 'analyzing' | 'review';
+
+export interface AppState {
+  phase: Phase;
+  doc: Doc;
+  sources: Map<string, SourceFile>;
+  progress: { done: number; total: number };
+  selection: Set<string>;
+  selecting: boolean;
+  filterFlagged: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  busy: 'opening' | 'exporting' | null;
+  error: string | null;
+  deskew: boolean;
+}
+
+type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
+
+export interface StoreDeps {
+  importFiles(files: File[]): Promise<{ sources: SourceFile[]; pages: Page[] }>;
+  analyzePages: typeof analyzePages;
+  createDetector(): Promise<OrientationDetector>;
+  exportPdf(doc: Doc, sources: Map<string, SourceFile>): Promise<Uint8Array>;
+  share: typeof shareOrDownload;
+  forgetPdf(fileId: string): Promise<void>;
+  storage: StorageLike | null;
+}
+
+function browserStorage(): StorageLike | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+function browserDeps(): StoreDeps {
+  return {
+    importFiles,
+    analyzePages,
+    createDetector: () => createTesseractDetector({ basePath: import.meta.env.BASE_URL, workers: 2 }),
+    exportPdf: (doc, sources) => exportPdf(doc, sources, browserRasterizer),
+    share: shareOrDownload,
+    forgetPdf,
+    storage: browserStorage(),
+  };
+}
+
+const DESKEW_KEY = 'wduck.deskew';
+const ANALYZE = { concurrency: 2, maxSide: 1400 } as const;
+
+/**
+ * Applies an analysis result to one history state. Unanalyzed pages start at rotation 0 and only
+ * user actions change it, so a non-zero rotation means the user already turned the page: keep it,
+ * but still record autoRotation/skew/flags/analyzed.
+ */
+export function mergeAnalysis(doc: Doc, a: PageAnalysis): Doc {
+  const page = doc.pages.find((p) => p.id === a.pageId);
+  if (!page || page.analyzed) return doc;
+  const next = applyAnalysis(doc, a.pageId, a);
+  if (page.rotation === 0) return next;
+  return { pages: next.pages.map((p) => (p.id === a.pageId ? { ...p, rotation: page.rotation } : p)) };
+}
+
+function errorMessage(e: unknown): string {
+  return e instanceof ImportError ? strings.errors[e.code] : strings.genericError;
+}
+
+/** One opened document; replaced on open/goHome so late async work can tell it is stale. */
+interface Session {
+  controller: AbortController;
+  runs: number;
+}
+
+export function createAppStore(overrides: Partial<StoreDeps> = {}) {
+  const deps: StoreDeps = { ...browserDeps(), ...overrides };
+  const listeners = new Set<() => void>();
+  let history: History<Doc> = createHistory<Doc>({ pages: [] });
+  let session: Session = { controller: new AbortController(), runs: 0 };
+  let detector: Promise<OrientationDetector> | null = null;
+
+  const readDeskew = (): boolean => {
+    try {
+      return deps.storage?.getItem(DESKEW_KEY) !== '0';
+    } catch {
+      return true;
+    }
+  };
+
+  let state: AppState = {
+    phase: 'home',
+    doc: history.present,
+    sources: new Map(),
+    progress: { done: 0, total: 0 },
+    selection: new Set(),
+    selecting: false,
+    filterFlagged: false,
+    canUndo: false,
+    canRedo: false,
+    busy: null,
+    error: null,
+    deskew: readDeskew(),
+  };
+
+  /** Publishes a new snapshot; doc/canUndo/canRedo always come from the history. */
+  const set = (patch: Partial<AppState>) => {
+    state = {
+      ...state,
+      ...patch,
+      doc: history.present,
+      canUndo: history.canUndo,
+      canRedo: history.canRedo,
+    };
+    listeners.forEach((l) => l());
+  };
+
+  const getDetector = (): Promise<OrientationDetector> => {
+    detector ??= deps.createDetector().catch((e) => {
+      detector = null; // allow a retry on the next document
+      throw e;
+    });
+    return detector;
+  };
+
+  const getSource = (fileId: string): SourceFile => {
+    const s = state.sources.get(fileId);
+    if (!s) throw new Error(`Missing source file ${fileId}`);
+    return s;
+  };
+
+  const runAnalysis = async (pages: Page[]) => {
+    const todo = pages.filter((p) => !p.analyzed);
+    if (todo.length === 0) return;
+    const own = session;
+    const { signal } = own.controller;
+    const current = () => own === session && !signal.aborted;
+    own.runs++;
+    set({
+      phase: 'analyzing',
+      progress: { done: state.progress.done, total: state.progress.total + todo.length },
+    });
+    try {
+      const det = await getDetector();
+      if (!current()) return;
+      await deps.analyzePages(
+        todo,
+        {
+          render: renderPage,
+          release: releaseCanvas,
+          detector: det,
+          thresholds: DEFAULT_THRESHOLDS,
+          getSource,
+          toGrayImage: canvasToGrayImage,
+        },
+        (a) => {
+          if (!current()) return;
+          history.mapAll((d) => mergeAnalysis(d, a));
+          set({ progress: { ...state.progress, done: state.progress.done + 1 } });
+        },
+        { ...ANALYZE, deskew: state.deskew, signal },
+      );
+    } catch {
+      if (current()) set({ error: strings.analysisError });
+    } finally {
+      own.runs--;
+      if (own === session && own.runs === 0 && state.phase === 'analyzing') set({ phase: 'review' });
+    }
+  };
+
+  const closeSession = () => {
+    session.controller.abort();
+    session = { controller: new AbortController(), runs: 0 };
+    for (const id of state.sources.keys()) void deps.forgetPdf(id).catch(() => {});
+  };
+
+  /** Pushes a user action onto the undo history (no-op when nothing changed). */
+  const commit = (next: Doc, patch: Partial<AppState> = {}) => {
+    if (next.pages === history.present.pages) return;
+    history.push(next);
+    set(patch);
+  };
+
+  const existing = (ids: Iterable<string>) => {
+    const present = new Set(history.present.pages.map((p) => p.id));
+    return [...ids].filter((id) => present.has(id));
+  };
+
+  const actions = {
+    /** Shows a document right away and analyzes its unanalyzed pages in the background. */
+    load(doc: Doc, sources: SourceFile[]) {
+      closeSession();
+      history = createHistory(doc);
+      set({
+        phase: 'review',
+        sources: new Map(sources.map((s) => [s.id, s])),
+        progress: { done: 0, total: 0 },
+        selection: new Set(),
+        selecting: false,
+        filterFlagged: false,
+        busy: null,
+      });
+      void runAnalysis(doc.pages);
+    },
+
+    async open(files: File[]) {
+      if (files.length === 0 || state.busy) return;
+      set({ busy: 'opening', error: null });
+      try {
+        const { sources, pages } = await deps.importFiles(files);
+        actions.load({ pages }, sources);
+      } catch (e) {
+        set({ busy: null, error: errorMessage(e) });
+      }
+    },
+
+    goHome() {
+      closeSession();
+      history = createHistory<Doc>({ pages: [] });
+      set({
+        phase: 'home',
+        sources: new Map(),
+        progress: { done: 0, total: 0 },
+        selection: new Set(),
+        selecting: false,
+        filterFlagged: false,
+        busy: null,
+      });
+    },
+
+    rotate(ids: Iterable<string>, delta: 90 | -90 | 180) {
+      const valid = existing(ids);
+      if (valid.length) commit(rotatePages(history.present, valid, delta));
+    },
+
+    move(from: number, to: number) {
+      const n = history.present.pages.length;
+      const ok = (i: number) => Number.isInteger(i) && i >= 0 && i < n;
+      if (!ok(from) || !ok(to) || from === to) return;
+      commit(movePage(history.present, from, to));
+    },
+
+    /** Moves page `activeId` to the position of page `overId` (drag & drop). */
+    moveById(activeId: string, overId: string) {
+      const pages = history.present.pages;
+      const from = pages.findIndex((p) => p.id === activeId);
+      const to = pages.findIndex((p) => p.id === overId);
+      if (from >= 0 && to >= 0) actions.move(from, to);
+    },
+
+    remove(ids: Iterable<string>) {
+      const valid = existing(ids);
+      if (!valid.length) return;
+      // removing ends the selection mode (nothing selected is left)
+      commit(deletePages(history.present, valid), { selection: new Set(), selecting: false });
+    },
+
+    async insertAt(index: number, files: File[]) {
+      if (files.length === 0 || state.busy) return;
+      const own = session;
+      set({ busy: 'opening', error: null });
+      try {
+        const { sources, pages } = await deps.importFiles(files);
+        if (own !== session) {
+          sources.forEach((s) => void deps.forgetPdf(s.id).catch(() => {}));
+          return;
+        }
+        const at = Math.max(0, Math.min(Math.trunc(index) || 0, history.present.pages.length));
+        const all = new Map(state.sources);
+        sources.forEach((s) => all.set(s.id, s));
+        history.push(insertPages(history.present, at, pages));
+        set({ sources: all, busy: null });
+        void runAnalysis(pages);
+      } catch (e) {
+        if (own === session) set({ busy: null, error: errorMessage(e) });
+      }
+    },
+
+    undo() {
+      history.undo();
+      set({});
+    },
+
+    redo() {
+      history.redo();
+      set({});
+    },
+
+    async export() {
+      if (state.busy || history.present.pages.length === 0) return;
+      set({ busy: 'exporting', error: null });
+      try {
+        const bytes = await deps.exportPdf(history.present, state.sources);
+        const first = state.sources.values().next().value as SourceFile | undefined;
+        await deps.share(bytes, exportFileName(first?.name ?? 'dokument.pdf'));
+        set({ busy: null });
+      } catch {
+        set({ busy: null, error: strings.exportError });
+      }
+    },
+
+    toggleSelecting() {
+      set({ selecting: !state.selecting, selection: new Set() });
+    },
+
+    toggleSelected(id: string) {
+      const selection = new Set(state.selection);
+      if (!selection.delete(id)) selection.add(id);
+      set({ selection });
+    },
+
+    setFilterFlagged(filterFlagged: boolean) {
+      set({ filterFlagged });
+    },
+
+    /** Applies to the next analysis run. */
+    setDeskew(deskew: boolean) {
+      try {
+        deps.storage?.setItem(DESKEW_KEY, deskew ? '1' : '0');
+      } catch {
+        // private mode / blocked storage: keep the in-memory value only
+      }
+      set({ deskew });
+    },
+
+    dismissError() {
+      set({ error: null });
+    },
+  };
+
+  return {
+    ...actions,
+    getState: () => state,
+    subscribe(l: () => void) {
+      listeners.add(l);
+      return () => {
+        listeners.delete(l);
+      };
+    },
+  };
+}
+
+export type AppStore = ReturnType<typeof createAppStore>;
+export type AppActions = Omit<AppStore, 'getState' | 'subscribe'>;
+
+const StoreContext = createContext<AppStore | null>(null);
+
+export function AppStoreProvider({ store, children }: { store: AppStore; children: ReactNode }) {
+  return createElement(StoreContext.Provider, { value: store }, children);
+}
+
+export function useAppStore(): AppState & AppActions & { getSource(fileId: string): SourceFile | undefined } {
+  const store = useContext(StoreContext);
+  if (!store) throw new Error('useAppStore outside AppStoreProvider');
+  const state = useSyncExternalStore(store.subscribe, store.getState);
+  return useMemo(
+    () => ({ ...store, ...state, getSource: (id: string) => state.sources.get(id) }),
+    [store, state],
+  );
+}
+
+export const isFlagged = (p: Page): boolean => p.flags.length > 0;

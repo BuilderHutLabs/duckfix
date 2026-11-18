@@ -5,6 +5,11 @@ export interface History<T> {
   push(next: T): void;
   undo(): void;
   redo(): void;
+  /**
+   * Rewrites every stored state (past, present and future) without adding an entry.
+   * For changes that are not user actions (e.g. analysis results), so undo/redo keep them.
+   */
+  mapAll(fn: (state: T) => T): void;
 }
 
 export function createHistory<T>(initial: T): History<T> {
@@ -21,5 +26,8 @@ export function createHistory<T>(initial: T): History<T> {
     },
     undo() { if (index > 0) index--; },
     redo() { if (index < states.length - 1) index++; },
+    mapAll(fn) {
+      for (let i = 0; i < states.length; i++) states[i] = fn(states[i]);
+    },
   };
 }
