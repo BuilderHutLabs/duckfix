@@ -2,6 +2,15 @@ import { otsuThreshold, type GrayImage } from './gray';
 
 const MAX_WIDTH = 800;
 const MAX_POINTS = 100_000;
+const MAX_ALLOWED_DEG = 20;
+
+/**
+ * Minimum `score` (confidence) for a skew estimate to be trusted. Callers must
+ * NOT deskew below it. Measured on synthetic pages: text 2.1-2.2, text with a
+ * large dark image block 1.4, table rules 9.9, random noise 1.0, uniform
+ * dark/blank 0. The threshold sits between the image-block and noise values.
+ */
+export const MIN_SKEW_SCORE = 1.25;
 
 /**
  * Estimates page skew by projection-profile analysis.
@@ -13,14 +22,19 @@ const MAX_POINTS = 100_000;
  *
  * Method: downscale to <= 800 px wide, binarize with Otsu, then for each
  * candidate tilt theta project dark pixels onto the line normal
- * (v = x sin(theta) + y cos(theta)) and score by the variance of the bin
- * counts. Coarse search at 1 degree over [-maxDeg, maxDeg], refined at 0.1.
+ * (v = x sin(theta) + y cos(theta)) and rank by the sum of squared bin counts
+ * (proportional to variance, as total ink is constant). Coarse search at 1
+ * degree over [-maxDeg, maxDeg] (maxDeg clamped to 20), refined at 0.1.
+ *
+ * `score` is a confidence: best score / median of the coarse scores (>= 1).
+ * ~1 means a flat profile (photo, noise, no text): callers must not deskew
+ * when `score < MIN_SKEW_SCORE`. Pages without ink return `{ 0, 0 }`.
  */
 export function estimateSkew(
   img: GrayImage,
   opts: { maxDeg?: number } = {},
 ): { angleDeg: number; score: number } {
-  const maxDeg = opts.maxDeg ?? 10;
+  const maxDeg = Math.min(MAX_ALLOWED_DEG, Math.max(0, opts.maxDeg ?? 10));
   const { xs, ys, width, height } = darkPoints(img);
   if (xs.length === 0) return { angleDeg: 0, score: 0 };
 
@@ -36,20 +50,18 @@ export function estimateSkew(
     for (let i = 0; i < xs.length; i++) {
       bins[(xs[i] * s + ys[i] * c + offset + 0.5) | 0]++;
     }
-    let sum = 0;
     let sumSq = 0;
-    for (let i = 0; i < nBins; i++) {
-      sum += bins[i];
-      sumSq += bins[i] * bins[i];
-    }
-    const mean = sum / nBins;
-    return sumSq / nBins - mean * mean;
+    for (let i = 0; i < nBins; i++) sumSq += bins[i] * bins[i];
+    return sumSq;
   };
 
+  const coarseScores: number[] = [];
   let bestDeg = 0;
   let bestScore = -Infinity;
-  for (let d = -Math.floor(maxDeg); d <= Math.floor(maxDeg); d++) {
+  const maxInt = Math.floor(maxDeg);
+  for (let d = -maxInt; d <= maxInt; d++) {
     const sc = score(d);
+    coarseScores.push(sc);
     if (sc > bestScore) {
       bestScore = sc;
       bestDeg = d;
@@ -57,15 +69,18 @@ export function estimateSkew(
   }
   const coarse = bestDeg;
   for (let k = -10; k <= 10; k++) {
-    if (k === 0) continue;
     const d = coarse + k / 10;
+    if (k === 0 || Math.abs(d) > maxDeg) continue;
     const sc = score(d);
     if (sc > bestScore) {
       bestScore = sc;
       bestDeg = d;
     }
   }
-  return { angleDeg: bestDeg === 0 ? 0 : -bestDeg, score: bestScore };
+  coarseScores.sort((x, y) => x - y);
+  const median = coarseScores[coarseScores.length >> 1];
+  const confidence = median > 0 ? bestScore / median : 0;
+  return { angleDeg: bestDeg === 0 ? 0 : -bestDeg, score: confidence };
 }
 
 /** Downscales to <= MAX_WIDTH (box average) and returns coordinates of Otsu-dark pixels. */
