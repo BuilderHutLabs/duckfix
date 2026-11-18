@@ -1,0 +1,27 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>OSD calibration (dev only)</title>
+<pre id="out">running...</pre>
+<script type="module">
+  import { createTesseractDetector } from '/wduck/src/orientation/tesseract.ts';
+  const lines = ['The quick brown fox jumps over the lazy dog.', 'Pack my box with five dozen liquor jugs.', 'How vexingly quick daft zebras jump today.', 'Sphinx of black quartz, judge my vow now.', 'Waltz, bad nymph, for quick jigs vex Bud.'];
+  function page(cw) {
+    const w = 1000, h = 700, c = document.createElement('canvas');
+    const swap = cw % 180 !== 0;
+    c.width = swap ? h : w; c.height = swap ? w : h;
+    const x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+    x.translate(c.width / 2, c.height / 2); x.rotate((cw * Math.PI) / 180); x.translate(-w / 2, -h / 2);
+    x.fillStyle = '#000'; x.font = '32px sans-serif';
+    lines.forEach((t, i) => x.fillText(t, 40, 80 + i * 100));
+    return c;
+  }
+  const d = await createTesseractDetector({ basePath: '/wduck/', workers: 1 });
+  let out = 'source CW -> rotation (expected (360-N)%360), confidence\n';
+  for (const cw of [0, 90, 180, 270]) {
+    const r = await d.detect(page(cw));
+    out += `${cw} -> ${r.rotation} (expected ${(360 - cw) % 360}), conf ${r.confidence.toFixed(1)}\n`;
+  }
+  document.getElementById('out').textContent = out;
+  await d.dispose();
+</script>
