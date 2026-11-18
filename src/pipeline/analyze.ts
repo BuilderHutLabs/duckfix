@@ -78,7 +78,8 @@ async function analyzeOne(
     const ink = inkRatio(raw, otsuThreshold(raw));
 
     const decision = decideOrientation(result, ink, deps.thresholds);
-    let rawRotation = decision.rotation;
+    // Low-text means "no change": keep the PDF's own orientation (model rotation 0).
+    let rawRotation: Rotation = decision.flags.includes('low-text') ? baseRotation : decision.rotation;
     if (decision.needsVerify && deps.detector.verifyUpright) {
       rawRotation = await deps.detector.verifyUpright(canvas, [rawRotation, addRotation(rawRotation, 180)]);
     }

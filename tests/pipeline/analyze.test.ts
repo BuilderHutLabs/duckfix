@@ -91,6 +91,20 @@ describe('analyzePages', () => {
     expect(r).toMatchObject({ rotation: 0, flags: ['low-text'] });
   });
 
+  it('keeps the PDF orientation (model rotation 0) for low-text pages with baseRotation', async () => {
+    const s = setup({ rotation: 180, confidence: 8 });
+    s.toGrayImage.mockReturnValue(blankGray());
+    const [r] = await run([pdfPage('a', { baseRotation: 90 })], s.deps);
+    expect(r).toMatchObject({ rotation: 0, flags: ['low-text'] });
+  });
+
+  it('emits model rotation 0 on error even with baseRotation', async () => {
+    const s = setup({ rotation: 180, confidence: 8 });
+    s.detect.mockRejectedValueOnce(new Error('boom'));
+    const [r] = await run([pdfPage('a', { baseRotation: 90 })], s.deps);
+    expect(r).toMatchObject({ rotation: 0, skewDeg: 0, flags: ['check-orientation'] });
+  });
+
   describe('deskew gate', () => {
     it('applies a confident angle above 0.3 on the upright image', async () => {
       skew.fn.mockReturnValue({ angleDeg: -1.5, score: 2 });
