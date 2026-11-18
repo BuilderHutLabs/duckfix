@@ -30,10 +30,10 @@ describe('rotatePages', () => {
     expect(doc.pages[1].rotation).toBe(0);
     expect(out).not.toBe(doc);
   });
-  it('clears check-orientation on manual rotation but keeps other flags and autoRotation', () => {
+  it('a manual rotation counts as "checked": clears check-orientation and low-text, keeps autoRotation', () => {
     const doc: Doc = { pages: [pdfPage('a', { flags: ['check-orientation', 'low-text'], autoRotation: 180, analyzed: true })] };
     const p = rotatePages(doc, ['a'], -90).pages[0];
-    expect(p.flags).toEqual(['low-text']);
+    expect(p.flags).toEqual([]);
     expect(p.autoRotation).toBe(180);
     expect(p.rotation).toBe(270);
   });

@@ -28,11 +28,14 @@ function mapPages(doc: Doc, ids: string[], fn: (p: Page) => Page): Doc {
   return { pages: doc.pages.map((p) => (set.has(p.id) ? fn(p) : p)) };
 }
 
+/** Flags a manual rotation resolves: the user has looked at the page ("checked"). */
+const CHECKED_BY_ROTATION: readonly PageFlag[] = ['check-orientation', 'low-text'];
+
 export function rotatePages(doc: Doc, ids: string[], delta: 90 | -90 | 180): Doc {
   return mapPages(doc, ids, (p) => ({
     ...p,
     rotation: addRotation(p.rotation, delta),
-    flags: p.flags.filter((f) => f !== 'check-orientation'),
+    flags: p.flags.filter((f) => !CHECKED_BY_ROTATION.includes(f)),
   }));
 }
 

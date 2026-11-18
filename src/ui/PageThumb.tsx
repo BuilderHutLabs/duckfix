@@ -1,4 +1,4 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react';
+import { memo, useEffect, useRef, useSyncExternalStore } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { effectiveRotation, type Page } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
@@ -8,13 +8,16 @@ import { strings } from './strings';
 
 interface Props {
   page: Page;
-  number: number;
+  /** Position in the whole document (0-based). */
+  index: number;
   source: SourceFile | undefined;
   cache: ThumbnailCache;
   selecting: boolean;
   selected: boolean;
-  onTap(): void;
-  onInsertBefore?: () => void;
+  /** Must be stable across renders (React.memo). */
+  onTap(pageId: string): void;
+  /** Inserts files before `index`; stable across renders. */
+  onInsertBefore?: (index: number) => void;
 }
 
 /** Keeps the displayed angle continuous so 270° → 0° animates as one quarter turn, not three back. */
@@ -25,7 +28,18 @@ function useContinuousAngle(target: number): number {
   return angle.current;
 }
 
-export function PageThumb({ page, number, source, cache, selecting, selected, onTap, onInsertBefore }: Props) {
+/** Memoized: an analysis result changes one page object, so only that thumb re-renders. */
+export const PageThumb = memo(function PageThumb({
+  page,
+  index,
+  source,
+  cache,
+  selecting,
+  selected,
+  onTap,
+  onInsertBefore,
+}: Props) {
+  const number = index + 1;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: page.id,
     disabled: selecting,
@@ -79,11 +93,11 @@ export function PageThumb({ page, number, source, cache, selecting, selected, on
       style={{ transform: transform ? `translate3d(${transform.x}px, ${transform.y}px, 0)` : undefined, transition }}
     >
       {onInsertBefore && (
-        <button type="button" className="insert-btn" aria-label={strings.insertHere} onClick={onInsertBefore}>
+        <button type="button" className="insert-btn" aria-label={strings.insertHere} onClick={() => onInsertBefore(index)}>
           <span aria-hidden="true">+</span>
         </button>
       )}
-      <button type="button" className={cls} {...attributes} {...listeners} aria-label={label} onClick={onTap}>
+      <button type="button" className={cls} {...attributes} {...listeners} aria-label={label} onClick={() => onTap(page.id)}>
         <div className="thumb-box" ref={box}>
           {thumb?.status === 'ready' ? (
             <img className="thumb-frame" src={thumb.url} style={frameStyle} alt="" draggable={false} />
@@ -114,4 +128,4 @@ export function PageThumb({ page, number, source, cache, selecting, selected, on
       </button>
     </div>
   );
-}
+});

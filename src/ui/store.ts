@@ -75,15 +75,23 @@ const ANALYZE = { concurrency: 2, maxSide: 1400 } as const;
 
 /**
  * Applies an analysis result to one history state. Unanalyzed pages start at rotation 0 and only
- * user actions change it, so a non-zero rotation means the user already turned the page: keep it,
- * but still record autoRotation/skew/flags/analyzed.
+ * user actions change it, so a non-zero rotation means the user already turned the page: keep it
+ * and drop 'check-orientation' (the user's tap settled it), but still record
+ * autoRotation/skew/other flags/analyzed.
  */
 export function mergeAnalysis(doc: Doc, a: PageAnalysis): Doc {
   const page = doc.pages.find((p) => p.id === a.pageId);
   if (!page || page.analyzed) return doc;
+  const userRotated = page.rotation !== 0;
   const next = applyAnalysis(doc, a.pageId, a);
-  if (page.rotation === 0) return next;
-  return { pages: next.pages.map((p) => (p.id === a.pageId ? { ...p, rotation: page.rotation } : p)) };
+  if (!userRotated) return next;
+  return {
+    pages: next.pages.map((p) =>
+      p.id === a.pageId
+        ? { ...p, rotation: page.rotation, flags: p.flags.filter((f) => f !== 'check-orientation') }
+        : p,
+    ),
+  };
 }
 
 function errorMessage(e: unknown): string {
@@ -332,8 +340,9 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       set({ selection });
     },
 
+    /** Clears the selection too, so actions never touch pages hidden by the filter. */
     setFilterFlagged(filterFlagged: boolean) {
-      set({ filterFlagged });
+      set({ filterFlagged, selection: new Set() });
     },
 
     /** Applies to the next analysis run. */
