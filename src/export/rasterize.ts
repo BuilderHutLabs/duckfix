@@ -4,7 +4,6 @@ import { isNearBitonal, toGray } from '../imaging/gray';
 import type { Rasterizer } from './exportPdf';
 
 const DPI = 300;
-const PT_PER_PX = 72 / DPI;
 const IMAGE_MAX_SIDE = 3508; // A4 @ 300 DPI
 const A4 = { w: 595.28, h: 841.89 };
 
@@ -14,15 +13,51 @@ function toBlob(c: HTMLCanvasElement, type: string, quality?: number): Promise<B
   );
 }
 
-/** Longest side (px) to render the raw page at: 300 DPI (PDF) or native capped to A4@300 (image). */
-async function rawMaxSide(
+export const MAX_CANVAS_PIXELS = 16_000_000; // stay under iOS Safari's ~16.7 MP canvas limit
+
+/** Exact (unrounded) bounding box of a w x h rectangle rotated CW by deg; trig noise snapped to 0. */
+export function rotatedBox(w: number, h: number, deg: number): { w: number; h: number } {
+  const rad = (deg * Math.PI) / 180;
+  const snap = (v: number) => (Math.abs(v) < 1e-9 ? 0 : Math.abs(v));
+  const cos = snap(Math.cos(rad));
+  const sin = snap(Math.sin(rad));
+  return { w: w * cos + h * sin, h: w * sin + h * cos };
+}
+
+/** Output canvas size in whole pixels: exact for right angles, ceil for skewed. */
+export function rotatedSize(w: number, h: number, deg: number): { w: number; h: number } {
+  const b = rotatedBox(w, h, deg);
+  return { w: Math.max(1, Math.ceil(b.w - 1e-6)), h: Math.max(1, Math.ceil(b.h - 1e-6)) };
+}
+
+/**
+ * Longest side (px) for the raw render: `desiredMaxSide`, reduced so that the rotated
+ * output area stays within `budget` pixels.
+ */
+export function budgetedMaxSide(
+  rawW: number,
+  rawH: number,
+  deg: number,
+  desiredMaxSide: number,
+  budget: number = MAX_CANVAS_PIXELS,
+): number {
+  const k = desiredMaxSide / Math.max(rawW, rawH);
+  const box = rotatedBox(rawW * k, rawH * k, deg);
+  const area = (box.w + 1) * (box.h + 1); // +1: ceil / render rounding
+  if (area <= budget) return desiredMaxSide;
+  return desiredMaxSide * Math.sqrt(budget / area);
+}
+
+/** Raw (unrotated) page dimensions: points for PDF, native pixels for image. */
+async function rawDimensions(
   page: Parameters<Rasterizer>[0],
   source: Parameters<Rasterizer>[1],
-): Promise<number> {
+): Promise<{ w: number; h: number; desiredMaxSide: number }> {
   if (page.source.kind === 'image') {
     const bmp = await createImageBitmap(source.blob, { imageOrientation: 'from-image' });
     try {
-      return Math.min(IMAGE_MAX_SIDE, Math.max(bmp.width, bmp.height));
+      const m = Math.max(bmp.width, bmp.height);
+      return { w: bmp.width, h: bmp.height, desiredMaxSide: Math.min(IMAGE_MAX_SIDE, m) };
     } finally {
       bmp.close();
     }
@@ -31,24 +66,29 @@ async function rawMaxSide(
   const p = await pdf.getPage(page.source.pageIndex + 1);
   const v = p.getViewport({ scale: 1, rotation: 0 });
   p.cleanup();
-  return Math.max(v.width, v.height) * (DPI / 72);
+  return { w: v.width, h: v.height, desiredMaxSide: Math.max(v.width, v.height) * (DPI / 72) };
 }
 
 export const browserRasterizer: Rasterizer = async (page, source) => {
-  const raw = await renderPage(source, page.source, await rawMaxSide(page, source));
+  const dims = await rawDimensions(page, source);
+  const deg = effectiveRotation(page) + page.skewDeg;
+  const maxSide = budgetedMaxSide(dims.w, dims.h, deg, dims.desiredMaxSide);
+  const raw = await renderPage(source, page.source, maxSide);
   try {
-    return await finish(raw, page);
+    return await finish(raw, page, deg, dims);
   } finally {
     releaseCanvas(raw);
   }
 };
 
-async function finish(raw: HTMLCanvasElement, page: Parameters<Rasterizer>[0]) {
-  const angle = ((effectiveRotation(page) + page.skewDeg) * Math.PI) / 180;
-  const cos = Math.abs(Math.cos(angle));
-  const sin = Math.abs(Math.sin(angle));
-  const w = Math.max(1, Math.ceil(raw.width * cos + raw.height * sin));
-  const h = Math.max(1, Math.ceil(raw.width * sin + raw.height * cos));
+async function finish(
+  raw: HTMLCanvasElement,
+  page: Parameters<Rasterizer>[0],
+  deg: number,
+  dims: { w: number; h: number },
+) {
+  const angle = (deg * Math.PI) / 180;
+  const { w, h } = rotatedSize(raw.width, raw.height, deg);
   const out = document.createElement('canvas');
   out.width = w;
   out.height = h;
@@ -68,8 +108,10 @@ async function finish(raw: HTMLCanvasElement, page: Parameters<Rasterizer>[0]) {
     let widthPt: number;
     let heightPt: number;
     if (page.source.kind === 'pdf') {
-      widthPt = w * PT_PER_PX;
-      heightPt = h * PT_PER_PX;
+      // true physical size, independent of the (budgeted) render DPI
+      const box = rotatedBox(dims.w, dims.h, deg);
+      widthPt = box.w;
+      heightPt = box.h;
     } else {
       const box = w > h ? { w: A4.h, h: A4.w } : A4;
       const k = Math.min(box.w / w, box.h / h);
