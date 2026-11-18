@@ -4,3 +4,4 @@ samples/
 public/tesseract/
 public/tessdata/
 .superpowers/
+.claude/
