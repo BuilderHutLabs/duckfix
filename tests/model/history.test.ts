@@ -24,3 +24,17 @@ describe('createHistory', () => {
     expect(h.present).toBe(1);
   });
 });
+
+describe('mapAll', () => {
+  it('rewrites past, present and future without adding an entry', () => {
+    const h = createHistory('a');
+    h.push('b'); h.push('c');
+    h.undo(); // present b, future c
+    h.mapAll((s) => s.toUpperCase());
+    expect(h.present).toBe('B');
+    h.undo(); expect(h.present).toBe('A');
+    expect(h.canUndo).toBe(false);
+    h.redo(); h.redo(); expect(h.present).toBe('C');
+    expect(h.canRedo).toBe(false);
+  });
+});
