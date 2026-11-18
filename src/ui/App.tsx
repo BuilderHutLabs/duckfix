@@ -20,13 +20,19 @@ function Shell() {
   const { phase } = useAppStore();
   return (
     <>
-      <ErrorBanner />
       {phase === 'home' ? (
-        <Home />
+        <>
+          <ErrorBanner />
+          <Home />
+        </>
       ) : (
         <div className="review">
-          <Toolbar />
-          <Progress />
+          {/* one sticky block: the error banner shows below the toolbar, never over it */}
+          <div className="review-top">
+            <Toolbar />
+            <Progress />
+            <ErrorBanner />
+          </div>
           <ReviewGrid />
         </div>
       )}

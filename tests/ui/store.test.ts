@@ -47,9 +47,13 @@ describe('mergeAnalysis', () => {
     });
   });
 
-  it('keeps a rotation the user set before the result arrived', () => {
-    const d = mergeAnalysis({ pages: [{ ...unanalyzed('a'), rotation: 90 }] }, result('a'));
+  it('keeps a rotation the user set before the result arrived and drops check-orientation', () => {
+    const d = mergeAnalysis(
+      { pages: [{ ...unanalyzed('a'), rotation: 90 }] },
+      result('a', { flags: ['check-orientation', 'low-text'] }),
+    );
     expect(d.pages[0]).toMatchObject({ rotation: 90, autoRotation: 180, skewDeg: 1.2, analyzed: true });
+    expect(d.pages[0].flags).toEqual(['low-text']);
   });
 
   it('returns the same doc when the page is missing or already analyzed', () => {
@@ -132,6 +136,17 @@ describe('app store', () => {
     await flush();
     expect(store.getState().phase).toBe('review');
     expect(store.getState().error).toBe('Automatyczne obracanie nie zadziałało. Możesz obracać strony ręcznie.');
+  });
+
+  it('toggling "show only flagged" clears the selection so hidden pages cannot be removed', () => {
+    const store = createAppStore(fakeDeps());
+    store.load(docWithFlags(3, { 0: ['check-orientation'] }), [source]);
+    store.toggleSelecting();
+    store.toggleSelected('p2');
+    store.setFilterFlagged(true);
+    expect(store.getState().selection.size).toBe(0);
+    store.remove(store.getState().selection);
+    expect(store.getState().doc.pages).toHaveLength(3);
   });
 
   it('move validates indices and moveById maps ids', () => {

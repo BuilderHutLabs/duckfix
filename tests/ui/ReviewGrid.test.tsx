@@ -9,7 +9,22 @@ vi.mock('../../src/imaging/render', () => ({
   forgetPdf: vi.fn(async () => {}),
 }));
 
+// PageThumb calls effectiveRotation once per render: count renders per page id
+// (React.memo must skip thumbs whose page did not change).
+const renderCounts = vi.hoisted(() => new Map<string, number>());
+vi.mock('../../src/model/document', async (importOriginal) => {
+  const real = await importOriginal<typeof import('../../src/model/document')>();
+  return {
+    ...real,
+    effectiveRotation: (p: Parameters<typeof real.effectiveRotation>[0]) => {
+      renderCounts.set(p.id, (renderCounts.get(p.id) ?? 0) + 1);
+      return real.effectiveRotation(p);
+    },
+  };
+});
+
 import { App } from '../../src/ui/App';
+import type { PageAnalysis } from '../../src/pipeline/analyze';
 import { createAppStore, type AppStore } from '../../src/ui/store';
 import { strings } from '../../src/ui/strings';
 import { ImportError } from '../../src/import/errors';
@@ -68,6 +83,48 @@ describe('review grid', () => {
     setup(docWithFlags(5, { 0: ['check-orientation'], 2: ['low-text'], 4: ['check-orientation'] }));
     fireEvent.click(thumb(1));
     expect(screen.getByText('2 strony do sprawdzenia')).toBeTruthy();
+  });
+
+  it('tapping every flagged page (incl. low-text) brings the counter to 0', () => {
+    setup(docWithFlags(3, { 0: ['check-orientation'], 2: ['low-text'] }));
+    fireEvent.click(screen.getByRole('button', { name: strings.showOnlyFlagged }));
+    fireEvent.click(thumb(1));
+    fireEvent.click(thumb(3));
+    // tapped pages stay in the filtered view so they can be turned further
+    expect(thumbs()).toHaveLength(2);
+    expect(screen.getByText('0 stron do sprawdzenia')).toBeTruthy();
+    expect(screen.getByText(strings.nothingFlagged)).toBeTruthy();
+  });
+
+  it('auto-rotated icon only when analysis changed the orientation in the model frame', () => {
+    const doc = docWithFlags(3);
+    // p1: PDF /Rotate already upright → model 0, no icon; p2: turned by analysis; p3: not analyzed yet
+    doc.pages[0] = { ...doc.pages[0], autoRotation: 0, source: { ...doc.pages[0].source, baseRotation: 90 } as never };
+    doc.pages[1] = { ...doc.pages[1], autoRotation: 90, rotation: 90 };
+    doc.pages[2] = { ...doc.pages[2], autoRotation: null, analyzed: false };
+    setup(doc);
+    expect(thumb(1).querySelector('.auto-icon')).toBeNull();
+    expect(thumb(2).querySelector('.auto-icon')).not.toBeNull();
+    expect(thumb(3).querySelector('.auto-icon')).toBeNull();
+    expect(thumb(2).getAttribute('aria-label')).toContain(strings.autoRotated);
+  });
+
+  it('an analysis result re-renders only the affected thumbnail', () => {
+    const doc = { pages: docWithFlags(4).pages.map((p) => ({ ...p, analyzed: false, autoRotation: null })) };
+    let onResult: ((a: PageAnalysis) => void) | undefined;
+    const deps = fakeDeps({
+      analyzePages: vi.fn((_p, _d, cb) => {
+        onResult = cb;
+        return new Promise<void>(() => {});
+      }),
+    });
+    const store = setup(doc, deps);
+    return waitFor(() => expect(onResult).toBeDefined()).then(() => {
+      renderCounts.clear();
+      act(() => onResult!({ pageId: 'p3', rotation: 90, skewDeg: 0, flags: [], confidence: 5, ms: 1 }));
+      expect(store.getState().doc.pages[2].rotation).toBe(90);
+      expect([...renderCounts.keys()]).toEqual(['p3']);
+    });
   });
 
   it('select mode: select 2 of 3, remove leaves 1 page; undo brings back 3', () => {
