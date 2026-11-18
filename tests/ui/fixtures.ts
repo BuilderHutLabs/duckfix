@@ -36,6 +36,7 @@ export function fakeDeps(over: Partial<StoreDeps> = {}): StoreDeps {
     share: vi.fn(async () => 'downloaded' as const),
     forgetPdf: vi.fn(async () => {}),
     storage: null,
+    session: null,
     ...over,
   };
 }

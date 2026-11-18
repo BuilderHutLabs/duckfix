@@ -417,3 +417,36 @@ img.thumb-frame {
   font-size: 32px;
   line-height: 1;
 }
+
+/* ---------- home: restore ---------- */
+
+.home-restore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ---------- diagnostics ---------- */
+
+.diag {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.diag-title {
+  margin: 0;
+  font-size: 20px;
+}
+.diag-report {
+  flex: 1;
+  margin: 0;
+  padding: 16px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+  user-select: text;
+  -webkit-user-select: text;
+}
