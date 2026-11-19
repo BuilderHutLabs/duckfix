@@ -17,6 +17,13 @@ export function Home() {
         <Settings />
       </div>
       {/* 5 taps on the title open the diagnostics screen */}
+      <img
+        className="home-icon"
+        src={import.meta.env.BASE_URL + 'icons/icon-192.png'}
+        alt=""
+        width={96}
+        height={96}
+      />
       <h1 className="home-title" onClick={onTitleTap}>
         {strings.appName}
       </h1>
@@ -26,7 +33,7 @@ export function Home() {
           <button type="button" className="btn btn-primary btn-huge" onClick={restore}>
             {strings.restoreSession}
           </button>
-          <button type="button" className="btn" onClick={discardStored}>
+          <button type="button" className="btn btn-plain" onClick={discardStored}>
             {strings.startOver}
           </button>
         </div>
@@ -40,6 +47,11 @@ export function Home() {
           {busy === 'opening' ? strings.opening : strings.open}
         </button>
       )}
+      <ul className="home-steps">
+        {strings.steps.map((step) => (
+          <li key={step}>{step}</li>
+        ))}
+      </ul>
       <input
         ref={input}
         className="visually-hidden"

@@ -1,14 +1,18 @@
 :root {
-  --bg: #f3f4f6;
-  --surface: #ffffff;
-  --text: #111827;
-  --muted: #6b7280;
-  --border: #d1d5db;
-  --primary: #1f2937;
-  --primary-text: #ffffff;
-  --accent: #2563eb;
-  --flag: #f28c00;
-  --danger: #b91c1c;
+  --bg: #f2f2f7;
+  --card: #ffffff;
+  --accent: #0a84ff;
+  --flag: #ff9f0a;
+  --danger: #ff3b30;
+  --text: #1c1c1e;
+  --text-2: #6e6e73;
+  --sep: #e5e5ea;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 14px rgba(0, 0, 0, 0.06);
+  --shadow-float: 0 8px 28px rgba(0, 0, 0, 0.18);
+  /* legacy aliases still used by the review screen until it is rebuilt */
+  --surface: var(--card);
+  --muted: var(--text-2);
+  --border: var(--sep);
   /* column gap = the 44 px hit area of the "+" insert button, so it never overlaps a thumb */
   --col-gap: 44px;
   --row-gap: 28px;
@@ -49,41 +53,54 @@ button {
 .btn {
   min-height: 44px;
   min-width: 44px;
-  padding: 0 14px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(120, 120, 128, 0.12);
+  color: var(--text);
   font-size: 16px;
   cursor: pointer;
 }
+.btn:active:not(:disabled) {
+  opacity: 0.7;
+}
 .btn:disabled {
-  opacity: 0.45;
+  opacity: 0.4;
   cursor: default;
 }
 .btn-primary {
-  background: var(--primary);
-  border-color: var(--primary);
-  color: var(--primary-text);
+  background: var(--accent);
+  color: #fff;
   font-weight: 600;
 }
+.btn-plain {
+  background: transparent;
+  color: var(--accent);
+}
 .btn-danger {
+  background: rgba(255, 59, 48, 0.12);
   color: var(--danger);
-  border-color: var(--danger);
 }
 .btn-icon {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
   padding: 0;
+  border-radius: 10px;
   font-size: 20px;
+  line-height: 1;
 }
 .btn-toggle.on {
   background: var(--flag);
-  border-color: var(--flag);
   color: #fff;
 }
 .btn-huge {
-  min-height: 72px;
+  min-height: 60px;
+  width: min(100%, 320px);
   padding: 0 32px;
-  font-size: 22px;
-  border-radius: 16px;
+  font-size: 20px;
+  border-radius: 14px;
 }
 
 /* ---------- home ---------- */
@@ -95,7 +112,7 @@ button {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   padding: 16px;
   text-align: center;
   position: relative;
@@ -105,47 +122,80 @@ button {
   top: max(16px, env(safe-area-inset-top));
   right: max(16px, env(safe-area-inset-right));
 }
+.home-icon {
+  width: 96px;
+  height: 96px;
+  border-radius: 22px;
+  box-shadow: var(--shadow);
+}
 .home-title {
-  margin: 0;
-  font-size: 40px;
+  margin: 6px 0 0;
+  font-size: 34px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
 }
 .home-subtitle {
-  margin: 0 0 24px;
-  color: var(--muted);
-  font-size: 18px;
-}
-
-/* ---------- error ---------- */
-
-.error-banner {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  background: #fef2f2;
-  border-bottom: 2px solid var(--danger);
-  color: var(--danger);
+  max-width: 320px;
+  margin: 0 0 18px;
+  color: var(--text-2);
   font-size: 17px;
+  line-height: 1.35;
 }
-/* on Home the banner is the first thing on screen: keep it below the iOS status bar */
-#root > .error-banner {
-  padding-top: max(10px, env(safe-area-inset-top));
+.home-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
 }
-.error-banner span {
-  flex: 1;
+.home-steps li {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, 0.12);
+  color: var(--text-2);
+  font-size: 13px;
 }
+
+/* ---------- banners: rounded cards under the bar ---------- */
+
+.error-banner,
 .notice-banner {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 10px 16px;
-  background: #f0fdf4;
-  border-bottom: 2px solid #15803d;
-  color: #166534;
-  font-size: 17px;
+  gap: 8px;
+  margin: 8px 12px;
+  padding: 10px 8px 10px 14px;
+  border-radius: 14px;
+  font-size: 15px;
+  overflow-wrap: anywhere;
 }
+.error-banner {
+  background: rgba(255, 59, 48, 0.12);
+  color: #c4261d;
+}
+.notice-banner {
+  background: rgba(52, 199, 89, 0.14);
+  color: #1d7a37;
+}
+/* on Home the banner is the first thing on screen: keep it below the iOS status bar */
+#root > .error-banner,
+#root > .notice-banner {
+  margin-top: max(8px, env(safe-area-inset-top));
+}
+.error-banner span,
 .notice-banner span {
   flex: 1;
+  min-width: 0;
+}
+.error-banner .btn,
+.notice-banner .btn {
+  min-height: 36px;
+  padding: 0 10px;
+  color: inherit;
+  font-weight: 600;
+  flex: none;
 }
 
 /* ---------- toolbar ---------- */
@@ -193,11 +243,11 @@ button {
   top: calc(100% + 6px);
   z-index: 30;
   width: min(300px, calc(100vw - 32px));
-  padding: 8px 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  padding: 6px 16px;
+  background: var(--card);
+  border: 0;
+  border-radius: 14px;
+  box-shadow: var(--shadow-float);
   text-align: left;
 }
 .switch-row {
@@ -212,11 +262,12 @@ button {
   width: 24px;
   height: 24px;
   margin: 0;
+  accent-color: var(--accent);
 }
 .settings-hint {
   margin: 0 0 8px;
-  color: var(--muted);
-  font-size: 14px;
+  color: var(--text-2);
+  font-size: 13px;
 }
 
 /* ---------- progress ---------- */
@@ -448,22 +499,32 @@ img.thumb-frame {
   display: flex;
   flex-direction: column;
 }
+.diag-bar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
 .diag-title {
   margin: 0;
   font-size: 20px;
+  font-weight: 700;
 }
 .diag-report {
   flex: 1;
-  margin: 0;
-  padding: 16px;
+  margin: 12px;
+  padding: 14px;
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  font-size: 14px;
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  font-size: 13px;
   user-select: text;
   -webkit-user-select: text;
 }
 
+/* floating card above the safe area */
 .update-prompt {
   position: fixed;
   left: 50%;
@@ -472,10 +533,17 @@ img.thumb-frame {
   z-index: 100;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  background: #1f2937;
-  color: #fff;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  gap: 4px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 6px 6px 6px 16px;
+  border-radius: 16px;
+  background: var(--card);
+  color: var(--text);
+  font-size: 15px;
+  box-shadow: var(--shadow-float);
+}
+.update-prompt .btn {
+  min-height: 40px;
+  font-weight: 600;
 }

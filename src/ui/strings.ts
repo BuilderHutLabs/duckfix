@@ -13,7 +13,8 @@ export const strings = {
   appName: 'WDuck',
   updateAvailable: 'Dostępna nowa wersja',
   updateAction: 'Odśwież',
-  appDescription: 'Automatyczne obracanie i prostowanie skanów PDF',
+  appDescription: 'Obraca i prostuje skany PDF. Wszystko zostaje na Twoim urządzeniu.',
+  steps: ['1. Otwórz', '2. Sprawdź', '3. Zapisz'],
 
   open: 'Otwórz PDF lub zdjęcia',
   opening: 'Otwieram…',
