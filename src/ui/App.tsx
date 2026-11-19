@@ -1,3 +1,4 @@
+import { chromeIntentUrl, detectInAppBrowser } from './inAppBrowser';
 import { useEffect, useState } from 'react';
 import { AppStoreProvider, createAppStore, useAppStore, type AppStore } from './store';
 import { Home } from './Home';
@@ -73,6 +74,7 @@ function Shell() {
     <>
       {phase === 'home' ? (
         <>
+          <InAppBanner />
           <ErrorBanner />
           <Home />
         </>
@@ -82,6 +84,7 @@ function Shell() {
           <div className="review-top">
             <Toolbar />
             <Progress />
+            <InAppBanner />
             <ErrorBanner />
             <NoticeBanner />
           </div>
@@ -115,6 +118,24 @@ function NoticeBanner() {
       <button type="button" className="btn btn-plain" onClick={dismissNotice}>
         {strings.dismiss}
       </button>
+    </div>
+  );
+}
+
+function InAppBanner() {
+  const platform = detectInAppBrowser(typeof navigator === 'undefined' ? '' : navigator.userAgent ?? '');
+  if (!platform) return null;
+  return (
+    <div className="inapp-banner" role="alert">
+      <div className="inapp-text">
+        <p>{strings.inAppWarning}</p>
+        {platform === 'ios' && <p>{strings.openInSafariHint}</p>}
+      </div>
+      {platform === 'android' && (
+        <a className="btn btn-primary" href={chromeIntentUrl(window.location.href)}>
+          {strings.openInChrome}
+        </a>
+      )}
     </div>
   );
 }
