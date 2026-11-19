@@ -35,8 +35,8 @@ export function UpdatePrompt() {
   if (!needRefresh) return null;
   return (
     <div className="update-prompt" role="status">
-      <span>{strings.updateAvailable} — </span>
-      <button type="button" className="btn" onClick={() => void updateServiceWorker(true)}>
+      <span>{strings.updateAvailable}</span>
+      <button type="button" className="btn btn-plain" onClick={() => void updateServiceWorker(true)}>
         {strings.updateAction}
       </button>
     </div>

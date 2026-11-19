@@ -84,16 +84,16 @@ export function Diagnostics({ onClose }: { onClose(): void }) {
 
   return (
     <main className="diag">
-      <header className="toolbar">
+      <header className="toolbar diag-bar">
         <h1 className="diag-title">{strings.diagTitle}</h1>
         <span className="toolbar-spacer" />
-        <button type="button" className="btn" disabled={!report} onClick={() => void copy()}>
+        <button type="button" className="btn btn-plain" disabled={!report} onClick={() => void copy()}>
           {copied ? strings.copied : strings.copy}
         </button>
         {canShare && (
           <button
             type="button"
-            className="btn"
+            className="btn btn-plain"
             disabled={!report}
             onClick={() => void navigator.share({ text: report }).catch(() => {})}
           >

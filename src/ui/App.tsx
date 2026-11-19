@@ -97,7 +97,7 @@ function ErrorBanner() {
   return (
     <div className="error-banner" role="alert">
       <span>{error}</span>
-      <button type="button" className="btn" onClick={dismissError}>
+      <button type="button" className="btn btn-plain" onClick={dismissError}>
         {strings.dismiss}
       </button>
     </div>
@@ -110,7 +110,7 @@ function NoticeBanner() {
   return (
     <div className="notice-banner" role="status">
       <span>{notice}</span>
-      <button type="button" className="btn" onClick={dismissNotice}>
+      <button type="button" className="btn btn-plain" onClick={dismissNotice}>
         {strings.dismiss}
       </button>
     </div>
