@@ -26,7 +26,7 @@ const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 /** Text report for the developer: build constants, analysis metrics and memory/storage use. */
 async function buildReport(metricsReport: string): Promise<string> {
   const lines = [
-    `WDuck — ${strings.diagTitle}`,
+    `${strings.appName} — ${strings.diagTitle}`,
     `Data: ${new Date().toISOString()}`,
     `ANALYSIS_MAX_SIDE: ${ANALYSIS_MAX_SIDE}`,
     `DEFAULT_THRESHOLDS: minConfidence=${DEFAULT_THRESHOLDS.minConfidence}, minInk=${DEFAULT_THRESHOLDS.minInk}`,

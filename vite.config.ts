@@ -22,7 +22,7 @@ function dropDevOnlyPages(): Plugin {
 const THEME_COLOR = '#f2f2f7';
 
 export default defineConfig({
-  base: '/wduck/',
+  base: '/duckfix/',
   plugins: [
     react(),
     dropDevOnlyPages(),
@@ -30,12 +30,12 @@ export default defineConfig({
       registerType: 'prompt',
       includeAssets: ['icons/*.png'],
       manifest: {
-        name: 'WDuck',
-        short_name: 'WDuck',
+        name: 'DuckFix',
+        short_name: 'DuckFix',
         description: 'Automatyczne obracanie i prostowanie skanów PDF',
         lang: 'pl',
-        start_url: '/wduck/',
-        scope: '/wduck/',
+        start_url: '/duckfix/',
+        scope: '/duckfix/',
         display: 'standalone',
         theme_color: THEME_COLOR,
         background_color: THEME_COLOR,
