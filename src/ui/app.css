@@ -9,13 +9,8 @@
   --sep: #e5e5ea;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 14px rgba(0, 0, 0, 0.06);
   --shadow-float: 0 8px 28px rgba(0, 0, 0, 0.18);
-  /* legacy aliases still used by the review screen until it is rebuilt */
-  --surface: var(--card);
-  --muted: var(--text-2);
-  --border: var(--sep);
-  /* column gap = the 44 px hit area of the "+" insert button, so it never overlaps a thumb */
-  --col-gap: 44px;
-  --row-gap: 28px;
+  --col-gap: 28px;
+  --row-gap: 14px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--text);
   -webkit-text-size-adjust: 100%;
@@ -90,10 +85,16 @@ button {
   border-radius: 10px;
   font-size: 20px;
   line-height: 1;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-.btn-toggle.on {
-  background: var(--flag);
-  color: #fff;
+/* visually 36 px, but the tap area is 44 px */
+.btn-icon::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
 }
 .btn-huge {
   min-height: 60px;
@@ -209,46 +210,97 @@ button {
 
 .toolbar {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  padding-top: max(8px, env(safe-area-inset-top));
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  padding: 6px 12px;
+  padding-top: max(6px, env(safe-area-inset-top));
+  background: rgba(255, 255, 255, 0.8);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--sep);
 }
-.toolbar-check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+.toolbar > * {
+  flex: none;
 }
 .toolbar-text {
   font-size: 16px;
-}
-.flag-text {
-  color: #b45309;
   font-weight: 600;
 }
 .toolbar-spacer {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
 }
 
-.settings {
+.capsule {
+  flex: 0 1 auto;
+  min-width: 0;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(120, 120, 128, 0.12);
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.toolbar > .capsule {
+  flex: 0 1 auto;
+}
+.capsule.flag {
+  background: rgba(255, 159, 10, 0.16);
+  color: #b25f00;
+}
+button.capsule {
+  cursor: pointer;
+}
+button.capsule.on {
+  background: var(--flag);
+  color: #fff;
+}
+
+.settings,
+.more-menu {
   position: relative;
 }
-.settings-panel {
+.settings-panel,
+.menu-panel {
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
   z-index: 30;
-  width: min(300px, calc(100vw - 32px));
+  width: min(300px, calc(100vw - 24px));
   padding: 6px 16px;
   background: var(--card);
   border: 0;
   border-radius: 14px;
   box-shadow: var(--shadow-float);
   text-align: left;
+}
+.menu-panel {
+  padding: 4px 16px;
+}
+.menu-item {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 17px;
+  text-align: left;
+  cursor: pointer;
+}
+.menu-item:active {
+  opacity: 0.6;
+}
+.menu-sep {
+  height: 1px;
+  margin: 0 -16px;
+  background: var(--sep);
 }
 .switch-row {
   display: flex;
@@ -270,25 +322,24 @@ button {
   font-size: 13px;
 }
 
-/* ---------- progress ---------- */
+/* ---------- progress: thin accent line under the bar, small grey text ---------- */
 
 .progress {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 8px 16px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  padding: 0 0 6px;
+  background: rgba(255, 255, 255, 0.8);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
 }
 .progress-text {
-  font-size: 15px;
-  white-space: nowrap;
+  display: block;
+  padding: 4px 16px 0;
+  color: var(--text-2);
+  font-size: 12px;
 }
 .progress-track {
-  flex: 1;
-  height: 8px;
-  border-radius: 4px;
-  background: #e5e7eb;
+  height: 2px;
+  margin-top: 4px;
+  background: var(--sep);
   overflow: hidden;
 }
 .progress-fill {
@@ -297,20 +348,43 @@ button {
   transition: width 0.2s;
 }
 
+/* ---------- bottom action bar ---------- */
+
+.action-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  background: rgba(255, 255, 255, 0.8);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--sep);
+}
+.action-bar .btn {
+  flex: 1;
+  min-height: 50px;
+  font-size: 17px;
+}
+
 /* ---------- grid ---------- */
 
 .grid-wrap {
   /* left padding holds the "+" before the first column */
-  padding: 20px 20px calc(32px + env(safe-area-inset-bottom)) var(--col-gap);
+  padding: 14px 12px calc(88px + env(safe-area-inset-bottom)) var(--col-gap);
 }
 .grid-note {
   text-align: center;
-  color: var(--muted);
+  color: var(--text-2);
   font-size: 17px;
 }
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
   column-gap: var(--col-gap);
   row-gap: var(--row-gap);
 }
@@ -325,14 +399,16 @@ button {
   min-width: 0;
 }
 
+/* the thumb is a white card; the page miniature sits inside it */
 .thumb {
   position: relative;
   display: block;
   width: 100%;
   padding: 6px;
-  border: 2px solid var(--border);
-  border-radius: 10px;
-  background: var(--surface);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: var(--card);
+  box-shadow: var(--shadow);
   cursor: pointer;
   /* long press must start a drag, not text selection or the iOS callout */
   -webkit-user-select: none;
@@ -340,13 +416,11 @@ button {
   -webkit-touch-callout: none;
 }
 .thumb.flagged {
-  border: 4px solid var(--flag);
-  padding: 4px;
-  box-shadow: 0 0 0 2px rgba(242, 140, 0, 0.25);
+  border-color: var(--flag);
 }
 .thumb.selected {
-  outline: 4px solid var(--accent);
-  outline-offset: 2px;
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
 }
 .thumb.dragging {
   opacity: 0.6;
@@ -369,12 +443,12 @@ button {
 }
 img.thumb-frame {
   display: block;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.18);
 }
 .thumb-pending {
   width: 62%;
   height: 88%;
-  background: #e5e7eb;
+  background: var(--sep);
 }
 .thumb-error {
   padding: 8px;
@@ -385,82 +459,81 @@ img.thumb-frame {
 
 .thumb-number {
   position: absolute;
-  left: 6px;
-  bottom: 6px;
-  min-width: 24px;
-  padding: 1px 6px;
-  border-radius: 8px;
-  background: rgba(17, 24, 39, 0.75);
+  left: 8px;
+  bottom: 8px;
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(28, 28, 30, 0.7);
   color: #fff;
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
 }
 .flag-label {
   position: absolute;
   left: 50%;
-  top: -12px;
+  top: -11px;
   transform: translateX(-50%);
-  padding: 2px 8px;
-  border-radius: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
   background: var(--flag);
   color: #fff;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
+  line-height: 18px;
   white-space: nowrap;
 }
 .auto-icon {
   position: absolute;
-  right: 6px;
-  bottom: 6px;
-  width: 24px;
-  height: 24px;
-  line-height: 24px;
+  right: 8px;
+  bottom: 8px;
+  width: 22px;
+  height: 22px;
+  line-height: 22px;
   border-radius: 50%;
   background: var(--accent);
   color: #fff;
-  font-size: 15px;
+  font-size: 14px;
+  text-align: center;
 }
 .check {
   position: absolute;
-  right: 6px;
-  top: 6px;
-  width: 28px;
-  height: 28px;
-  line-height: 26px;
+  right: 8px;
+  top: 8px;
+  width: 26px;
+  height: 26px;
+  line-height: 22px;
   border: 2px solid var(--accent);
   border-radius: 50%;
-  background: var(--surface);
+  background: var(--card);
   color: #fff;
   font-weight: 700;
+  text-align: center;
 }
 .check.on {
   background: var(--accent);
 }
 
-/* "+" fills the column gap (or left padding) before each page: 44 px hit area, 30 px circle */
+/* "+" fills the column gap (or left padding) before each page: 28 px wide, 44 px tall tap area */
 .insert-btn {
   position: absolute;
   z-index: 2;
   top: 50%;
   left: calc(-1 * var(--col-gap));
-  width: 44px;
+  width: var(--col-gap);
   height: 44px;
   margin-top: -22px;
   padding: 0;
   border: 0;
   background: transparent;
-  cursor: pointer;
-}
-.insert-btn span {
-  display: inline-block;
-  width: 30px;
-  height: 30px;
-  line-height: 28px;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: var(--surface);
   color: var(--accent);
-  font-size: 22px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  font-size: 26px;
+  font-weight: 200;
+  line-height: 44px;
+  text-align: center;
+  cursor: pointer;
 }
 
 .add-cell {
@@ -470,8 +543,8 @@ img.thumb-frame {
   justify-content: center;
   gap: 4px;
   min-height: 120px;
-  border: 2px dashed var(--border);
-  border-radius: 10px;
+  border: 2px dashed var(--sep);
+  border-radius: 8px;
   background: transparent;
   color: var(--accent);
   font-size: 15px;
@@ -479,6 +552,7 @@ img.thumb-frame {
 }
 .add-plus {
   font-size: 32px;
+  font-weight: 200;
   line-height: 1;
 }
 

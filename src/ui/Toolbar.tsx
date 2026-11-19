@@ -1,32 +1,26 @@
 import { useState } from 'react';
 import { isFlagged, useAppStore } from './store';
 import { strings } from './strings';
-import { useSecretTaps } from './Diagnostics';
+import { IconClose, IconGear, IconRedo, IconUndo } from './icons';
+import { MoreMenu } from './MoreMenu';
 
 export function Toolbar() {
   const s = useAppStore();
   const flagged = s.doc.pages.filter(isFlagged).length;
-  const onCounterTap = useSecretTaps(s.openDiagnostics);
 
   if (s.selecting) {
-    const n = s.selection.size;
     return (
       <header className="toolbar">
-        <button type="button" className="btn" onClick={s.toggleSelecting}>
+        <button type="button" className="btn btn-plain" onClick={s.toggleSelecting}>
           {strings.selectDone}
         </button>
-        <span className="toolbar-text">{strings.selectedCount(n)}</span>
+        <span className="toolbar-text">{strings.selectedCount(s.selection.size)}</span>
         <span className="toolbar-spacer" />
-        <button type="button" className="btn" disabled={n === 0} onClick={() => s.rotate(s.selection, 90)}>
-          {strings.rotate}
-        </button>
-        <button type="button" className="btn btn-danger" disabled={n === 0} onClick={() => s.remove(s.selection)}>
-          {strings.remove}
-        </button>
       </header>
     );
   }
 
+  const capsuleClass = flagged > 0 ? 'capsule flag' : 'capsule';
   return (
     <header className="toolbar">
       <button
@@ -38,58 +32,49 @@ export function Toolbar() {
           if (window.confirm(strings.confirmClose)) s.goHome();
         }}
       >
-        ✕
+        <IconClose />
       </button>
-      <div className="toolbar-check">
-        {/* 5 taps on the counter open the diagnostics screen (Home: the title) */}
-        <span className={flagged ? 'toolbar-text flag-text' : 'toolbar-text'} onClick={onCounterTap}>
-          {strings.toCheck(flagged)}
-        </span>
-        {(flagged > 0 || s.filterFlagged) && (
-          <button
-            type="button"
-            className={s.filterFlagged ? 'btn btn-toggle on' : 'btn btn-toggle'}
-            aria-pressed={s.filterFlagged}
-            onClick={() => s.setFilterFlagged(!s.filterFlagged)}
-          >
-            {strings.showOnlyFlagged}
-          </button>
-        )}
-      </div>
-      <span className="toolbar-spacer" />
-      <button type="button" className="btn" disabled={!s.canUndo} onClick={s.undo}>
-        {strings.undo}
-      </button>
-      <button type="button" className="btn" disabled={!s.canRedo} onClick={s.redo}>
-        {strings.redo}
-      </button>
-      <button type="button" className="btn" onClick={s.toggleSelecting}>
-        {strings.select}
-      </button>
-      <Settings />
-      {s.exportReady ? (
-        // separate tap: the share sheet needs a fresh user activation after a long export
-        <button type="button" className="btn btn-primary" onClick={() => void s.shareExport()}>
-          {strings.shareExport}
-        </button>
-      ) : (
+      {flagged > 0 || s.filterFlagged ? (
         <button
           type="button"
-          className="btn btn-primary"
-          disabled={s.busy !== null || s.phase === 'analyzing' || s.doc.pages.length === 0}
-          onClick={() => void s.export()}
+          className={s.filterFlagged ? `${capsuleClass} on` : capsuleClass}
+          aria-pressed={s.filterFlagged}
+          aria-label={strings.showOnlyFlagged}
+          title={strings.showOnlyFlagged}
+          onClick={() => s.setFilterFlagged(!s.filterFlagged)}
         >
-          {s.busy !== 'exporting'
-            ? strings.save
-            : s.exportProgress
-              ? strings.savingProgress(s.exportProgress.done, s.exportProgress.total)
-              : strings.saving}
+          {strings.toCheck(flagged)}
         </button>
+      ) : (
+        <span className={capsuleClass}>{strings.toCheck(flagged)}</span>
       )}
+      <span className="toolbar-spacer" />
+      <button
+        type="button"
+        className="btn btn-icon"
+        aria-label={strings.undo}
+        title={strings.undo}
+        disabled={!s.canUndo}
+        onClick={s.undo}
+      >
+        <IconUndo />
+      </button>
+      <button
+        type="button"
+        className="btn btn-icon"
+        aria-label={strings.redo}
+        title={strings.redo}
+        disabled={!s.canRedo}
+        onClick={s.redo}
+      >
+        <IconRedo />
+      </button>
+      <MoreMenu />
     </header>
   );
 }
 
+/** Home's ⚙ settings popover (the review screen has the deskew switch in its ⋯ menu). */
 export function Settings() {
   const { deskew, setDeskew } = useAppStore();
   const [open, setOpen] = useState(false);
@@ -103,7 +88,7 @@ export function Settings() {
         aria-expanded={open}
         onClick={() => setOpen(!open)}
       >
-        ⚙
+        <IconGear />
       </button>
       {open && (
         <div className="settings-panel">
