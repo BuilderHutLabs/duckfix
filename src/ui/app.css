@@ -170,11 +170,88 @@ button {
   top: max(16px, env(safe-area-inset-top));
   right: max(16px, env(safe-area-inset-right));
 }
-.home-icon {
+.duck {
+  position: relative;
   width: 96px;
   height: 96px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.duck-svg {
+  display: block;
   border-radius: 22px;
   box-shadow: var(--shadow);
+}
+/* each half of the beak turns around its hinge (the end nearest the head) */
+.duck-beak-lower,
+.duck-beak-upper {
+  transform-box: fill-box;
+  transform-origin: left center;
+}
+.duck.quacking .duck-svg {
+  animation: duck-pop 0.45s cubic-bezier(0.34, 1.5, 0.64, 1) both;
+}
+.duck.quacking .duck-beak-lower {
+  animation: beak-lower 0.9s ease-in-out 0.35s both;
+}
+.duck.quacking .duck-beak-upper {
+  animation: beak-upper 0.9s ease-in-out 0.35s both;
+}
+/* speech bubble coming out of the beak */
+.duck-bubble {
+  position: absolute;
+  left: 86px;
+  top: 2px;
+  padding: 5px 10px;
+  border-radius: 14px;
+  /* always a white bubble, also in dark mode (a dark one vanishes on the black background) */
+  background: #fff;
+  color: #1c1c1e;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: var(--shadow-float);
+  transform-origin: 0 100%;
+  pointer-events: none;
+  animation: bubble 2.2s ease-out 0.38s both;
+}
+.duck-bubble::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  bottom: -6px;
+  border: 7px solid transparent;
+  border-top-color: #fff;
+  border-bottom: 0;
+  border-left: 0;
+}
+@keyframes duck-pop {
+  from { transform: scale(0.6); opacity: 0; }
+}
+@keyframes beak-lower {
+  0%, 30%, 60%, 100% { transform: rotate(0deg); }
+  15%, 45% { transform: rotate(24deg); }
+}
+@keyframes beak-upper {
+  0%, 30%, 60%, 100% { transform: rotate(0deg); }
+  15%, 45% { transform: rotate(-10deg); }
+}
+@keyframes bubble {
+  0% { transform: scale(0) rotate(-12deg); opacity: 0; }
+  12% { transform: scale(1.12) rotate(3deg); opacity: 1; }
+  20% { transform: scale(1) rotate(0deg); }
+  80% { transform: scale(1); opacity: 1; }
+  100% { transform: translateY(-8px) scale(0.96); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .duck.quacking .duck-svg,
+  .duck.quacking .duck-beak-lower,
+  .duck.quacking .duck-beak-upper { animation: none; }
+  .duck-bubble { animation-name: bubble-fade; }
+}
+@keyframes bubble-fade {
+  0%, 80% { opacity: 1; }
+  100% { opacity: 0; }
 }
 .home-title {
   margin: 6px 0 0;
