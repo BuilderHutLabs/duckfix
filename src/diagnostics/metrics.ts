@@ -14,6 +14,7 @@ export function createMetrics(): { record(a: PageAnalysis): void; report(doc: Do
       for (const r of records) rot[r.rotation]++;
       const meanConf = n ? records.reduce((s, r) => s + r.confidence, 0) / n : 0;
       const flagged = (f: string) => records.filter((r) => (r.flags as string[]).includes(f)).length;
+      const failed = records.filter((r) => r.error !== undefined);
       return [
         `Urządzenie: ${device}`,
         `Liczba stron: ${n}`,
@@ -23,6 +24,8 @@ export function createMetrics(): { record(a: PageAnalysis): void; report(doc: Do
         `Średnia pewność: ${meanConf.toFixed(2)}`,
         `Odsetek stron bez poprawek (untouchedRate): ${(untouchedRate(doc) * 100).toFixed(0)}%`,
         `Flagi: check-orientation=${flagged('check-orientation')}, low-text=${flagged('low-text')}`,
+        `Błędy analizy: ${failed.length}`,
+        ...(failed.length ? [`Ostatni błąd: ${failed[failed.length - 1].error}`] : []),
       ].join('\n');
     },
   };

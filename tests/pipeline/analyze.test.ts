@@ -84,6 +84,24 @@ describe('analyzePages', () => {
     expect(r.flags).toEqual(['check-orientation']);
   });
 
+  it('falls back to the OSD rotation (flag kept) when verifyUpright fails', async () => {
+    const s = setup({ rotation: 180, confidence: 1 });
+    s.verifyUpright.mockRejectedValueOnce(new Error('ocr model missing'));
+    const [r] = await run([pdfPage('a', { baseRotation: 90 })], s.deps);
+    expect(s.verifyUpright).toHaveBeenCalledTimes(1);
+    expect(r.rotation).toBe(90); // OSD raw 180 - base 90
+    expect(r.flags).toEqual(['check-orientation']);
+    expect(r.confidence).toBe(1);
+    expect(r.error).toBeUndefined();
+  });
+
+  it('records the error message of a failed page', async () => {
+    const s = setup({ rotation: 0, confidence: 8 });
+    s.detect.mockRejectedValueOnce(new Error('boom'));
+    const [r] = await run([pdfPage('a')], s.deps);
+    expect(r.error).toBe('boom');
+  });
+
   it('flags low-text and leaves rotation 0 on blank pages', async () => {
     const s = setup({ rotation: 90, confidence: 8 });
     s.toGrayImage.mockReturnValue(blankGray());
@@ -166,6 +184,24 @@ describe('analyzePages', () => {
 });
 
 describe('createMetrics', () => {
+  it('reports failed pages and the last error message', () => {
+    const m = createMetrics();
+    m.record({ pageId: 'a', rotation: 0, skewDeg: 0, flags: [], confidence: 4, ms: 10 });
+    m.record({ pageId: 'b', rotation: 0, skewDeg: 0, flags: ['check-orientation'], confidence: 0, ms: 5, error: 'first' });
+    m.record({ pageId: 'c', rotation: 0, skewDeg: 0, flags: ['check-orientation'], confidence: 0, ms: 5, error: 'render failed' });
+    const text = m.report({ pages: [] }, 'dev');
+    expect(text).toContain('Błędy analizy: 2');
+    expect(text).toContain('Ostatni błąd: render failed');
+  });
+
+  it('reports zero failures without a last-error line', () => {
+    const m = createMetrics();
+    m.record({ pageId: 'a', rotation: 0, skewDeg: 0, flags: [], confidence: 4, ms: 10 });
+    const text = m.report({ pages: [] }, 'dev');
+    expect(text).toContain('Błędy analizy: 0');
+    expect(text).not.toContain('Ostatni błąd');
+  });
+
   it('reports counts, timing, rotations and untouchedRate', () => {
     const m = createMetrics();
     m.record({ pageId: 'a', rotation: 90, skewDeg: 0, flags: [], confidence: 4, ms: 100 });
