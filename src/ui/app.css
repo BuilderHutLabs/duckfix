@@ -963,3 +963,45 @@ body:has(.action-bar) .update-prompt {
   font-weight: 600;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
+
+/* ---------- launch splash (installed app only) ---------- */
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  transition: background-color 0.45s ease;
+}
+.splash.leaving {
+  background-color: transparent;
+}
+.splash-duck {
+  /* resting: a slow, gentle breath */
+  animation: splash-breathe 1.2s ease-in-out infinite alternate;
+}
+.splash.leaving .splash-duck {
+  animation: none;
+}
+.splash .duck-svg {
+  display: block;
+  border-radius: 29px;
+  box-shadow: var(--shadow);
+}
+/* the home duck is hidden while the splash duck flies onto it */
+body.splashing .home .duck {
+  visibility: hidden;
+}
+.duck.landed .duck-svg {
+  animation: none;
+}
+@keyframes splash-breathe {
+  from { transform: scale(1); }
+  to { transform: scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .splash-duck { animation: none; }
+}

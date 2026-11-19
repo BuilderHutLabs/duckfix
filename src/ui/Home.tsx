@@ -1,5 +1,6 @@
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DuckLogo } from './DuckLogo';
+import { SPLASH_TOTAL_MS, isStandaloneLaunch } from './Splash';
 import { useAppStore } from './store';
 import { strings } from './strings';
 import { Settings } from './Toolbar';
@@ -8,17 +9,17 @@ import { useSecretTaps } from './Diagnostics';
 export const FILE_ACCEPT = 'application/pdf,image/*';
 
 let introPlayed = false;
-/** The duck quacks once per app start, not every time the user comes back to the home screen. */
-function playIntro(): boolean {
-  if (introPlayed) return false;
-  introPlayed = true;
-  return true;
-}
 
 export function Home() {
   const { open, busy, restorable, restore, discardStored, openDiagnostics } = useAppStore();
   const input = useRef<HTMLInputElement>(null);
   const onTitleTap = useSecretTaps(openDiagnostics);
+  // the duck quacks once per app start, not every time the user comes back to the home screen
+  // (marked after mount, so a double render in development does not use it up)
+  const [intro] = useState(() => !introPlayed);
+  useEffect(() => {
+    introPlayed = true;
+  }, []);
 
   return (
     <main className="home">
@@ -26,7 +27,7 @@ export function Home() {
         <Settings />
       </div>
       {/* 5 taps on the title open the diagnostics screen */}
-      <DuckLogo autoplay={playIntro()} />
+      <DuckLogo autoplay={intro} delayMs={isStandaloneLaunch() ? SPLASH_TOTAL_MS : 0} />
       <h1 className="home-title" onClick={onTitleTap}>
         {strings.appName}
       </h1>
