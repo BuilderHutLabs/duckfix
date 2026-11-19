@@ -763,7 +763,7 @@ body:has(.action-bar) .update-prompt {
   width: 100cqh;
   height: 100cqw;
 }
-.preview-nav {
+.preview .preview-nav {
   position: absolute;
   top: 50%;
   z-index: 2;
@@ -771,6 +771,13 @@ body:has(.action-bar) .update-prompt {
   height: 44px;
   margin-top: -22px;
   border-radius: 22px;
+  /* sits over a white page: dark disc so the white chevron stays visible */
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+.preview .preview-nav:disabled {
+  opacity: 0.35;
 }
 .preview-prev {
   left: max(8px, env(safe-area-inset-left));
