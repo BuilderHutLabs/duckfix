@@ -174,16 +174,61 @@ describe('app store', () => {
     expect(store.getState().doc.pages.map((p) => p.id)).toEqual(['p1', 'p2']);
   });
 
-  it('export: builds the PDF and shares it under <first source>_wduck.pdf', async () => {
-    const deps = fakeDeps();
+  it('export: builds the PDF with page progress, then waits for a fresh tap to share <first source>_wduck.pdf', async () => {
+    let report: ((done: number, total: number) => void) | undefined;
+    let finish: (b: Uint8Array) => void = () => {};
+    const exportPdf: StoreDeps['exportPdf'] = vi.fn((_doc, _sources, onProgress) => {
+      report = onProgress;
+      return new Promise<Uint8Array>((resolve) => (finish = resolve));
+    });
+    const deps = fakeDeps({ exportPdf, share: vi.fn(async () => 'shared' as const) });
     const store = createAppStore(deps);
     store.load(docWithFlags(2), [source]);
     const done = store.export();
     expect(store.getState().busy).toBe('exporting');
+    expect(deps.exportPdf).toHaveBeenCalledWith(store.getState().doc, new Map([['f1', source]]), expect.any(Function));
+    report!(1, 2);
+    expect(store.getState().exportProgress).toEqual({ done: 1, total: 2 });
+    finish(new Uint8Array([1]));
     await done;
-    expect(store.getState().busy).toBe(null);
-    expect(deps.exportPdf).toHaveBeenCalledWith(store.getState().doc, new Map([['f1', source]]));
-    expect(deps.share).toHaveBeenCalledWith(new Uint8Array([1]), 'skan_wduck.pdf');
+
+    // the share sheet needs a fresh user activation: nothing is shared until the user taps again
+    expect(deps.share).not.toHaveBeenCalled();
+    expect(store.getState()).toMatchObject({ busy: null, exportProgress: null });
+    const file = store.getState().exportReady!;
+    expect(file.name).toBe('skan_wduck.pdf');
+    expect(file.type).toBe('application/pdf');
+
+    await store.shareExport();
+    expect(deps.share).toHaveBeenCalledWith(file);
+    expect(store.getState().exportReady).toBeNull();
+  });
+
+  it('a cancelled share keeps the file ready for another tap', async () => {
+    const deps = fakeDeps({ share: vi.fn(async () => 'cancelled' as const) });
+    const store = createAppStore(deps);
+    store.load(docWithFlags(1), [source]);
+    await store.export();
+    await store.shareExport();
+    expect(store.getState().exportReady).not.toBeNull();
+  });
+
+  it('an edit after export drops the stale ready file', async () => {
+    const store = createAppStore(fakeDeps());
+    store.load(docWithFlags(2), [source]);
+    await store.export();
+    expect(store.getState().exportReady).not.toBeNull();
+    store.rotate(['p1'], 90);
+    expect(store.getState().exportReady).toBeNull();
+  });
+
+  it('a failed share shows the export error and keeps the file', async () => {
+    const store = createAppStore(fakeDeps({ share: vi.fn(async () => Promise.reject(new Error('x'))) }));
+    store.load(docWithFlags(1), [source]);
+    await store.export();
+    await store.shareExport();
+    expect(store.getState().error).toBe('Nie udało się zapisać PDF. Spróbuj ponownie.');
+    expect(store.getState().exportReady).not.toBeNull();
   });
 
   it('export failure shows a Polish message', async () => {

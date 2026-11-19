@@ -18,7 +18,7 @@ import type { OrientationDetector } from '../orientation/detector';
 import { DEFAULT_THRESHOLDS } from '../orientation/policy';
 import { exportFileName, exportPdf } from '../export/exportPdf';
 import { browserRasterizer } from '../export/rasterize';
-import { shareOrDownload } from '../export/share';
+import { pdfFile, shareOrDownload } from '../export/share';
 import { createMetrics } from '../diagnostics/metrics';
 import { indexedDbSession, type SessionStorage, type StoredSession } from '../storage/session';
 import { strings } from './strings';
@@ -36,6 +36,10 @@ export interface AppState {
   canUndo: boolean;
   canRedo: boolean;
   busy: 'opening' | 'exporting' | null;
+  /** Pages written so far while exporting. */
+  exportProgress: { done: number; total: number } | null;
+  /** Exported PDF waiting for the user's tap on "Udostępnij / Zapisz". */
+  exportReady: File | null;
   error: string | null;
   deskew: boolean;
   /** A document from an earlier visit is stored and can be restored (shown on Home). */
@@ -49,7 +53,11 @@ export interface StoreDeps {
   importFiles(files: File[]): Promise<{ sources: SourceFile[]; pages: Page[] }>;
   analyzePages: typeof analyzePages;
   createDetector(): Promise<OrientationDetector>;
-  exportPdf(doc: Doc, sources: Map<string, SourceFile>): Promise<Uint8Array>;
+  exportPdf(
+    doc: Doc,
+    sources: Map<string, SourceFile>,
+    onProgress: (done: number, total: number) => void,
+  ): Promise<Uint8Array>;
   share: typeof shareOrDownload;
   forgetPdf(fileId: string): Promise<void>;
   storage: StorageLike | null;
@@ -69,7 +77,7 @@ function browserDeps(): StoreDeps {
     importFiles,
     analyzePages,
     createDetector: () => createTesseractDetector({ basePath: import.meta.env.BASE_URL, workers: 2 }),
-    exportPdf: (doc, sources) => exportPdf(doc, sources, browserRasterizer),
+    exportPdf: (doc, sources, onProgress) => exportPdf(doc, sources, browserRasterizer, onProgress),
     share: shareOrDownload,
     forgetPdf,
     storage: browserStorage(),
@@ -128,6 +136,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
   /** Last doc handed to session storage, and the pending debounced save. */
   let persistedDoc: Doc = history.present;
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The doc `state.exportReady` was built from; any other doc makes the file stale. */
+  let exportedDoc: Doc | null = null;
   /** When the oldest unsaved change was scheduled (start of the max-wait window). */
   let savePendingSince: number | null = null;
 
@@ -150,6 +160,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     canUndo: false,
     canRedo: false,
     busy: null,
+    exportProgress: null,
+    exportReady: null,
     error: null,
     deskew: readDeskew(),
     restorable: false,
@@ -196,9 +208,10 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
 
   /** Publishes a new snapshot; doc/canUndo/canRedo always come from the history. */
   const set = (patch: Partial<AppState>) => {
+    const next = { ...state, ...patch };
+    if (next.exportReady && history.present !== exportedDoc) next.exportReady = null; // doc changed since export
     state = {
-      ...state,
-      ...patch,
+      ...next,
       doc: history.present,
       canUndo: history.canUndo,
       canRedo: history.canRedo,
@@ -294,6 +307,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         selecting: false,
         filterFlagged: false,
         busy: null,
+        exportProgress: null,
         restorable: false,
       });
       void runAnalysis(doc.pages);
@@ -327,6 +341,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         selecting: false,
         filterFlagged: false,
         busy: null,
+        exportProgress: null,
       });
     },
 
@@ -389,16 +404,37 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       set({});
     },
 
+    /** Builds the PDF; sharing is a separate tap (shareExport) with a fresh user activation. */
     async export() {
       if (state.busy || history.present.pages.length === 0) return;
-      set({ busy: 'exporting', error: null });
+      const own = session;
+      const doc = history.present;
+      set({ busy: 'exporting', exportProgress: null, exportReady: null, error: null });
       try {
-        const bytes = await deps.exportPdf(history.present, state.sources);
+        const bytes = await deps.exportPdf(doc, state.sources, (done, total) => {
+          if (own === session) set({ exportProgress: { done, total } });
+        });
+        if (own !== session) return;
         const first = state.sources.values().next().value as SourceFile | undefined;
-        await deps.share(bytes, exportFileName(first?.name ?? 'dokument.pdf'));
-        set({ busy: null });
+        exportedDoc = doc;
+        set({ busy: null, exportProgress: null, exportReady: pdfFile(bytes, exportFileName(first?.name ?? 'dokument.pdf')) });
       } catch {
-        set({ busy: null, error: strings.exportError });
+        if (own === session) set({ busy: null, exportProgress: null, error: strings.exportError });
+      }
+    },
+
+    /** Opens the share sheet (or downloads) for the exported PDF; call it from the user's tap. */
+    async shareExport() {
+      const file = state.exportReady;
+      if (!file) return;
+      try {
+        const result = await deps.share(file);
+        if (result !== 'cancelled' && state.exportReady === file) {
+          exportedDoc = null;
+          set({ exportReady: null });
+        }
+      } catch {
+        set({ error: strings.exportError });
       }
     },
 

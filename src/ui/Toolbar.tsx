@@ -67,14 +67,25 @@ export function Toolbar() {
         {strings.select}
       </button>
       <Settings />
-      <button
-        type="button"
-        className="btn btn-primary"
-        disabled={s.busy !== null || s.phase === 'analyzing' || s.doc.pages.length === 0}
-        onClick={() => void s.export()}
-      >
-        {s.busy === 'exporting' ? strings.saving : strings.save}
-      </button>
+      {s.exportReady ? (
+        // separate tap: the share sheet needs a fresh user activation after a long export
+        <button type="button" className="btn btn-primary" onClick={() => void s.shareExport()}>
+          {strings.shareExport}
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={s.busy !== null || s.phase === 'analyzing' || s.doc.pages.length === 0}
+          onClick={() => void s.export()}
+        >
+          {s.busy !== 'exporting'
+            ? strings.save
+            : s.exportProgress
+              ? strings.savingProgress(s.exportProgress.done, s.exportProgress.total)
+              : strings.saving}
+        </button>
+      )}
     </header>
   );
 }
