@@ -8,7 +8,11 @@ export type Rasterizer = (
 ) => Promise<{ bytes: Uint8Array; format: 'png' | 'jpg'; widthPt: number; heightPt: number }>;
 
 export function exportFileName(original: string): string {
-  return `${original.replace(/\.[^./\\]*$/, '')}_wduck.pdf`;
+  const base = original
+    .replace(/\.[^./\\]*$/, '')
+    // a corrected file opened again (Android may have added " (1)") keeps one suffix
+    .replace(/ \(poprawiony\)( \(\d+\))?$/, '');
+  return `${base} (poprawiony).pdf`;
 }
 
 function needsRaster(page: Page): boolean {

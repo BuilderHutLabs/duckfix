@@ -116,9 +116,14 @@ describe('exportPdf', () => {
 });
 
 describe('exportFileName', () => {
-  it('appends _wduck and uses .pdf', () => {
-    expect(exportFileName('skan.pdf')).toBe('skan_wduck.pdf');
-    expect(exportFileName('foto.jpg')).toBe('foto_wduck.pdf');
-    expect(exportFileName('noext')).toBe('noext_wduck.pdf');
+  it('appends " (poprawiony)" and uses .pdf', () => {
+    expect(exportFileName('Scan_20261119_1345.pdf')).toBe('Scan_20261119_1345 (poprawiony).pdf');
+    expect(exportFileName('foto.jpg')).toBe('foto (poprawiony).pdf');
+    expect(exportFileName('noext')).toBe('noext (poprawiony).pdf');
+  });
+
+  it('does not stack the suffix when a corrected file is opened again', () => {
+    expect(exportFileName('skan (poprawiony).pdf')).toBe('skan (poprawiony).pdf');
+    expect(exportFileName('skan (poprawiony) (1).pdf')).toBe('skan (poprawiony).pdf');
   });
 });

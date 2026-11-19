@@ -174,7 +174,7 @@ describe('app store', () => {
     expect(store.getState().doc.pages.map((p) => p.id)).toEqual(['p1', 'p2']);
   });
 
-  it('export: builds the PDF with page progress, then waits for a fresh tap to share <first source>_wduck.pdf', async () => {
+  it('export: builds the PDF with page progress, then waits for a fresh tap to share <first source> (poprawiony).pdf', async () => {
     let report: ((done: number, total: number) => void) | undefined;
     let finish: (b: Uint8Array) => void = () => {};
     const exportPdf: StoreDeps['exportPdf'] = vi.fn((_doc, _sources, onProgress) => {
@@ -196,7 +196,7 @@ describe('app store', () => {
     expect(deps.share).not.toHaveBeenCalled();
     expect(store.getState()).toMatchObject({ busy: null, exportProgress: null });
     const file = store.getState().exportReady!;
-    expect(file.name).toBe('skan_wduck.pdf');
+    expect(file.name).toBe('skan (poprawiony).pdf');
     expect(file.type).toBe('application/pdf');
 
     await store.shareExport();
@@ -212,9 +212,9 @@ describe('app store', () => {
     expect(deps.share).not.toHaveBeenCalled();
     expect(deps.download).toHaveBeenCalledTimes(1);
     const file = vi.mocked(deps.download).mock.calls[0][0];
-    expect(file.name).toBe('skan_wduck.pdf');
+    expect(file.name).toBe('skan (poprawiony).pdf');
     expect(store.getState().exportReady).toBeNull();
-    expect(store.getState().notice).toContain('skan_wduck.pdf');
+    expect(store.getState().notice).toContain('skan (poprawiony).pdf');
     store.dismissNotice();
     expect(store.getState().notice).toBeNull();
   });
