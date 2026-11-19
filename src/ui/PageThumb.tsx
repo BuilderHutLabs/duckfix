@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useSyncExternalStore } from 'react';
+import { memo, useEffect, useRef, useSyncExternalStore, type PointerEvent } from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { effectiveRotation, type Page } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
@@ -16,6 +16,8 @@ interface Props {
   selected: boolean;
   /** Must be stable across renders (React.memo). */
   onTap(pageId: string): void;
+  /** Mouse hold opens the preview; stable across renders. Absent in selection mode. */
+  onPreview?: (pageId: string) => void;
   /** Inserts files before `index`; stable across renders. */
   onInsertBefore?: (index: number) => void;
 }
@@ -28,6 +30,64 @@ function useContinuousAngle(target: number): number {
   return angle.current;
 }
 
+const MOUSE_HOLD_MS = 500;
+const MOUSE_HOLD_SLOP_PX = 8;
+/** The swallowed click is only expected right after the release; later clicks are real taps. */
+const SWALLOW_MS = 400;
+
+/** Holding the mouse button still for 500 ms opens the preview and swallows the click that follows. */
+function useMouseHold(pageId: string, onPreview: ((id: string) => void) | undefined) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const start = useRef({ x: 0, y: 0 });
+  const swallow = useRef(false);
+  const expire = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopTimer = () => {
+    if (timer.current !== null) clearTimeout(timer.current);
+    timer.current = null;
+  };
+  useEffect(
+    () => () => {
+      stopTimer();
+      if (expire.current !== null) clearTimeout(expire.current);
+    },
+    [],
+  );
+
+  return {
+    onPointerDown(e: PointerEvent<HTMLElement>) {
+      if (!onPreview || e.pointerType !== 'mouse' || e.button !== 0) return;
+      stopTimer();
+      start.current = { x: e.clientX, y: e.clientY };
+      timer.current = setTimeout(() => {
+        timer.current = null;
+        swallow.current = true;
+        onPreview(pageId);
+      }, MOUSE_HOLD_MS);
+    },
+    onPointerMove(e: PointerEvent<HTMLElement>) {
+      if (timer.current === null) return;
+      if (Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) > MOUSE_HOLD_SLOP_PX) stopTimer();
+    },
+    cancel() {
+      stopTimer();
+      if (swallow.current) {
+        // no click follows when the button is released elsewhere (e.g. over the preview)
+        if (expire.current !== null) clearTimeout(expire.current);
+        expire.current = setTimeout(() => {
+          swallow.current = false;
+        }, SWALLOW_MS);
+      }
+    },
+    /** True once for the click that ends a hold. */
+    consumeClick(): boolean {
+      const was = swallow.current;
+      swallow.current = false;
+      return was;
+    },
+  };
+}
+
 /** Memoized: an analysis result changes one page object, so only that thumb re-renders. */
 export const PageThumb = memo(function PageThumb({
   page,
@@ -37,6 +97,7 @@ export const PageThumb = memo(function PageThumb({
   selecting,
   selected,
   onTap,
+  onPreview,
   onInsertBefore,
 }: Props) {
   const number = index + 1;
@@ -69,6 +130,7 @@ export const PageThumb = memo(function PageThumb({
     return () => io.disconnect();
   }, [cache, page.id, page.source, source]);
 
+  const hold = useMouseHold(page.id, onPreview);
   const angle = useContinuousAngle(effectiveRotation(page) + page.skewDeg);
   const flagged = isFlagged(page);
   const autoRotated = page.analyzed && page.autoRotation !== null && page.autoRotation !== 0;
@@ -97,7 +159,15 @@ export const PageThumb = memo(function PageThumb({
           <span aria-hidden="true">+</span>
         </button>
       )}
-      <button type="button" className={cls} {...attributes} {...listeners} aria-label={label} onClick={() => onTap(page.id)}>
+      <button type="button" className={cls} {...attributes} {...listeners} aria-label={label} onClick={() => {
+          if (!hold.consumeClick()) onTap(page.id);
+        }}
+        onPointerDown={hold.onPointerDown}
+        onPointerMove={hold.onPointerMove}
+        onPointerUp={hold.cancel}
+        onPointerLeave={hold.cancel}
+        onPointerCancel={hold.cancel}
+      >
         <div className="thumb-box" ref={box}>
           {thumb?.status === 'ready' ? (
             <img className="thumb-frame" src={thumb.url} style={frameStyle} alt="" draggable={false} />

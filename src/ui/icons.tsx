@@ -63,3 +63,15 @@ export const IconFilter = (p: IconProps) => (
     <path d="M3 5h18M7 12h10M10 19h4" />
   </Svg>
 );
+
+export const IconChevronLeft = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M15 5l-7 7 7 7" />
+  </Svg>
+);
+
+export const IconChevronRight = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M9 5l7 7-7 7" />
+  </Svg>
+);

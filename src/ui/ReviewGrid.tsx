@@ -12,6 +12,7 @@ import { SortableContext, rectSortingStrategy } from '@dnd-kit/sortable';
 import { isFlagged, useAppStore } from './store';
 import { createThumbnailCache } from './thumbnails';
 import { PageThumb } from './PageThumb';
+import { PagePreview } from './PagePreview';
 import { FILE_ACCEPT } from './Home';
 import { strings } from './strings';
 
@@ -22,6 +23,18 @@ const SORTING_ENABLED = { draggable: false, droppable: false };
 const MOUSE_OPTIONS = { activationConstraint: { distance: 8 } };
 // long press (250 ms) starts a drag; a quick tap stays a click
 const TOUCH_OPTIONS = { activationConstraint: { delay: 250, tolerance: 8 } };
+const HOLD_SLOP_PX = 8;
+/** The click that follows the touchend of a hold must not rotate the page. */
+const CLICK_SUPPRESS_MS = 400;
+
+/** A touch hold released (almost) where it started: a preview, not a move. */
+export function isHoldRelease(
+  activeId: string | number,
+  overId: string | number | null | undefined,
+  delta: { x: number; y: number },
+): boolean {
+  return (overId == null || overId === activeId) && Math.hypot(delta.x, delta.y) <= HOLD_SLOP_PX;
+}
 
 export function ReviewGrid() {
   const s = useAppStore();
@@ -52,18 +65,27 @@ export function ReviewGrid() {
   // Stable callbacks (read the latest store through a ref) so React.memo can skip unchanged thumbs.
   const latest = useRef(s);
   latest.current = s;
+  const suppressTapUntil = useRef(0);
   const onTap = useCallback((id: string) => {
+    if (Date.now() < suppressTapUntil.current) return;
     const st = latest.current;
     if (st.selecting) st.toggleSelected(id);
     else st.rotate([id], 90);
+  }, []);
+  const onPreview = useCallback((id: string) => {
+    suppressTapUntil.current = Date.now() + CLICK_SUPPRESS_MS;
+    latest.current.openPreview(id);
   }, []);
   const pickFiles = useCallback((index: number) => {
     insertIndex.current = index;
     input.current?.click();
   }, []);
 
-  const onDragEnd = ({ active, over }: DragEndEvent) => {
-    if (over && active.id !== over.id) s.moveById(String(active.id), String(over.id));
+  const onDragEnd = ({ active, over, delta, activatorEvent }: DragEndEvent) => {
+    // a mouse drag only starts after 8 px of movement; a mouse hold opens the preview in PageThumb
+    if (!s.selecting && activatorEvent.type !== 'mousedown' && isHoldRelease(active.id, over?.id, delta)) {
+      onPreview(String(active.id));
+    } else if (over && active.id !== over.id) s.moveById(String(active.id), String(over.id));
   };
 
   return (
@@ -85,6 +107,7 @@ export function ReviewGrid() {
                 selecting={s.selecting}
                 selected={s.selection.has(page.id)}
                 onTap={onTap}
+                onPreview={s.selecting ? undefined : onPreview}
                 onInsertBefore={s.selecting ? undefined : pickFiles}
               />
             ))}
@@ -104,6 +127,7 @@ export function ReviewGrid() {
           </div>
         </SortableContext>
       </DndContext>
+      <PagePreview pageIds={items} cache={cache} />
       <input
         ref={input}
         className="visually-hidden"
