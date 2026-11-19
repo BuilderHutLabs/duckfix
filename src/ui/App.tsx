@@ -1,3 +1,4 @@
+import { Splash, isStandaloneLaunch } from './Splash';
 import { chromeIntentUrl, detectInAppBrowser } from './inAppBrowser';
 import { useEffect, useState } from 'react';
 import { AppStoreProvider, createAppStore, useAppStore, type AppStore } from './store';
@@ -23,10 +24,13 @@ export function App({ store }: { store?: AppStore }) {
     }
   }, []);
 
+  const [splash, setSplash] = useState(isStandaloneLaunch);
+
   return (
     <AppStoreProvider store={s}>
       <Shell />
       <UpdatePrompt />
+      {splash && <Splash onDone={() => setSplash(false)} />}
     </AppStoreProvider>
   );
 }
