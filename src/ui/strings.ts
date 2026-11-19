@@ -58,6 +58,9 @@ export const strings = {
   deskewHint: 'Zmiana działa przy następnym otwarciu pliku.',
 
   page: (n: number) => `Strona ${n}`,
+  preview: (n: number) => `Podgląd: strona ${n}`,
+  previousPage: 'Poprzednia strona',
+  nextPage: 'Następna strona',
   flagLabels: {
     'check-orientation': 'Sprawdź',
     'low-text': 'Mało tekstu',

@@ -33,6 +33,8 @@ export interface AppState {
   selection: Set<string>;
   selecting: boolean;
   filterFlagged: boolean;
+  /** Page shown in the full-screen preview. */
+  previewId: string | null;
   canUndo: boolean;
   canRedo: boolean;
   busy: 'opening' | 'exporting' | null;
@@ -165,6 +167,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     selection: new Set(),
     selecting: false,
     filterFlagged: false,
+    previewId: null,
     canUndo: false,
     canRedo: false,
     busy: null,
@@ -315,6 +318,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         selection: new Set(),
         selecting: false,
         filterFlagged: false,
+        previewId: null,
         busy: null,
         exportProgress: null,
         restorable: false,
@@ -349,6 +353,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         selection: new Set(),
         selecting: false,
         filterFlagged: false,
+        previewId: null,
         busy: null,
         exportProgress: null,
       });
@@ -378,7 +383,11 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       const valid = existing(ids);
       if (!valid.length) return;
       // removing ends the selection mode (nothing selected is left)
-      commit(deletePages(history.present, valid), { selection: new Set(), selecting: false });
+      commit(deletePages(history.present, valid), {
+        selection: new Set(),
+        selecting: false,
+        previewId: state.previewId !== null && valid.includes(state.previewId) ? null : state.previewId,
+      });
     },
 
     async insertAt(index: number, files: File[]) {
@@ -455,6 +464,14 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
 
     dismissNotice() {
       set({ notice: null });
+    },
+
+    openPreview(id: string) {
+      set({ previewId: id });
+    },
+
+    closePreview() {
+      if (state.previewId !== null) set({ previewId: null });
     },
 
     toggleSelecting() {
