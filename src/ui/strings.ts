@@ -11,6 +11,8 @@ function plural(n: number, one: string, few: string, many: string): string {
 
 export const strings = {
   appName: 'WDuck',
+  updateAvailable: 'Dostępna nowa wersja',
+  updateAction: 'Odśwież',
   appDescription: 'Automatyczne obracanie i prostowanie skanów PDF',
 
   open: 'Otwórz PDF lub zdjęcia',
