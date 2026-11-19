@@ -15,6 +15,8 @@ export interface PageAnalysis {
   flags: PageFlag[];
   confidence: number;
   ms: number;
+  /** Set when analysis of this page failed (neutral result); reported in diagnostics. */
+  error?: string;
 }
 
 export interface AnalyzeDeps {
@@ -81,7 +83,11 @@ async function analyzeOne(
     // Low-text means "no change": keep the PDF's own orientation (model rotation 0).
     let rawRotation: Rotation = decision.flags.includes('low-text') ? baseRotation : decision.rotation;
     if (decision.needsVerify && deps.detector.verifyUpright) {
-      rawRotation = await deps.detector.verifyUpright(canvas, [rawRotation, addRotation(rawRotation, 180)]);
+      try {
+        rawRotation = await deps.detector.verifyUpright(canvas, [rawRotation, addRotation(rawRotation, 180)]);
+      } catch {
+        // OCR check unavailable: keep the OSD rotation; the page stays flagged for review.
+      }
     }
 
     let skewDeg = 0;
@@ -98,7 +104,7 @@ async function analyzeOne(
       confidence: result.confidence,
       ms: performance.now() - t0,
     };
-  } catch {
+  } catch (e) {
     return {
       pageId: page.id,
       rotation: 0,
@@ -106,6 +112,7 @@ async function analyzeOne(
       flags: ['check-orientation'],
       confidence: 0,
       ms: performance.now() - t0,
+      error: e instanceof Error ? e.message || e.name : String(e),
     };
   } finally {
     if (canvas) deps.release(canvas);

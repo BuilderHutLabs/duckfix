@@ -42,6 +42,9 @@ export async function createTesseractDetector(opts: TesseractDetectorOptions): P
     corePath: `${base}tesseract`,
     langPath: `${base}tessdata`,
     gzip: false,
+    // Load the worker script by URL, not via a blob: URL; on iOS WebKit the service worker does not
+    // reliably control blob workers, which would break offline analysis.
+    workerBlobURL: false,
   };
 
   const settled = await Promise.allSettled(
@@ -75,7 +78,11 @@ export async function createTesseractDetector(opts: TesseractDetectorOptions): P
   };
 
   let ocrWorker: Promise<Worker> | null = null;
-  const getOcrWorker = () => (ocrWorker ??= createWorker('pol+eng', OEM.LSTM_ONLY, paths));
+  const getOcrWorker = () =>
+    (ocrWorker ??= createWorker('pol+eng', OEM.LSTM_ONLY, paths).catch((e) => {
+      ocrWorker = null; // allow a retry on the next uncertain page
+      throw e;
+    }));
 
   return {
     async detect(canvas): Promise<OrientationResult> {

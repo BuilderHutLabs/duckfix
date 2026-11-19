@@ -36,6 +36,30 @@ describe('createTesseractDetector', () => {
     for (const w of created) expect(w.terminate).toHaveBeenCalledTimes(1);
   });
 
+  it('passes workerBlobURL: false so the worker script loads from /wduck/tesseract/', async () => {
+    const { createWorker } = await import('tesseract.js');
+    vi.mocked(createWorker).mockClear();
+    const d = await createTesseractDetector({ basePath: '/wduck/', workers: 1 });
+    const opts = vi.mocked(createWorker).mock.calls[0][2] as Record<string, unknown>;
+    expect(opts).toMatchObject({ workerBlobURL: false, workerPath: '/wduck/tesseract/worker.min.js' });
+    await d.dispose();
+  });
+
+  it('retries creating the OCR worker after a failed start', async () => {
+    const d = await createTesseractDetector({ basePath: '/wduck/', workers: 1 });
+    failOnCall = calls; // the next createWorker call (the OCR worker) fails
+    const src = { width: 10, height: 10 } as unknown as OffscreenCanvas;
+    await expect(d.verifyUpright!(src, [0, 180])).rejects.toThrow('missing model');
+    vi.stubGlobal('OffscreenCanvas', class {
+      constructor(public width: number, public height: number) {}
+      getContext() {
+        return { translate() {}, rotate() {}, drawImage() {} };
+      }
+    });
+    await expect(d.verifyUpright!(src, [0, 180])).resolves.toBe(0);
+    await d.dispose();
+  });
+
   it('zeroes the size of rotated canvas copies after verifyUpright', async () => {
     const copies: Array<{ width: number; height: number }> = [];
     class FakeOffscreen {
