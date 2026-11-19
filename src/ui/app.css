@@ -134,6 +134,19 @@ button {
 .error-banner span {
   flex: 1;
 }
+.notice-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #f0fdf4;
+  border-bottom: 2px solid #15803d;
+  color: #166534;
+  font-size: 17px;
+}
+.notice-banner span {
+  flex: 1;
+}
 
 /* ---------- toolbar ---------- */
 

@@ -82,6 +82,7 @@ function Shell() {
             <Toolbar />
             <Progress />
             <ErrorBanner />
+            <NoticeBanner />
           </div>
           <ReviewGrid />
         </div>
@@ -97,6 +98,19 @@ function ErrorBanner() {
     <div className="error-banner" role="alert">
       <span>{error}</span>
       <button type="button" className="btn" onClick={dismissError}>
+        {strings.dismiss}
+      </button>
+    </div>
+  );
+}
+
+function NoticeBanner() {
+  const { notice, dismissNotice } = useAppStore();
+  if (!notice) return null;
+  return (
+    <div className="notice-banner" role="status">
+      <span>{notice}</span>
+      <button type="button" className="btn" onClick={dismissNotice}>
         {strings.dismiss}
       </button>
     </div>

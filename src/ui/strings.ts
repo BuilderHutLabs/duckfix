@@ -35,6 +35,7 @@ export const strings = {
   saving: 'Zapisuję…',
   savingProgress: (done: number, total: number) => `Zapisuję ${done}/${total}`,
   shareExport: 'Udostępnij / Zapisz',
+  savedNotice: (name: string) => `Zapisano plik „${name}” w folderze Pobrane.`,
 
   select: 'Zaznacz',
   selectDone: 'Gotowe',

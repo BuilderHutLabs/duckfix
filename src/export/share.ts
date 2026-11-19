@@ -1,6 +1,7 @@
 export type ShareResult = 'shared' | 'downloaded' | 'cancelled';
 
-function download(file: File): void {
+/** Saves the file through a download link (Downloads folder on Windows/Android). */
+export function downloadFile(file: File): void {
   const url = URL.createObjectURL(file);
   const a = document.createElement('a');
   a.href = url;
@@ -30,6 +31,19 @@ export async function shareOrDownload(file: File): Promise<ShareResult> {
       // any other failure: fall back to download
     }
   }
-  download(file);
+  downloadFile(file);
   return 'downloaded';
+}
+
+/**
+ * iPhone/iPad: a blob download is unreliable (esp. in the installed app), so saving goes through
+ * the share sheet ("Zachowaj w Plikach"). Everywhere else the share sheet has no "save" option,
+ * so saving is a plain download. iPadOS reports a Mac UA; touch points tell it apart.
+ */
+export function prefersShareSheet(): boolean {
+  const nav = typeof navigator === 'undefined' ? undefined : navigator;
+  if (!nav) return false;
+  const ua = nav.userAgent ?? '';
+  if (/iPhone|iPad|iPod/.test(ua)) return true;
+  return /Macintosh/.test(ua) && (nav.maxTouchPoints ?? 0) > 1;
 }

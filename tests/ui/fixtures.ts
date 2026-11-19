@@ -34,6 +34,8 @@ export function fakeDeps(over: Partial<StoreDeps> = {}): StoreDeps {
     createDetector: vi.fn(async () => ({ detect: vi.fn(), dispose: vi.fn(async () => {}) })),
     exportPdf: vi.fn(async () => new Uint8Array([1])),
     share: vi.fn(async () => 'downloaded' as const),
+    download: vi.fn(),
+    shareFirst: true,
     forgetPdf: vi.fn(async () => {}),
     storage: null,
     session: null,
