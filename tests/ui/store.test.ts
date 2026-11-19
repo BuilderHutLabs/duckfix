@@ -204,6 +204,29 @@ describe('app store', () => {
     expect(store.getState().exportReady).toBeNull();
   });
 
+  it('export on Windows/Android (no share-sheet preference) downloads the file straight away and says so', async () => {
+    const deps = fakeDeps({ shareFirst: false, download: vi.fn() });
+    const store = createAppStore(deps);
+    store.load(docWithFlags(1), [source]);
+    await store.export();
+    expect(deps.share).not.toHaveBeenCalled();
+    expect(deps.download).toHaveBeenCalledTimes(1);
+    const file = vi.mocked(deps.download).mock.calls[0][0];
+    expect(file.name).toBe('skan_wduck.pdf');
+    expect(store.getState().exportReady).toBeNull();
+    expect(store.getState().notice).toContain('skan_wduck.pdf');
+    store.dismissNotice();
+    expect(store.getState().notice).toBeNull();
+  });
+
+  it('a failed download shows the export error', async () => {
+    const deps = fakeDeps({ shareFirst: false, download: vi.fn(() => { throw new Error('x'); }) });
+    const store = createAppStore(deps);
+    store.load(docWithFlags(1), [source]);
+    await store.export();
+    expect(store.getState().error).toBe('Nie udało się zapisać PDF. Spróbuj ponownie.');
+  });
+
   it('a cancelled share keeps the file ready for another tap', async () => {
     const deps = fakeDeps({ share: vi.fn(async () => 'cancelled' as const) });
     const store = createAppStore(deps);

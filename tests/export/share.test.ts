@@ -58,3 +58,39 @@ describe('shareOrDownload', () => {
     expect(click).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('prefersShareSheet', () => {
+  const ua = (userAgent: string, maxTouchPoints = 0) => vi.stubGlobal('navigator', { userAgent, maxTouchPoints });
+
+  it('is true on iPhone and iPad (incl. iPadOS desktop-class UA with touch)', async () => {
+    const { prefersShareSheet } = await import('../../src/export/share');
+    ua('Mozilla/5.0 (iPhone; CPU iPhone OS 17_4 like Mac OS X) AppleWebKit/605.1.15 Mobile/15E148');
+    expect(prefersShareSheet()).toBe(true);
+    ua('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.4 Safari/605.1.15', 5);
+    expect(prefersShareSheet()).toBe(true);
+  });
+
+  it('is false on Windows, Android and a Mac without touch', async () => {
+    const { prefersShareSheet } = await import('../../src/export/share');
+    ua('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36');
+    expect(prefersShareSheet()).toBe(false);
+    ua('Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/131.0 Mobile Safari/537.36', 5);
+    expect(prefersShareSheet()).toBe(false);
+    ua('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.4 Safari/605.1.15', 0);
+    expect(prefersShareSheet()).toBe(false);
+  });
+});
+
+describe('downloadFile', () => {
+  it('clicks a download link named after the file', async () => {
+    const { downloadFile } = await import('../../src/export/share');
+    const click = stubDownload();
+    let name = '';
+    click.mockImplementation(function (this: HTMLAnchorElement) {
+      name = this.download;
+    });
+    downloadFile(file('b_wduck.pdf'));
+    expect(click).toHaveBeenCalledTimes(1);
+    expect(name).toBe('b_wduck.pdf');
+  });
+});

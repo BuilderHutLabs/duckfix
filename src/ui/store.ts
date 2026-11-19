@@ -18,7 +18,7 @@ import type { OrientationDetector } from '../orientation/detector';
 import { DEFAULT_THRESHOLDS } from '../orientation/policy';
 import { exportFileName, exportPdf } from '../export/exportPdf';
 import { browserRasterizer } from '../export/rasterize';
-import { pdfFile, shareOrDownload } from '../export/share';
+import { downloadFile, pdfFile, prefersShareSheet, shareOrDownload } from '../export/share';
 import { createMetrics } from '../diagnostics/metrics';
 import { indexedDbSession, type SessionStorage, type StoredSession } from '../storage/session';
 import { strings } from './strings';
@@ -41,6 +41,8 @@ export interface AppState {
   /** Exported PDF waiting for the user's tap on "Udostępnij / Zapisz". */
   exportReady: File | null;
   error: string | null;
+  /** Short confirmation, e.g. where the saved file went. */
+  notice: string | null;
   deskew: boolean;
   /** A document from an earlier visit is stored and can be restored (shown on Home). */
   restorable: boolean;
@@ -59,6 +61,10 @@ export interface StoreDeps {
     onProgress: (done: number, total: number) => void,
   ): Promise<Uint8Array>;
   share: typeof shareOrDownload;
+  /** Plain download of the exported file (Windows, Android, Mac). */
+  download(file: File): void;
+  /** iPhone/iPad: save through the share sheet on a separate tap instead of a download. */
+  shareFirst: boolean;
   forgetPdf(fileId: string): Promise<void>;
   storage: StorageLike | null;
   session: SessionStorage | null;
@@ -79,6 +85,8 @@ function browserDeps(): StoreDeps {
     createDetector: () => createTesseractDetector({ basePath: import.meta.env.BASE_URL, workers: 2 }),
     exportPdf: (doc, sources, onProgress) => exportPdf(doc, sources, browserRasterizer, onProgress),
     share: shareOrDownload,
+    download: downloadFile,
+    shareFirst: prefersShareSheet(),
     forgetPdf,
     storage: browserStorage(),
     session: indexedDbSession,
@@ -162,6 +170,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     busy: null,
     exportProgress: null,
     exportReady: null,
+    notice: null,
     error: null,
     deskew: readDeskew(),
     restorable: false,
@@ -409,15 +418,21 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       if (state.busy || history.present.pages.length === 0) return;
       const own = session;
       const doc = history.present;
-      set({ busy: 'exporting', exportProgress: null, exportReady: null, error: null });
+      set({ busy: 'exporting', exportProgress: null, exportReady: null, error: null, notice: null });
       try {
         const bytes = await deps.exportPdf(doc, state.sources, (done, total) => {
           if (own === session) set({ exportProgress: { done, total } });
         });
         if (own !== session) return;
         const first = state.sources.values().next().value as SourceFile | undefined;
-        exportedDoc = doc;
-        set({ busy: null, exportProgress: null, exportReady: pdfFile(bytes, exportFileName(first?.name ?? 'dokument.pdf')) });
+        const file = pdfFile(bytes, exportFileName(first?.name ?? 'dokument.pdf'));
+        if (deps.shareFirst) {
+          exportedDoc = doc;
+          set({ busy: null, exportProgress: null, exportReady: file });
+        } else {
+          deps.download(file);
+          set({ busy: null, exportProgress: null, notice: strings.savedNotice(file.name) });
+        }
       } catch {
         if (own === session) set({ busy: null, exportProgress: null, error: strings.exportError });
       }
@@ -436,6 +451,10 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       } catch {
         set({ error: strings.exportError });
       }
+    },
+
+    dismissNotice() {
+      set({ notice: null });
     },
 
     toggleSelecting() {
