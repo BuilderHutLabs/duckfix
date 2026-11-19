@@ -665,3 +665,39 @@ img.thumb-frame {
 body:has(.action-bar) .update-prompt {
   bottom: calc(84px + env(safe-area-inset-bottom));
 }
+
+/* built-in browser of Messenger/Facebook/Instagram: downloads don't work there */
+.inapp-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 8px max(12px, env(safe-area-inset-right)) 8px max(12px, env(safe-area-inset-left));
+  padding: 10px 12px 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 159, 10, 0.16);
+  color: #8a4b00;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+#root > .inapp-banner {
+  margin-top: max(8px, env(safe-area-inset-top));
+}
+.inapp-text {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.inapp-text p {
+  margin: 0;
+}
+.inapp-text p + p {
+  margin-top: 4px;
+  font-weight: 600;
+}
+.inapp-banner .btn {
+  min-height: 44px;
+  flex: none;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+}

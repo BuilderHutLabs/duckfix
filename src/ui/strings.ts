@@ -37,6 +37,9 @@ export const strings = {
   saving: 'Zapisuję…',
   savingProgress: (done: number, total: number) => `Zapisuję ${done}/${total}`,
   shareExport: 'Udostępnij / Zapisz',
+  inAppWarning: 'Ta wbudowana przeglądarka (np. Messenger) nie zapisuje plików PDF.',
+  openInChrome: 'Otwórz w Chrome',
+  openInSafariHint: 'Dotknij ⋯ w rogu ekranu i wybierz „Otwórz w Safari”.',
   savedNotice: (name: string) => `Zapisano plik „${name}” w folderze Pobrane.`,
 
   select: 'Zaznacz',
