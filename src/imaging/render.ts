@@ -2,18 +2,22 @@ import type { PDFDocumentProxy } from 'pdfjs-dist';
 import type { SourceRef } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
 
-type PdfjsModule = typeof import('pdfjs-dist');
+type PdfjsModule = typeof import('pdfjs-dist/legacy/build/pdf.mjs');
 
+/**
+ * pdf.js legacy build (library + worker): the modern build uses Promise.withResolvers etc. without
+ * polyfills and needs iPadOS 17.4+. The worker is a local asset (precached by the service worker).
+ */
 let loader: () => Promise<PdfjsModule> = async () => {
-  const pdfjs = await import('pdfjs-dist');
-  const worker = await import('pdfjs-dist/build/pdf.worker.min.mjs?url');
+  const pdfjs = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  const worker = await import('pdfjs-dist/legacy/build/pdf.worker.min.mjs?url');
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
   return pdfjs;
 };
 
 const docs = new Map<string, Promise<PDFDocumentProxy>>();
 
-/** Test seam: lets Node tests inject the pdfjs `legacy` build. */
+/** Test seam: lets tests inject a pdf.js module. */
 export function setPdfjsLoader(l: () => Promise<PdfjsModule>): void {
   loader = l;
   docs.clear();
