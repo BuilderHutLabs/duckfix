@@ -1,3 +1,4 @@
+import { ThemePicker } from './ThemePicker';
 import { useEffect, useRef, useState } from 'react';
 import { isFlagged, useAppStore } from './store';
 import { strings } from './strings';
@@ -118,6 +119,8 @@ export function Settings() {
             <span>{strings.deskew}</span>
           </label>
           <p className="settings-hint">{strings.deskewHint}</p>
+          <div className="menu-sep" />
+          <ThemePicker />
         </div>
       )}
     </div>

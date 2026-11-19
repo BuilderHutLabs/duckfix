@@ -56,6 +56,10 @@ export const strings = {
   diagnostics: 'Diagnostyka',
   deskew: 'Prostuj przekrzywienie',
   deskewHint: 'Zmiana działa przy następnym otwarciu pliku.',
+  theme: 'Wygląd',
+  themeAuto: 'Automatyczny',
+  themeLight: 'Jasny',
+  themeDark: 'Ciemny',
 
   page: (n: number) => `Strona ${n}`,
   preview: (n: number) => `Podgląd: strona ${n}`,

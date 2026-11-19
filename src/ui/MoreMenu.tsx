@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { IconMore } from './icons';
 import { useAppStore } from './store';
 import { strings } from './strings';
+import { ThemePicker } from './ThemePicker';
 
 /** The ⋯ popover of the review top bar: select mode, deskew switch, diagnostics. */
 export function MoreMenu() {
@@ -54,6 +55,8 @@ export function MoreMenu() {
             <span>{strings.deskew}</span>
           </label>
           <p className="settings-hint">{strings.deskewHint}</p>
+          <div className="menu-sep" />
+          <ThemePicker />
           <div className="menu-sep" />
           <button type="button" className="menu-item" onClick={choose(openDiagnostics)}>
             {strings.diagnostics}
