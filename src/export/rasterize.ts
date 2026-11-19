@@ -99,6 +99,7 @@ async function finish(
     ctx.translate(w / 2, h / 2);
     ctx.rotate(angle); // canvas rotate is clockwise for positive angles
     ctx.drawImage(raw, -raw.width / 2, -raw.height / 2);
+    releaseCanvas(raw); // free the raw render before encoding (peak memory on iPad)
 
     const gray = toGray(ctx.getImageData(0, 0, w, h).data, w, h);
     const png = isNearBitonal(gray);

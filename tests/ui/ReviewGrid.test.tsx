@@ -149,6 +149,28 @@ describe('review grid', () => {
     expect(store.getState().doc.pages.map((p) => p.rotation)).toEqual([0, 90, 0]);
   });
 
+  it('export: counter while saving, then a separate "Udostępnij / Zapisz" tap shares', async () => {
+    let report: ((done: number, total: number) => void) | undefined;
+    let finish: (b: Uint8Array) => void = () => {};
+    const deps = fakeDeps({
+      exportPdf: vi.fn((_d, _s, onProgress) => {
+        report = onProgress;
+        return new Promise<Uint8Array>((resolve) => (finish = resolve));
+      }),
+      share: vi.fn(async () => 'shared' as const),
+    });
+    setup(docWithFlags(3), deps);
+    fireEvent.click(screen.getByRole('button', { name: strings.save }));
+    expect(screen.getByRole('button', { name: strings.saving })).toBeTruthy();
+    act(() => report!(2, 3));
+    expect(screen.getByRole('button', { name: 'Zapisuję 2/3' })).toBeTruthy();
+    await act(async () => finish(new Uint8Array([1])));
+    expect(deps.share).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Udostępnij / Zapisz' }));
+    await waitFor(() => expect(deps.share).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByRole('button', { name: strings.save })).toBeTruthy());
+  });
+
   it('miniature transform is effective rotation + skew', () => {
     const doc = docWithFlags(1);
     doc.pages[0] = {

@@ -33,6 +33,8 @@ export const strings = {
   redo: 'Ponów',
   save: 'Zapisz PDF',
   saving: 'Zapisuję…',
+  savingProgress: (done: number, total: number) => `Zapisuję ${done}/${total}`,
+  shareExport: 'Udostępnij / Zapisz',
 
   select: 'Zaznacz',
   selectDone: 'Gotowe',

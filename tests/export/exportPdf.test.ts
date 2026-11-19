@@ -81,6 +81,18 @@ describe('exportPdf', () => {
     expect(out.getPage(0).getRotation().angle).toBe(0);
   });
 
+  it('reports progress after every page', async () => {
+    const src = await makePdf([[100, 100], [200, 200], [300, 300]]);
+    const doc: Doc = { pages: [pdfPage(0), pdfPage(1, { skewDeg: 1 }), pdfPage(2)] };
+    const progress: Array<[number, number]> = [];
+    await exportPdf(doc, new Map([['f1', src]]), fakeRaster(), (done, total) => progress.push([done, total]));
+    expect(progress).toEqual([
+      [1, 3],
+      [2, 3],
+      [3, 3],
+    ]);
+  });
+
   it('rasterizes only skewed pages', async () => {
     const src = await makePdf([[100, 100], [100, 100]]);
     const r = fakeRaster();

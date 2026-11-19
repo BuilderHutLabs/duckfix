@@ -11,12 +11,19 @@ function download(file: File): void {
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
 
-export async function shareOrDownload(bytes: Uint8Array, name: string): Promise<ShareResult> {
-  const file = new File([bytes as BlobPart], name, { type: 'application/pdf' });
+export function pdfFile(bytes: Uint8Array, name: string): File {
+  return new File([bytes as BlobPart], name, { type: 'application/pdf' });
+}
+
+/**
+ * Opens the share sheet, or downloads when file sharing is unsupported. Call it straight from a
+ * tap: navigator.share needs a fresh user activation (it expires during a long export).
+ */
+export async function shareOrDownload(file: File): Promise<ShareResult> {
   const nav = typeof navigator === 'undefined' ? undefined : navigator;
   if (nav?.canShare?.({ files: [file] }) && nav.share) {
     try {
-      await nav.share({ files: [file], title: name });
+      await nav.share({ files: [file], title: file.name });
       return 'shared';
     } catch (e) {
       if ((e as { name?: string })?.name === 'AbortError') return 'cancelled';

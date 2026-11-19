@@ -19,6 +19,8 @@ export async function exportPdf(
   doc: Doc,
   sources: Map<string, SourceFile>,
   rasterize: Rasterizer,
+  /** Called after each page with (pages done, total pages). */
+  onProgress?: (done: number, total: number) => void,
 ): Promise<Uint8Array> {
   const out = await PDFDocument.create();
   const loaded = new Map<string, Promise<PDFDocument>>();
@@ -31,6 +33,8 @@ export async function exportPdf(
     return p;
   };
 
+  const total = doc.pages.length;
+  let done = 0;
   for (const page of doc.pages) {
     const source = sources.get(page.source.fileId);
     if (!source) throw new Error(`Missing source file ${page.source.fileId}`);
@@ -47,6 +51,7 @@ export async function exportPdf(
       copied.setRotation(degrees(effectiveRotation(page)));
       out.addPage(copied);
     }
+    onProgress?.(++done, total);
   }
   return out.save();
 }
