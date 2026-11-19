@@ -5,14 +5,26 @@ import { Toolbar } from './Toolbar';
 import { Progress } from './Progress';
 import { ReviewGrid } from './ReviewGrid';
 import { Diagnostics, DIAG_HASH } from './Diagnostics';
+import { UpdatePrompt } from './UpdatePrompt';
 import { strings } from './strings';
 import './app.css';
 
 export function App({ store }: { store?: AppStore }) {
   const [s] = useState(() => store ?? createAppStore());
+
+  // ask the browser not to evict IndexedDB (session + offline data) under storage pressure; best-effort
+  useEffect(() => {
+    try {
+      void navigator.storage?.persist?.().catch(() => {});
+    } catch {
+      /* unsupported */
+    }
+  }, []);
+
   return (
     <AppStoreProvider store={s}>
       <Shell />
+      <UpdatePrompt />
     </AppStoreProvider>
   );
 }
