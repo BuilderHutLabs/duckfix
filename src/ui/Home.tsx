@@ -1,10 +1,19 @@
 import { useRef } from 'react';
+import { DuckLogo } from './DuckLogo';
 import { useAppStore } from './store';
 import { strings } from './strings';
 import { Settings } from './Toolbar';
 import { useSecretTaps } from './Diagnostics';
 
 export const FILE_ACCEPT = 'application/pdf,image/*';
+
+let introPlayed = false;
+/** The duck quacks once per app start, not every time the user comes back to the home screen. */
+function playIntro(): boolean {
+  if (introPlayed) return false;
+  introPlayed = true;
+  return true;
+}
 
 export function Home() {
   const { open, busy, restorable, restore, discardStored, openDiagnostics } = useAppStore();
@@ -17,13 +26,7 @@ export function Home() {
         <Settings />
       </div>
       {/* 5 taps on the title open the diagnostics screen */}
-      <img
-        className="home-icon"
-        src={import.meta.env.BASE_URL + 'icons/icon-192.png'}
-        alt=""
-        width={96}
-        height={96}
-      />
+      <DuckLogo autoplay={playIntro()} />
       <h1 className="home-title" onClick={onTitleTap}>
         {strings.appName}
       </h1>

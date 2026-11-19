@@ -15,9 +15,8 @@ describe('Home screen', () => {
     for (const step of ['1. Otwórz', '2. Sprawdź', '3. Zapisz']) {
       expect(screen.getByText(step)).toBeTruthy();
     }
-    const src = document.querySelector('img.home-icon')?.getAttribute('src') ?? '';
-    expect(src.endsWith('icons/icon-192.png')).toBe(true);
-    expect(src).toBe(import.meta.env.BASE_URL + 'icons/icon-192.png');
+    // the duck logo (animated SVG) replaces the static icon image
+    expect(document.querySelector('.home .duck svg')).not.toBeNull();
   });
 
   it('settings popover closes on outside pointerdown and on Escape', () => {

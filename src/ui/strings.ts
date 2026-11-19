@@ -56,6 +56,7 @@ export const strings = {
   diagnostics: 'Diagnostyka',
   deskew: 'Prostuj przekrzywienie',
   deskewHint: 'Zmiana działa przy następnym otwarciu pliku.',
+  quack: 'Kwa kwa!',
   theme: 'Wygląd',
   themeAuto: 'Automatyczny',
   themeLight: 'Jasny',
