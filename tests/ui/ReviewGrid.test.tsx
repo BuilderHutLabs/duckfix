@@ -38,6 +38,11 @@ function setup(doc: Doc, deps = fakeDeps()): AppStore {
   return store;
 }
 
+const openMenu = () => fireEvent.click(screen.getByRole('button', { name: strings.more }));
+const openSelectMode = () => {
+  openMenu();
+  fireEvent.click(screen.getByRole('button', { name: strings.select }));
+};
 const thumbs = () => screen.queryAllByRole('button', { name: /^Strona \d+/ });
 const thumb = (n: number) => screen.getByRole('button', { name: new RegExp(`^Strona ${n}\\b`) });
 
@@ -129,7 +134,7 @@ describe('review grid', () => {
 
   it('select mode: select 2 of 3, remove leaves 1 page; undo brings back 3', () => {
     const store = setup(docWithFlags(3));
-    fireEvent.click(screen.getByRole('button', { name: strings.select }));
+    openSelectMode();
     fireEvent.click(thumb(1));
     fireEvent.click(thumb(3));
     expect(store.getState().doc.pages.every((p) => p.rotation === 0)).toBe(true); // taps select, not rotate
@@ -143,7 +148,7 @@ describe('review grid', () => {
 
   it('select mode: rotate rotates only the selected pages', () => {
     const store = setup(docWithFlags(3));
-    fireEvent.click(screen.getByRole('button', { name: strings.select }));
+    openSelectMode();
     fireEvent.click(thumb(2));
     fireEvent.click(screen.getByRole('button', { name: strings.rotate }));
     expect(store.getState().doc.pages.map((p) => p.rotation)).toEqual([0, 90, 0]);
@@ -182,6 +187,48 @@ describe('review grid', () => {
     setup(doc);
     const frame = thumb(1).querySelector('.thumb-frame') as HTMLElement;
     expect(frame.style.transform).toBe('rotate(271.5deg)');
+  });
+});
+
+describe('review chrome', () => {
+  it('⋯ menu holds Zaznacz, deskew and Diagnostyka and closes after choosing', () => {
+    setup(docWithFlags(3));
+    openMenu();
+    expect(screen.getByRole('button', { name: strings.select })).toBeTruthy();
+    expect(screen.getByRole('checkbox', { name: strings.deskew })).toBeTruthy();
+    expect(screen.getByRole('button', { name: strings.diagnostics })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: strings.select }));
+    expect(screen.getByText(strings.selectedCount(0))).toBeTruthy();
+    expect(screen.queryByRole('checkbox', { name: strings.deskew })).toBeNull();
+  });
+
+  it('⋯ menu closes on Escape and on outside tap', () => {
+    setup(docWithFlags(3));
+    openMenu();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('checkbox', { name: strings.deskew })).toBeNull();
+    openMenu();
+    expect(screen.getByRole('checkbox', { name: strings.deskew })).toBeTruthy();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('checkbox', { name: strings.deskew })).toBeNull();
+  });
+
+  it('filter capsule shows the count and toggles the filter', () => {
+    setup(docWithFlags(5, { 0: ['check-orientation'], 2: ['low-text'], 4: ['check-orientation'] }));
+    expect(screen.getByText('3 strony do sprawdzenia')).toBeTruthy();
+    const capsule = screen.getByRole('button', { name: strings.showOnlyFlagged });
+    expect(capsule.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(capsule);
+    expect(capsule.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('save lives in the bottom action bar; selection actions replace it', () => {
+    setup(docWithFlags(3));
+    expect(screen.getByRole('button', { name: strings.save }).closest('.action-bar')).not.toBeNull();
+    openSelectMode();
+    expect(screen.getByRole('button', { name: strings.rotate }).closest('.action-bar')).not.toBeNull();
+    expect(screen.getByRole('button', { name: strings.remove }).closest('.action-bar')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: strings.save })).toBeNull();
   });
 });
 

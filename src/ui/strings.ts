@@ -48,6 +48,8 @@ export const strings = {
   addAtEnd: 'Dodaj strony',
 
   settings: 'Ustawienia',
+  more: 'Więcej',
+  diagnostics: 'Diagnostyka',
   deskew: 'Prostuj przekrzywienie',
   deskewHint: 'Zmiana działa przy następnym otwarciu pliku.',
 

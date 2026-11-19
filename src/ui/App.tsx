@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { AppStoreProvider, createAppStore, useAppStore, type AppStore } from './store';
 import { Home } from './Home';
 import { Toolbar } from './Toolbar';
+import { ActionBar } from './ActionBar';
 import { Progress } from './Progress';
 import { ReviewGrid } from './ReviewGrid';
 import { Diagnostics, DIAG_HASH } from './Diagnostics';
@@ -85,6 +86,7 @@ function Shell() {
             <NoticeBanner />
           </div>
           <ReviewGrid />
+          <ActionBar />
         </div>
       )}
     </>
