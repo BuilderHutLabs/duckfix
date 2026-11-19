@@ -3,7 +3,7 @@
 <title>OSD calibration (dev only)</title>
 <pre id="out">running...</pre>
 <script type="module">
-  import { createTesseractDetector } from '/wduck/src/orientation/tesseract.ts';
+  import { createTesseractDetector } from '/duckfix/src/orientation/tesseract.ts';
   const lines = ['The quick brown fox jumps over the lazy dog.', 'Pack my box with five dozen liquor jugs.', 'How vexingly quick daft zebras jump today.', 'Sphinx of black quartz, judge my vow now.', 'Waltz, bad nymph, for quick jigs vex Bud.'];
   function page(cw) {
     const w = 1000, h = 700, c = document.createElement('canvas');
@@ -16,7 +16,7 @@
     lines.forEach((t, i) => x.fillText(t, 40, 80 + i * 100));
     return c;
   }
-  const d = await createTesseractDetector({ basePath: '/wduck/', workers: 1 });
+  const d = await createTesseractDetector({ basePath: '/duckfix/', workers: 1 });
   let out = 'source CW -> rotation (expected (360-N)%360), confidence\n';
   for (const cw of [0, 90, 180, 270]) {
     const r = await d.detect(page(cw));

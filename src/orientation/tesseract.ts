@@ -16,7 +16,7 @@ export function osdToRotation(orientationDegrees: number): Rotation {
 }
 
 export interface TesseractDetectorOptions {
-  /** Base URL of the app, e.g. import.meta.env.BASE_URL ('/wduck/'). */
+  /** Base URL of the app, e.g. import.meta.env.BASE_URL ('/duckfix/'). */
   basePath: string;
   workers: number;
 }

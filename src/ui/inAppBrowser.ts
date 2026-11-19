@@ -1,7 +1,7 @@
 /**
  * Messenger, Facebook and Instagram open links in their own built-in browser (a WebView). It
  * silently drops downloads of generated files, can't install the app and has separate storage,
- * so WDuck asks the user to switch to the real browser.
+ * so DuckFix asks the user to switch to the real browser.
  */
 export type InAppPlatform = 'android' | 'ios';
 

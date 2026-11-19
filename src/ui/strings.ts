@@ -10,7 +10,7 @@ function plural(n: number, one: string, few: string, many: string): string {
 }
 
 export const strings = {
-  appName: 'WDuck',
+  appName: 'DuckFix',
   updateAvailable: 'Dostępna nowa wersja',
   updateAction: 'Odśwież',
   appDescription: 'Automatycznie obraca i prostuje krzywe skany PDF.',
