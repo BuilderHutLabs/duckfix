@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { effectiveRotation } from '../model/document';
 import { releaseCanvas, renderPage } from '../imaging/render';
 import type { ThumbnailCache } from './thumbnails';
@@ -14,6 +14,10 @@ interface Props {
   /** Its miniature is shown while the sharp render loads. */
   cache?: ThumbnailCache;
 }
+
+/** A touch hold opens the preview under the finger; the click that follows the touchend must not hit it. */
+const GHOST_CLICK_MS = 400;
+const noSubscribe = () => () => {};
 
 /** Long side of the sharp render: enough for the screen at its pixel density, bounded for iOS memory. */
 function previewMaxSide(): number {
@@ -63,7 +67,11 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     })();
     return () => {
       cancelled = true;
-      if (url) URL.revokeObjectURL(url);
+      if (url) {
+        URL.revokeObjectURL(url);
+        const revoked = url;
+        setFull((cur) => (cur?.url === revoked ? null : cur));
+      }
     };
   }, [pageId, source, sourceRef, render]);
 
@@ -81,9 +89,21 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     return () => document.removeEventListener('keydown', onKey);
   }, [open, prevId, nextId, closePreview, openPreview]);
 
+  const thumb = useSyncExternalStore(
+    (cb) => (cache && pageId !== null ? cache.subscribe(pageId, cb) : noSubscribe()),
+    () => (cache && pageId !== null ? cache.get(pageId) : undefined),
+  );
+
   const wasOpen = useRef(false);
+  const openedAt = useRef(0);
+  const guarded = (fn: () => void) => () => {
+    if (Date.now() - openedAt.current >= GHOST_CLICK_MS) fn();
+  };
   useEffect(() => {
-    if (open && !wasOpen.current) dialog.current?.focus({ preventScroll: true });
+    if (open && !wasOpen.current) {
+      openedAt.current = Date.now();
+      dialog.current?.focus({ preventScroll: true });
+    }
     wasOpen.current = open;
   }, [open]);
 
@@ -91,7 +111,6 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
 
   const angle = effectiveRotation(page) + page.skewDeg;
   const sideways = Math.round(angle / 90) % 2 !== 0;
-  const thumb = cache?.get(page.id);
   const src = full?.id === page.id ? full.url : thumb?.status === 'ready' ? thumb.url : null;
   const number = doc.pages.indexOf(page) + 1;
 
@@ -105,13 +124,13 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
       tabIndex={-1}
     >
       <div className="preview-bar">
-        <button type="button" className="btn btn-icon preview-btn" aria-label={strings.close} onClick={closePreview}>
+        <button type="button" className="btn btn-icon preview-btn" aria-label={strings.close} onClick={guarded(closePreview)}>
           <IconClose />
         </button>
         <span className="preview-title" aria-hidden="true">
           {strings.page(number)}
         </span>
-        <button type="button" className="btn btn-plain preview-rotate" onClick={() => rotate([page.id], 90)}>
+        <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => rotate([page.id], 90))}>
           {strings.rotate}
         </button>
       </div>
@@ -131,7 +150,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
         className="btn btn-icon preview-nav preview-prev"
         aria-label={strings.previousPage}
         disabled={!prevId}
-        onClick={() => prevId && openPreview(prevId)}
+        onClick={guarded(() => prevId && openPreview(prevId))}
       >
         <IconChevronLeft />
       </button>
@@ -140,7 +159,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
         className="btn btn-icon preview-nav preview-next"
         aria-label={strings.nextPage}
         disabled={!nextId}
-        onClick={() => nextId && openPreview(nextId)}
+        onClick={guarded(() => nextId && openPreview(nextId))}
       >
         <IconChevronRight />
       </button>
