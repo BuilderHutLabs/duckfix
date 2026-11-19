@@ -19,7 +19,7 @@ function dropDevOnlyPages(): Plugin {
   };
 }
 
-const THEME_COLOR = '#1f2937';
+const THEME_COLOR = '#f2f2f7';
 
 export default defineConfig({
   base: '/wduck/',
