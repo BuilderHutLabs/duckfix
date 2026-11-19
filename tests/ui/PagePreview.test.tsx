@@ -33,7 +33,14 @@ function fakeCanvas() {
 }
 
 let urlCount = 0;
+let now = 1_000_000;
+/** Moves the clock past the ghost-click guard of a freshly opened preview. */
+const settle = () => {
+  now += 500;
+};
 beforeEach(() => {
+  now = 1_000_000;
+  vi.spyOn(Date, 'now').mockImplementation(() => now);
   urlCount = 0;
   URL.createObjectURL = vi.fn(() => `blob:full-${++urlCount}`);
   URL.revokeObjectURL = vi.fn();
@@ -41,6 +48,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
 describe('isHoldRelease', () => {
@@ -57,6 +65,7 @@ describe('page preview', () => {
     render(<App store={store} />);
     act(() => store.openPreview('p2'));
     const dlg = screen.getByRole('dialog', { name: 'Podgląd: strona 2' });
+    settle();
     fireEvent.click(within(dlg).getByRole('button', { name: strings.rotate }));
     expect(store.getState().doc.pages[1].rotation).toBe(90);
     act(() => store.undo());
@@ -80,6 +89,7 @@ describe('page preview', () => {
     const prev = screen.getByRole('button', { name: strings.previousPage });
     const next = screen.getByRole('button', { name: strings.nextPage });
     expect((prev as HTMLButtonElement).disabled).toBe(true);
+    settle();
     fireEvent.click(next);
     expect(dialog(3)).not.toBeNull();
     expect((screen.getByRole('button', { name: strings.nextPage }) as HTMLButtonElement).disabled).toBe(true);
@@ -135,6 +145,65 @@ describe('page preview', () => {
     expect(releaseCanvas).toHaveBeenCalledTimes(2);
     act(() => store.closePreview());
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:full-1');
+  });
+});
+
+describe('preview robustness', () => {
+  it('reopening a page does not show the revoked URL', async () => {
+    const store = setup(docWithFlags(1));
+    const fake = vi.fn(async () => fakeCanvas());
+    render(
+      <AppStoreProvider store={store}>
+        <PagePreview pageIds={['p1']} render={fake} />
+      </AppStoreProvider>,
+    );
+    act(() => store.openPreview('p1'));
+    const first = ((await screen.findByRole('presentation')) as HTMLImageElement).src;
+    act(() => store.closePreview());
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(first);
+    fake.mockImplementation(() => new Promise(() => {}));
+    act(() => store.openPreview('p1'));
+    const img = screen.queryByRole('presentation') as HTMLImageElement | null;
+    expect(img?.src ?? null).not.toBe(first);
+  });
+
+  it('the placeholder thumbnail appears when it finishes during the preview', () => {
+    const store = setup(docWithFlags(1));
+    let state: { status: 'ready'; url: string } | undefined;
+    const subs = new Set<() => void>();
+    const cache = {
+      get: () => state,
+      subscribe: (_id: string, cb: () => void) => {
+        subs.add(cb);
+        return () => subs.delete(cb);
+      },
+    } as never;
+    render(
+      <AppStoreProvider store={store}>
+        <PagePreview pageIds={['p1']} render={() => new Promise(() => {})} cache={cache} />
+      </AppStoreProvider>,
+    );
+    act(() => store.openPreview('p1'));
+    expect(screen.queryByRole('presentation')).toBeNull();
+    state = { status: 'ready', url: 'blob:thumb' };
+    act(() => subs.forEach((cb) => cb()));
+    expect((screen.getByRole('presentation') as HTMLImageElement).src).toBe('blob:thumb');
+  });
+
+  it('ignores the ghost click right after opening', () => {
+    const store = setup(docWithFlags(2));
+    render(
+      <AppStoreProvider store={store}>
+        <PagePreview pageIds={['p1', 'p2']} />
+      </AppStoreProvider>,
+    );
+    act(() => store.openPreview('p1'));
+    fireEvent.click(screen.getByRole('button', { name: strings.close }));
+    fireEvent.click(screen.getByRole('button', { name: strings.nextPage }));
+    expect(dialog(1)).not.toBeNull();
+    settle();
+    fireEvent.click(screen.getByRole('button', { name: strings.close }));
+    expect(dialog(1)).toBeNull();
   });
 });
 
