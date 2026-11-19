@@ -9,11 +9,57 @@
   --sep: #e5e5ea;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 14px rgba(0, 0, 0, 0.06);
   --shadow-float: 0 8px 28px rgba(0, 0, 0, 0.18);
+  --fill: rgba(120, 120, 128, 0.12);
+  --bar: rgba(255, 255, 255, 0.8);
+  --danger-text: #c4261d;
+  --ok-text: #1d7a37;
+  --flag-text: #a85a00;
   --col-gap: 28px;
   --row-gap: 14px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--text);
   -webkit-text-size-adjust: 100%;
+  color-scheme: light;
+}
+
+/* dark: the system setting (unless "Jasny" is chosen) or an explicit "Ciemny" */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --bg: #000000;
+    --card: #1c1c1e;
+    --accent: #0a84ff;
+    --flag: #ff9f0a;
+    --danger: #ff453a;
+    --text: #f2f2f7;
+    --text-2: #98989f;
+    --sep: #38383a;
+    --fill: rgba(120, 120, 128, 0.32);
+    --bar: rgba(28, 28, 30, 0.78);
+    --danger-text: #ff6961;
+    --ok-text: #4cd964;
+    --flag-text: #ffb340;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 14px rgba(0, 0, 0, 0.35);
+    --shadow-float: 0 8px 28px rgba(0, 0, 0, 0.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --bg: #000000;
+  --card: #1c1c1e;
+  --accent: #0a84ff;
+  --flag: #ff9f0a;
+  --danger: #ff453a;
+  --text: #f2f2f7;
+  --text-2: #98989f;
+  --sep: #38383a;
+  --fill: rgba(120, 120, 128, 0.32);
+  --bar: rgba(28, 28, 30, 0.78);
+  --danger-text: #ff6961;
+  --ok-text: #4cd964;
+  --flag-text: #ffb340;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.5), 0 4px 14px rgba(0, 0, 0, 0.35);
+  --shadow-float: 0 8px 28px rgba(0, 0, 0, 0.6);
+  color-scheme: dark;
 }
 
 * {
@@ -51,7 +97,7 @@ button {
   padding: 0 16px;
   border: 0;
   border-radius: 12px;
-  background: rgba(120, 120, 128, 0.12);
+  background: var(--fill);
   color: var(--text);
   font-size: 16px;
   cursor: pointer;
@@ -155,7 +201,7 @@ button {
 .home-steps li {
   padding: 5px 12px;
   border-radius: 999px;
-  background: rgba(120, 120, 128, 0.12);
+  background: var(--fill);
   color: var(--text-2);
   font-size: 13px;
 }
@@ -175,11 +221,11 @@ button {
 }
 .error-banner {
   background: rgba(255, 59, 48, 0.12);
-  color: #c4261d;
+  color: var(--danger-text);
 }
 .notice-banner {
   background: rgba(52, 199, 89, 0.14);
-  color: #1d7a37;
+  color: var(--ok-text);
 }
 /* on Home the banner is the first thing on screen: keep it below the iOS status bar */
 #root > .error-banner,
@@ -221,7 +267,7 @@ button {
   gap: 4px;
   padding: 6px max(12px, env(safe-area-inset-right)) 6px max(12px, env(safe-area-inset-left));
   padding-top: max(6px, env(safe-area-inset-top));
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--bar);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--sep);
@@ -249,7 +295,7 @@ button {
   padding: 0 10px;
   border: 0;
   border-radius: 999px;
-  background: rgba(120, 120, 128, 0.12);
+  background: var(--fill);
   color: var(--text-2);
   font-size: 14px;
   font-weight: 600;
@@ -260,7 +306,7 @@ button {
 }
 .capsule.flag {
   background: rgba(255, 159, 10, 0.16);
-  color: #b25f00;
+  color: var(--flag-text);
 }
 button.capsule {
   cursor: pointer;
@@ -350,7 +396,7 @@ button.capsule.on {
 
 .progress {
   padding: 0 0 6px;
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--bar);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
 }
@@ -384,7 +430,7 @@ button.capsule.on {
   gap: 10px;
   padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left));
   padding-bottom: max(10px, env(safe-area-inset-bottom));
-  background: rgba(255, 255, 255, 0.8);
+  background: var(--bar);
   -webkit-backdrop-filter: blur(20px);
   backdrop-filter: blur(20px);
   border-top: 1px solid var(--sep);
@@ -677,7 +723,7 @@ body:has(.action-bar) .update-prompt {
   padding: 10px 12px 10px 14px;
   border-radius: 14px;
   background: rgba(255, 159, 10, 0.16);
-  color: #8a4b00;
+  color: var(--flag-text);
   font-size: 15px;
   overflow-wrap: anywhere;
 }
@@ -800,4 +846,43 @@ body:has(.action-bar) .update-prompt {
 @media (prefers-reduced-motion: reduce) {
   .thumb-frame { transition: none; }
   .preview, .preview-stage { animation: none; }
+}
+
+/* ---------- theme picker (segmented control) ---------- */
+
+.theme-picker {
+  padding: 6px 12px 10px;
+}
+.theme-label {
+  display: block;
+  font-size: 13px;
+  color: var(--text-2);
+  margin-bottom: 6px;
+}
+.segmented {
+  display: flex;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--fill);
+}
+.segmented button {
+  flex: 1;
+  min-height: 34px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  font-size: 13px;
+  cursor: pointer;
+  position: relative;
+}
+/* 44 px tap target */
+.segmented button::after {
+  content: '';
+  position: absolute;
+  inset: -5px 0;
+}
+.segmented button[aria-pressed='true'] {
+  background: var(--card);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
 }
