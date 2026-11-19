@@ -94,14 +94,29 @@ describe('persistent session', () => {
     await waitFor(() => expect(box.stored).toBeNull());
   });
 
-  it('opening a file clears the old session, then stores the new doc and sources', async () => {
+  it('a failed import keeps the stored session restorable', async () => {
+    const { box, session } = memorySession(stored);
+    const deps = fakeDeps({ session });
+    vi.mocked(deps.importFiles).mockRejectedValueOnce(new Error('encrypted'));
+    const store = createAppStore(deps);
+    await act(async () => {}); // let the startup load resolve
+    await store.open([new File(['x'], 'zly.pdf')]);
+    expect(store.getState().error).toBeTruthy();
+    expect(session.clear).not.toHaveBeenCalled();
+    expect(box.stored).toEqual(stored);
+    expect(store.getState().restorable).toBe(true);
+    store.restore();
+    expect(store.getState().phase).toBe('analyzing');
+    expect(store.getState().doc.pages.map((p) => p.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('opening a file stores the new doc and sources over the old session', async () => {
     const { box, session } = memorySession(stored);
     const store = createAppStore(fakeDeps({ session }));
     await act(async () => {}); // let the startup load resolve
     await store.open([new File(['x'], 'nowy.pdf')]);
-    expect(vi.mocked(session.clear).mock.invocationCallOrder[0]).toBeLessThan(
-      vi.mocked(session.save).mock.invocationCallOrder[0],
-    );
+    expect(session.clear).not.toHaveBeenCalled();
+    expect(session.save).toHaveBeenCalledTimes(1);
     expect(box.stored!.doc.pages.map((p) => p.id)).toEqual(['n1']);
     expect(box.stored!.sources).toEqual([source]);
     expect(store.getState().restorable).toBe(false);

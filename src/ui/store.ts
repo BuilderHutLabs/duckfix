@@ -292,14 +292,17 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
 
     async open(files: File[]) {
       if (files.length === 0 || state.busy) return;
-      clearStored(); // a new file replaces the stored document
+      // The stored document is only replaced once the import succeeded (saveAll overwrites it).
       set({ busy: 'opening', error: null, restorable: false });
       try {
         const { sources, pages } = await deps.importFiles(files);
+        stored = null;
+        storedReplaced = true;
         actions.load({ pages }, sources);
         saveAll();
       } catch (e) {
-        set({ busy: null, error: errorMessage(e) });
+        set({ busy: null, error: errorMessage(e), restorable: stored !== null });
+        if (stored === null && !storedReplaced) loadStored(); // startup load was ignored while busy
       }
     },
 
@@ -451,12 +454,15 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     },
   };
 
-  void deps.session?.load().then((s) => {
-    // ignore when the user already opened (or closed) something while it loaded
-    if (!s || storedReplaced || state.phase !== 'home' || state.busy) return;
-    stored = s;
-    set({ restorable: true });
-  }, () => {});
+  function loadStored() {
+    void deps.session?.load().then((s) => {
+      // ignore when the user already opened (or closed) something while it loaded
+      if (!s || storedReplaced || state.phase !== 'home' || state.busy) return;
+      stored = s;
+      set({ restorable: true });
+    }, () => {});
+  }
+  loadStored();
 
   return {
     ...actions,
