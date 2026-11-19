@@ -80,6 +80,8 @@ function browserDeps(): StoreDeps {
 const DESKEW_KEY = 'wduck.deskew';
 const ANALYZE = { concurrency: 2, maxSide: ANALYSIS_MAX_SIDE } as const;
 const SAVE_DOC_DELAY_MS = 500;
+/** While changes keep coming (analysis progress), the doc is still saved at least this often. */
+const SAVE_DOC_MAX_WAIT_MS = 2500;
 
 /**
  * Applies an analysis result to one history state. Unanalyzed pages start at rotation 0 and only
@@ -126,6 +128,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
   /** Last doc handed to session storage, and the pending debounced save. */
   let persistedDoc: Doc = history.present;
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
+  /** When the oldest unsaved change was scheduled (start of the max-wait window). */
+  let savePendingSince: number | null = null;
 
   const readDeskew = (): boolean => {
     try {
@@ -155,6 +159,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
   const cancelDocSave = () => {
     if (saveTimer !== null) clearTimeout(saveTimer);
     saveTimer = null;
+    savePendingSince = null;
   };
 
   const saveDocNow = () => {
@@ -163,11 +168,15 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     void deps.session?.saveDoc(persistedDoc);
   };
 
-  /** Stores the doc 500 ms after the last change, while a document is open. */
+  /** Stores the doc 500 ms after the last change (but at most 2.5 s after the first unsaved one), while a document is open. */
   const scheduleDocSave = () => {
     if (!deps.session || state.sources.size === 0 || history.present === persistedDoc) return;
+    const now = Date.now();
+    const since = savePendingSince ?? now;
     cancelDocSave();
-    saveTimer = setTimeout(saveDocNow, SAVE_DOC_DELAY_MS);
+    savePendingSince = since;
+    const delay = Math.max(0, Math.min(SAVE_DOC_DELAY_MS, since + SAVE_DOC_MAX_WAIT_MS - now));
+    saveTimer = setTimeout(saveDocNow, delay);
   };
 
   /** Stores doc + sources at once (the source set changed). */

@@ -146,6 +146,39 @@ describe('persistent session', () => {
     expect(box.stored).toBeNull();
   });
 
+  it('keeps saving at least every 2.5 s while changes keep coming', async () => {
+    vi.useFakeTimers();
+    const { ctl, analyzePages } = controllableAnalysis();
+    const { session } = memorySession();
+    const deps = fakeDeps({ session, analyzePages });
+    const many = Array.from({ length: 12 }, (_, i) => page(`q${i}`, { analyzed: false, autoRotation: null }));
+    vi.mocked(deps.importFiles).mockResolvedValueOnce({ sources: [source], pages: many });
+    const store = createAppStore(deps);
+    await store.open([new File(['x'], 'skan.pdf')]);
+    await vi.advanceTimersByTimeAsync(0);
+
+    // a result every 400 ms re-arms the 500 ms debounce each time
+    for (let i = 0; i < 6; i++) {
+      ctl.onResult!(result(`q${i}`));
+      await vi.advanceTimersByTimeAsync(400);
+    }
+    // 2400 ms since the first unsaved change: not yet
+    expect(session.saveDoc).not.toHaveBeenCalled();
+    ctl.onResult!(result('q6'));
+    await vi.advanceTimersByTimeAsync(100);
+    expect(session.saveDoc).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(session.saveDoc).mock.calls[0][0].pages.filter((p) => p.analyzed)).toHaveLength(7);
+
+    // the window restarts after a save
+    for (let i = 7; i < 12; i++) {
+      ctl.onResult!(result(`q${i}`));
+      await vi.advanceTimersByTimeAsync(400);
+    }
+    expect(session.saveDoc).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(500);
+    expect(session.saveDoc).toHaveBeenCalledTimes(2);
+  });
+
   it('insertAt stores the new source set', async () => {
     const { box, session } = memorySession();
     const deps = fakeDeps({ session });
