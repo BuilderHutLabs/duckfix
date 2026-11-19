@@ -254,8 +254,6 @@ button {
   font-size: 14px;
   font-weight: 600;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .toolbar > .capsule {
   flex: 0 1 auto;
@@ -271,6 +269,7 @@ button.capsule {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .capsule svg {
   flex: none;
