@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { isFlagged, useAppStore } from './store';
 import { strings } from './strings';
-import { IconClose, IconGear, IconRedo, IconUndo } from './icons';
+import { IconClose, IconFilter, IconGear, IconRedo, IconUndo } from './icons';
 import { MoreMenu } from './MoreMenu';
 
 export function Toolbar() {
@@ -39,14 +39,17 @@ export function Toolbar() {
           type="button"
           className={s.filterFlagged ? `${capsuleClass} on` : capsuleClass}
           aria-pressed={s.filterFlagged}
-          aria-label={strings.showOnlyFlagged}
+          aria-label={`${strings.toCheck(flagged)}. ${strings.showOnlyFlagged}`}
           title={strings.showOnlyFlagged}
           onClick={() => s.setFilterFlagged(!s.filterFlagged)}
         >
-          {strings.toCheck(flagged)}
+          <IconFilter />
+          <span className="capsule-text">{strings.toCheckShort(flagged)}</span>
         </button>
       ) : (
-        <span className={capsuleClass}>{strings.toCheck(flagged)}</span>
+        <span className={capsuleClass}>
+          <span className="capsule-text">{strings.toCheckShort(flagged)}</span>
+        </span>
       )}
       <span className="toolbar-spacer" />
       <button
@@ -78,8 +81,26 @@ export function Toolbar() {
 export function Settings() {
   const { deskew, setDeskew } = useAppStore();
   const [open, setOpen] = useState(false);
+  const root = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: Event) => {
+      if (!root.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
   return (
-    <div className="settings">
+    <div className="settings" ref={root}>
       <button
         type="button"
         className="btn btn-icon"

@@ -26,6 +26,7 @@ export const strings = {
 
   analyzing: (done: number, total: number) => `Analizuję ${done}/${total}`,
   toCheck: (n: number) => `${n} ${plural(n, 'strona', 'strony', 'stron')} do sprawdzenia`,
+  toCheckShort: (n: number) => `${n} do sprawdzenia`,
   showOnlyFlagged: 'Pokaż tylko te',
   nothingFlagged: 'Wszystkie strony sprawdzone.',
   emptyDoc: 'Brak stron. Dodaj strony przyciskiem „+”.',
