@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { App } from '../../src/ui/App';
 import { createAppStore } from '../../src/ui/store';
 import { strings } from '../../src/ui/strings';
@@ -18,5 +18,17 @@ describe('Home screen', () => {
     const src = document.querySelector('img.home-icon')?.getAttribute('src') ?? '';
     expect(src.endsWith('icons/icon-192.png')).toBe(true);
     expect(src).toBe(import.meta.env.BASE_URL + 'icons/icon-192.png');
+  });
+
+  it('settings popover closes on outside pointerdown and on Escape', () => {
+    render(<App store={createAppStore(fakeDeps())} />);
+    const gear = () => screen.getByRole('button', { name: strings.settings });
+    fireEvent.click(gear());
+    expect(screen.getByRole('checkbox', { name: strings.deskew })).toBeTruthy();
+    fireEvent.pointerDown(document.body);
+    expect(screen.queryByRole('checkbox', { name: strings.deskew })).toBeNull();
+    fireEvent.click(gear());
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('checkbox', { name: strings.deskew })).toBeNull();
   });
 });

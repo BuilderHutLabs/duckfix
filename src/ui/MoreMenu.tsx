@@ -38,7 +38,7 @@ export function MoreMenu() {
         aria-label={strings.more}
         title={strings.more}
         aria-expanded={open}
-        aria-haspopup="true"
+        aria-haspopup="dialog"
         onClick={() => setOpen(!open)}
       >
         <IconMore />

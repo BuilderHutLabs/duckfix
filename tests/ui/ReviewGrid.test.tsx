@@ -73,9 +73,9 @@ describe('review grid', () => {
 
   it('counts flagged pages and filters to them', () => {
     setup(docWithFlags(5, { 0: ['check-orientation'], 2: ['low-text'], 4: ['check-orientation'] }));
-    expect(screen.getByText('3 strony do sprawdzenia')).toBeTruthy();
+    expect(screen.getByText('3 do sprawdzenia')).toBeTruthy();
     expect(thumbs()).toHaveLength(5);
-    fireEvent.click(screen.getByRole('button', { name: strings.showOnlyFlagged }));
+    fireEvent.click(screen.getByRole('button', { name: /Pokaż tylko te/ }));
     expect(thumbs()).toHaveLength(3);
     expect(thumbs().map((b) => b.getAttribute('aria-label')?.split(',')[0])).toEqual([
       'Strona 1',
@@ -87,17 +87,17 @@ describe('review grid', () => {
   it('tapping a check-orientation page clears its flag from the counter', () => {
     setup(docWithFlags(5, { 0: ['check-orientation'], 2: ['low-text'], 4: ['check-orientation'] }));
     fireEvent.click(thumb(1));
-    expect(screen.getByText('2 strony do sprawdzenia')).toBeTruthy();
+    expect(screen.getByText('2 do sprawdzenia')).toBeTruthy();
   });
 
   it('tapping every flagged page (incl. low-text) brings the counter to 0', () => {
     setup(docWithFlags(3, { 0: ['check-orientation'], 2: ['low-text'] }));
-    fireEvent.click(screen.getByRole('button', { name: strings.showOnlyFlagged }));
+    fireEvent.click(screen.getByRole('button', { name: /Pokaż tylko te/ }));
     fireEvent.click(thumb(1));
     fireEvent.click(thumb(3));
     // tapped pages stay in the filtered view so they can be turned further
     expect(thumbs()).toHaveLength(2);
-    expect(screen.getByText('0 stron do sprawdzenia')).toBeTruthy();
+    expect(screen.getByText('0 do sprawdzenia')).toBeTruthy();
     expect(screen.getByText(strings.nothingFlagged)).toBeTruthy();
   });
 
@@ -215,11 +215,27 @@ describe('review chrome', () => {
 
   it('filter capsule shows the count and toggles the filter', () => {
     setup(docWithFlags(5, { 0: ['check-orientation'], 2: ['low-text'], 4: ['check-orientation'] }));
-    expect(screen.getByText('3 strony do sprawdzenia')).toBeTruthy();
-    const capsule = screen.getByRole('button', { name: strings.showOnlyFlagged });
+    expect(screen.getByText('3 do sprawdzenia')).toBeTruthy();
+    const capsule = screen.getByRole('button', { name: /Pokaż tylko te/ });
     expect(capsule.getAttribute('aria-pressed')).toBe('false');
     fireEvent.click(capsule);
     expect(capsule.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('capsule accessible name keeps the count', () => {
+    setup(docWithFlags(5, { 0: ['check-orientation'], 2: ['low-text'] }));
+    const capsule = screen.getByRole('button', { name: /Pokaż tylko te/ });
+    expect(capsule.getAttribute('aria-label')).toContain('2 strony do sprawdzenia');
+  });
+
+  it('⋯ → Diagnostyka opens diagnostics and Zamknij returns to review', async () => {
+    setup(docWithFlags(3));
+    openMenu();
+    fireEvent.click(screen.getByRole('button', { name: strings.diagnostics }));
+    expect(await screen.findByTestId('diag-report')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: strings.close }));
+    expect(screen.queryByTestId('diag-report')).toBeNull();
+    expect(screen.getByRole('button', { name: strings.save })).toBeTruthy();
   });
 
   it('save lives in the bottom action bar; selection actions replace it', () => {

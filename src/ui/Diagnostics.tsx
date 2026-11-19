@@ -86,23 +86,24 @@ export function Diagnostics({ onClose }: { onClose(): void }) {
     <main className="diag">
       <header className="toolbar diag-bar">
         <h1 className="diag-title">{strings.diagTitle}</h1>
-        <span className="toolbar-spacer" />
-        <button type="button" className="btn btn-plain" disabled={!report} onClick={() => void copy()}>
-          {copied ? strings.copied : strings.copy}
-        </button>
-        {canShare && (
-          <button
-            type="button"
-            className="btn btn-plain"
-            disabled={!report}
-            onClick={() => void navigator.share({ text: report }).catch(() => {})}
-          >
-            {strings.share}
-          </button>
-        )}
         <button type="button" className="btn btn-primary" onClick={onClose}>
           {strings.close}
         </button>
+        <div className="diag-actions">
+          <button type="button" className="btn btn-plain" disabled={!report} onClick={() => void copy()}>
+            {copied ? strings.copied : strings.copy}
+          </button>
+          {canShare && (
+            <button
+              type="button"
+              className="btn btn-plain"
+              disabled={!report}
+              onClick={() => void navigator.share({ text: report }).catch(() => {})}
+            >
+              {strings.share}
+            </button>
+          )}
+        </div>
       </header>
       <pre ref={pre} className="diag-report" data-testid="diag-report">
         {report}
