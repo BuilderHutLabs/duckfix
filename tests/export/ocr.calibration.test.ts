@@ -34,7 +34,7 @@ async function pdfText(bytes: Uint8Array): Promise<string> {
 describe.skipIf(!hasPol)('searchable PDF with real tesseract', () => {
   test('the exported page carries searchable Polish text over the image', async () => {
     const png = textPng();
-    const engine = await createOcrEngine('pl', { langPath, gzip: false });
+    const engine = await createOcrEngine('pl', { langPath, gzip: false, cacheMethod: 'none' });
     try {
       const raster: Rasterizer = async () => ({ bytes: png, format: 'png', widthPt: 595, heightPt: 212 });
       const page: Page = {
