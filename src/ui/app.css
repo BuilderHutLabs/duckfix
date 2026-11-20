@@ -1421,3 +1421,14 @@ body.splashing .home .duck {
   color: var(--text-2);
   text-align: center;
 }
+.scan-filters {
+  margin: 12px 16px 0;
+  background: rgba(255, 255, 255, 0.14);
+}
+.scan-filters button {
+  color: #fff;
+}
+.scan-filters button[aria-pressed='true'] {
+  background: #fff;
+  color: #1c1c1e;
+}

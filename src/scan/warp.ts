@@ -2,6 +2,7 @@ import { releaseCanvas } from '../imaging/render';
 import { toGray } from '../imaging/gray';
 import { MAX_CANVAS_PIXELS } from '../export/rasterize';
 import { detectQuad } from './detectQuad';
+import { enhance, type ScanFilter } from './enhance';
 import { applyHomography, homography, warpSize, type Quad } from './quad';
 
 /** A decoded camera photo: upright (EXIF applied) bitmap plus an object URL for display. */
@@ -71,7 +72,7 @@ export function findSheet(photo: Photo): Quad | null {
 }
 
 /** Straightens the sheet inside `q` (photo pixels) into an upright JPEG. */
-export async function warpToBlob(photo: Photo, q: Quad): Promise<Blob> {
+export async function warpToBlob(photo: Photo, q: Quad, filter: ScanFilter = 'whiten'): Promise<Blob> {
   const { w, h } = warpSize(q);
   // sample from a copy no larger than needed (and within the canvas budget)
   const k = Math.min(1, SOURCE_SIDE / Math.max(photo.width, photo.height), Math.sqrt(MAX_CANVAS_PIXELS / 2 / (photo.width * photo.height)));
@@ -117,6 +118,7 @@ export async function warpToBlob(photo: Photo, q: Quad): Promise<Blob> {
         o.data[di + 3] = 255;
       }
     }
+    enhance(o.data, w, h, filter);
     octx.putImageData(o, 0, 0);
     return await new Promise<Blob>((resolve, reject) =>
       out.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', JPEG_QUALITY),

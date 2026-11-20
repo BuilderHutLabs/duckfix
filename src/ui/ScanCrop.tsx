@@ -2,6 +2,28 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { findSheet, loadPhoto, warpToBlob, type Photo } from '../scan/warp';
 import { defaultQuad, type Quad } from '../scan/quad';
 import { openCamera } from './camera';
+import { storageKey } from '../config';
+import type { ScanFilter } from '../scan/enhance';
+
+const FILTER_KEY = storageKey('duckfix-scan-filter');
+const FILTERS: ScanFilter[] = ['color', 'whiten', 'bw'];
+
+function loadFilter(): ScanFilter {
+  try {
+    const v = localStorage.getItem(FILTER_KEY) as ScanFilter | null;
+    return v && FILTERS.includes(v) ? v : 'whiten';
+  } catch {
+    return 'whiten';
+  }
+}
+
+function saveFilter(f: ScanFilter): void {
+  try {
+    localStorage.setItem(FILTER_KEY, f);
+  } catch {
+    /* private mode */
+  }
+}
 import { useAppStore } from './store';
 import { strings } from './strings';
 
@@ -13,6 +35,7 @@ export function ScanCrop({ file }: { file: File }) {
   const s = useAppStore();
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [quad, setQuad] = useState<Quad | null>(null);
+  const [filter, setFilter] = useState<ScanFilter>(loadFilter);
   const stage = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ left: 0, top: 0, scale: 1 });
   /** the photo is handed to a running warp; the warp closes it, not the unmount */
@@ -84,7 +107,7 @@ export function ScanCrop({ file }: { file: File }) {
     const p = photo;
     const at = s.scanIndex;
     s.setScanPhoto(null);
-    void warpToBlob(p, quad)
+    void warpToBlob(p, quad, filter)
       .then((blob) => s.addScan(blob, at))
       .catch(() => s.showError(strings.genericError))
       .finally(() => p.close());
@@ -117,6 +140,21 @@ export function ScanCrop({ file }: { file: File }) {
             ))}
           </>
         )}
+      </div>
+      <div className="segmented scan-filters" role="group">
+        {FILTERS.map((f) => (
+          <button
+            key={f}
+            type="button"
+            aria-pressed={filter === f}
+            onClick={() => {
+              setFilter(f);
+              saveFilter(f);
+            }}
+          >
+            {{ color: strings.filterColor, whiten: strings.filterWhiten, bw: strings.filterBw }[f]}
+          </button>
+        ))}
       </div>
       <div className="scan-actions">
         <button type="button" className="btn" onClick={() => s.setScanPhoto(null)}>

@@ -64,6 +64,9 @@ export const de: Strings = {
   cropHint: 'Ziehe die Kreise auf die Ecken der Seite.',
   cropCorner: (n) => `Ecke ${n}`,
 
+  filterColor: 'Farbe',
+  filterWhiten: 'Aufgehellt',
+  filterBw: 'Schwarzweiß',
   insertHere: 'Seiten hier einfügen',
   addAtEnd: 'Dateien hinzufügen',
 

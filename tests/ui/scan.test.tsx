@@ -113,6 +113,22 @@ describe('camera scan', () => {
     await waitFor(() => expect(store.getState().doc.pages.map((p) => p.id)).toEqual(['p1', 'n1', 'p2']));
   });
 
+  it('the crop screen offers Kolor / Wybielony / Czarno-biały (Wybielony first time); the choice is used and remembered', async () => {
+    const { warpToBlob } = await import('../../src/scan/warp');
+    localStorage.clear();
+    render(<App store={createAppStore(fakeDeps())} />);
+    await takePhoto();
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    const opt = (name: string) => screen.getByRole('button', { name });
+    expect(opt(strings.filterWhiten).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(opt(strings.filterBw));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropDone })));
+    expect(vi.mocked(warpToBlob).mock.calls.at(-1)![2]).toBe('bw');
+    await takePhoto();
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    expect(opt(strings.filterBw).getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('Anuluj closes the crop screen without adding anything', async () => {
     const deps = fakeDeps();
     render(<App store={createAppStore(deps)} />);
