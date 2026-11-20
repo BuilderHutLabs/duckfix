@@ -36,7 +36,15 @@ export const de: Strings = {
   inAppWarning: 'Dieser eingebaute Browser (z. B. Messenger) kann keine PDF-Dateien speichern.',
   openInChrome: 'In Chrome öffnen',
   openInSafariHint: 'Tippe auf ⋯ in der Bildschirmecke und wähle „In Safari öffnen“.',
-  savedNotice: (name) => `„${name}“ wurde unter Downloads gespeichert.`,
+  savedNotice: (name, size) => `„${name}“ (${size}) wurde unter Downloads gespeichert.`,
+
+  saveOptions: 'PDF speichern',
+  smallerFile: 'Kleinere Datei',
+  smallerFileHint: 'Seiten werden als leichtere Bilder gespeichert. Gut für E-Mail und Ämter.',
+  searchableText: 'Durchsuchbarer Text',
+  searchableTextHint: 'Erkennt den Text, damit du ihn suchen und kopieren kannst. Dauert länger.',
+  saveConfirm: 'Speichern',
+  cancel: 'Abbrechen',
 
   select: 'Auswählen',
   selectDone: 'Fertig',

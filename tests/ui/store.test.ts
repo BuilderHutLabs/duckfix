@@ -186,7 +186,12 @@ describe('app store', () => {
     store.load(docWithFlags(2), [source]);
     const done = store.export();
     expect(store.getState().busy).toBe('exporting');
-    expect(deps.exportPdf).toHaveBeenCalledWith(store.getState().doc, new Map([['f1', source]]), expect.any(Function));
+    expect(deps.exportPdf).toHaveBeenCalledWith(
+      store.getState().doc,
+      new Map([['f1', source]]),
+      expect.any(Function),
+      expect.objectContaining({ compress: false, ocr: false }),
+    );
     report!(1, 2);
     expect(store.getState().exportProgress).toEqual({ done: 1, total: 2 });
     finish(new Uint8Array([1]));

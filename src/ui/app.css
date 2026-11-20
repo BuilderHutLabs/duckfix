@@ -1204,3 +1204,105 @@ body.splashing .home .duck {
   font-size: 12px;
   padding: 0 2px;
 }
+
+/* ---------- save sheet (bottom sheet with save options) ---------- */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  animation: preview-fade 0.2s ease-out;
+}
+.sheet {
+  width: 100%;
+  max-width: 520px;
+  padding: 8px 16px calc(16px + env(safe-area-inset-bottom));
+  border-radius: 16px 16px 0 0;
+  background: var(--card);
+  box-shadow: var(--shadow-float);
+  animation: sheet-up 0.32s cubic-bezier(0.34, 1.2, 0.64, 1);
+}
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+.sheet-grabber {
+  width: 36px;
+  height: 5px;
+  margin: 0 auto 10px;
+  border-radius: 3px;
+  background: var(--sep);
+}
+.sheet-title {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+  text-align: center;
+}
+.sheet-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 56px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sep);
+}
+.sheet-option-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sheet-option-label {
+  font-size: 16px;
+}
+.sheet-option-hint {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.switch {
+  position: relative;
+  flex: none;
+  width: 51px;
+  height: 31px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--fill);
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 27px;
+  height: 27px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  transition: transform 0.25s cubic-bezier(0.34, 1.32, 0.64, 1);
+}
+.switch[aria-checked='true'] {
+  background: var(--accent);
+}
+.switch[aria-checked='true']::after {
+  transform: translateX(20px);
+}
+.sheet-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+.sheet-actions .btn {
+  flex: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet,
+  .sheet-backdrop,
+  .switch::after { animation: none; transition: none; }
+}

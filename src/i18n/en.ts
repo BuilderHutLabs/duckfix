@@ -36,7 +36,15 @@ export const en: Strings = {
   inAppWarning: 'This built-in browser (e.g. Messenger) cannot save PDF files.',
   openInChrome: 'Open in Chrome',
   openInSafariHint: 'Tap ⋯ in the corner of the screen and choose “Open in Safari”.',
-  savedNotice: (name) => `Saved “${name}” to Downloads.`,
+  savedNotice: (name, size) => `Saved “${name}” (${size}) to Downloads.`,
+
+  saveOptions: 'Save PDF',
+  smallerFile: 'Smaller file',
+  smallerFileHint: 'Pages are saved as lighter images. Good for email and forms.',
+  searchableText: 'Searchable text',
+  searchableTextHint: 'Recognizes the text so you can search and copy it. Takes longer.',
+  saveConfirm: 'Save',
+  cancel: 'Cancel',
 
   select: 'Select',
   selectDone: 'Done',

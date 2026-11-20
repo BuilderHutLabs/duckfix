@@ -166,6 +166,7 @@ describe('review grid', () => {
     });
     setup(docWithFlags(3), deps);
     fireEvent.click(screen.getByRole('button', { name: strings.save }));
+    fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm })); // save sheet
     expect(screen.getByRole('button', { name: strings.saving })).toBeTruthy();
     act(() => report!(2, 3));
     expect(screen.getByRole('button', { name: 'Zapisuję 2/3' })).toBeTruthy();

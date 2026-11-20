@@ -5,6 +5,8 @@ import type { Rasterizer } from './exportPdf';
 
 const DPI = 300;
 const IMAGE_MAX_SIDE = 3508; // A4 @ 300 DPI
+/** "Mniejszy plik": 150 DPI, JPEG 0.7 for every page. */
+const SMALL = { dpi: 150, imageMaxSide: 1754, quality: 0.7 };
 const A4 = { w: 595.28, h: 841.89 };
 
 function toBlob(c: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
@@ -52,12 +54,15 @@ export function budgetedMaxSide(
 async function rawDimensions(
   page: Parameters<Rasterizer>[0],
   source: Parameters<Rasterizer>[1],
+  compress: boolean,
 ): Promise<{ w: number; h: number; desiredMaxSide: number }> {
+  const dpi = compress ? SMALL.dpi : DPI;
+  const imageMax = compress ? SMALL.imageMaxSide : IMAGE_MAX_SIDE;
   if (page.source.kind === 'image') {
     const bmp = await createImageBitmap(source.blob, { imageOrientation: 'from-image' });
     try {
       const m = Math.max(bmp.width, bmp.height);
-      return { w: bmp.width, h: bmp.height, desiredMaxSide: Math.min(IMAGE_MAX_SIDE, m) };
+      return { w: bmp.width, h: bmp.height, desiredMaxSide: Math.min(imageMax, m) };
     } finally {
       bmp.close();
     }
@@ -66,16 +71,17 @@ async function rawDimensions(
   const p = await pdf.getPage(page.source.pageIndex + 1);
   const v = p.getViewport({ scale: 1, rotation: 0 });
   p.cleanup();
-  return { w: v.width, h: v.height, desiredMaxSide: Math.max(v.width, v.height) * (DPI / 72) };
+  return { w: v.width, h: v.height, desiredMaxSide: Math.max(v.width, v.height) * (dpi / 72) };
 }
 
-export const browserRasterizer: Rasterizer = async (page, source) => {
-  const dims = await rawDimensions(page, source);
+export const browserRasterizer: Rasterizer = async (page, source, opts) => {
+  const compress = opts?.compress === true;
+  const dims = await rawDimensions(page, source, compress);
   const deg = effectiveRotation(page) + page.skewDeg;
   const maxSide = budgetedMaxSide(dims.w, dims.h, deg, dims.desiredMaxSide);
   const raw = await renderPage(source, page.source, maxSide);
   try {
-    return await finish(raw, page, deg, dims);
+    return await finish(raw, page, deg, dims, compress);
   } finally {
     releaseCanvas(raw);
   }
@@ -86,6 +92,7 @@ async function finish(
   page: Parameters<Rasterizer>[0],
   deg: number,
   dims: { w: number; h: number },
+  compress: boolean,
 ) {
   const angle = (deg * Math.PI) / 180;
   const { w, h } = rotatedSize(raw.width, raw.height, deg);
@@ -101,9 +108,9 @@ async function finish(
     ctx.drawImage(raw, -raw.width / 2, -raw.height / 2);
     releaseCanvas(raw); // free the raw render before encoding (peak memory on iPad)
 
-    const gray = toGray(ctx.getImageData(0, 0, w, h).data, w, h);
-    const png = isNearBitonal(gray);
-    const blob = png ? await toBlob(out, 'image/png') : await toBlob(out, 'image/jpeg', 0.9);
+    // a smaller file is always JPEG; otherwise near-bitonal pages stay crisp as PNG
+    const png = !compress && isNearBitonal(toGray(ctx.getImageData(0, 0, w, h).data, w, h));
+    const blob = png ? await toBlob(out, 'image/png') : await toBlob(out, 'image/jpeg', compress ? SMALL.quality : 0.9);
     const bytes = new Uint8Array(await blob.arrayBuffer());
 
     let widthPt: number;

@@ -42,6 +42,15 @@ export function loadLanguage(): Lang {
   return detectLanguage(nav.filter(Boolean));
 }
 
+/** File size for people: "1,2 MB" / "420 kB" (decimal units, like phones show). */
+export function formatSize(bytes: number, lang: Lang = current): string {
+  if (bytes >= 1_000_000) {
+    const mb = new Intl.NumberFormat(lang, { minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(bytes / 1_000_000);
+    return `${mb} MB`;
+  }
+  return `${Math.max(1, Math.round(bytes / 1000))} kB`;
+}
+
 export function currentLanguage(): Lang {
   return current;
 }

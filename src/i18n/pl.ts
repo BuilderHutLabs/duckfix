@@ -43,7 +43,15 @@ export const pl = {
   inAppWarning: 'Ta wbudowana przeglądarka (np. Messenger) nie zapisuje plików PDF.',
   openInChrome: 'Otwórz w Chrome',
   openInSafariHint: 'Dotknij ⋯ w rogu ekranu i wybierz „Otwórz w Safari”.',
-  savedNotice: (name: string) => `Zapisano plik „${name}” w folderze Pobrane.`,
+  savedNotice: (name: string, size: string) => `Zapisano plik „${name}” (${size}) w folderze Pobrane.`,
+
+  saveOptions: 'Zapisz PDF',
+  smallerFile: 'Mniejszy plik',
+  smallerFileHint: 'Strony zapisują się jako lżejsze zdjęcia. Dobre do maila i urzędu.',
+  searchableText: 'Tekst do wyszukiwania',
+  searchableTextHint: 'Rozpoznaje tekst, żeby dało się go szukać i kopiować. Trwa dłużej.',
+  saveConfirm: 'Zapisz',
+  cancel: 'Anuluj',
 
   select: 'Zaznacz',
   selectDone: 'Gotowe',

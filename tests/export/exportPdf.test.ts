@@ -105,6 +105,36 @@ describe('exportPdf', () => {
     expect(imageCount(out)).toBeGreaterThan(0); // PNG alpha adds an SMask image too
   });
 
+  it('smaller file: every page is rasterized, untouched PDF pages too, with compress on', async () => {
+    const src = await makePdf([[100, 100], [100, 100]]);
+    const r = fakeRaster();
+    const doc: Doc = { pages: [pdfPage(0), pdfPage(1, { skewDeg: 2 })] };
+    const out = await load(await exportPdf(doc, new Map([['f1', src]]), r, undefined, { compress: true }));
+    expect(r).toHaveBeenCalledTimes(2);
+    expect(r.mock.calls.map((c) => c[2])).toEqual([{ compress: true }, { compress: true }]);
+    expect(out.getPageCount()).toBe(2);
+  });
+
+  it('without options an untouched PDF page is copied, not rasterized', async () => {
+    const src = await makePdf([[100, 100]]);
+    const r = fakeRaster();
+    await exportPdf({ pages: [pdfPage(0)] }, new Map([['f1', src]]), r);
+    expect(r).not.toHaveBeenCalled();
+  });
+
+  it('cancelling stops the export with an AbortError', async () => {
+    const src = await makePdf([[100, 100], [100, 100], [100, 100]]);
+    const ctrl = new AbortController();
+    const run = exportPdf(
+      { pages: [pdfPage(0), pdfPage(1), pdfPage(2)] },
+      new Map([['f1', src]]),
+      fakeRaster(),
+      (done) => done === 1 && ctrl.abort(),
+      { signal: ctrl.signal },
+    );
+    await expect(run).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
   it('always rasterizes image pages', async () => {
     const img: SourceFile = { id: 'i1', name: 'foto.jpg', type: 'image', blob: new Blob([PNG as BlobPart]) };
     const r = fakeRaster();

@@ -1,4 +1,6 @@
 import { storageKey } from '../config';
+import { formatSize } from '../i18n';
+import { loadExportOptions, saveExportOptions, type ExportOptions } from '../export/options';
 import { createContext, createElement, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import {
   applyAnalysis,
@@ -43,6 +45,10 @@ export interface AppState {
   exportProgress: { done: number; total: number } | null;
   /** Exported PDF waiting for the user's tap on "Udostępnij / Zapisz". */
   exportReady: File | null;
+  /** "Zapisz PDF" opened the save options sheet. */
+  saveSheetOpen: boolean;
+  /** Last choices in the save sheet (remembered). */
+  exportOptions: ExportOptions;
   error: string | null;
   /** Short confirmation, e.g. where the saved file went. */
   notice: string | null;
@@ -62,6 +68,7 @@ export interface StoreDeps {
     doc: Doc,
     sources: Map<string, SourceFile>,
     onProgress: (done: number, total: number) => void,
+    opts: ExportOptions & { signal: AbortSignal },
   ): Promise<Uint8Array>;
   share: typeof shareOrDownload;
   /** Plain download of the exported file (Windows, Android, Mac). */
@@ -86,7 +93,8 @@ function browserDeps(): StoreDeps {
     importFiles,
     analyzePages,
     createDetector: () => createTesseractDetector({ basePath: import.meta.env.BASE_URL, workers: 2 }),
-    exportPdf: (doc, sources, onProgress) => exportPdf(doc, sources, browserRasterizer, onProgress),
+    exportPdf: (doc, sources, onProgress, opts) =>
+      exportPdf(doc, sources, browserRasterizer, onProgress, { compress: opts.compress, signal: opts.signal }),
     share: shareOrDownload,
     download: downloadFile,
     shareFirst: prefersShareSheet(),
@@ -149,6 +157,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   /** The doc `state.exportReady` was built from; any other doc makes the file stale. */
   let exportedDoc: Doc | null = null;
+  /** Aborts the running export ("Anuluj"). */
+  let exportCtrl: AbortController | null = null;
   /** When the oldest unsaved change was scheduled (start of the max-wait window). */
   let savePendingSince: number | null = null;
 
@@ -174,6 +184,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     busy: null,
     exportProgress: null,
     exportReady: null,
+    saveSheetOpen: false,
+    exportOptions: loadExportOptions(deps.storage),
     notice: null,
     error: null,
     deskew: readDeskew(),
@@ -423,16 +435,46 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       set({});
     },
 
-    /** Builds the PDF; sharing is a separate tap (shareExport) with a fresh user activation. */
-    async export() {
+    openSaveSheet() {
       if (state.busy || history.present.pages.length === 0) return;
+      set({ saveSheetOpen: true });
+    },
+
+    closeSaveSheet() {
+      set({ saveSheetOpen: false });
+    },
+
+    /** Stops a running export; nothing is saved and no error is shown. */
+    cancelExport() {
+      exportCtrl?.abort();
+    },
+
+    /** Builds the PDF; sharing is a separate tap (shareExport) with a fresh user activation. */
+    async export(opts: ExportOptions = state.exportOptions) {
+      if (state.busy || history.present.pages.length === 0) return;
+      saveExportOptions(deps.storage, opts);
       const own = session;
       const doc = history.present;
-      set({ busy: 'exporting', exportProgress: null, exportReady: null, error: null, notice: null });
+      const ctrl = new AbortController();
+      exportCtrl = ctrl;
+      set({
+        busy: 'exporting',
+        exportProgress: null,
+        exportReady: null,
+        error: null,
+        notice: null,
+        saveSheetOpen: false,
+        exportOptions: opts,
+      });
       try {
-        const bytes = await deps.exportPdf(doc, state.sources, (done, total) => {
-          if (own === session) set({ exportProgress: { done, total } });
-        });
+        const bytes = await deps.exportPdf(
+          doc,
+          state.sources,
+          (done, total) => {
+            if (own === session) set({ exportProgress: { done, total } });
+          },
+          { ...opts, signal: ctrl.signal },
+        );
         if (own !== session) return;
         const first = state.sources.values().next().value as SourceFile | undefined;
         const file = pdfFile(bytes, exportFileName(first?.name ?? strings.defaultDocName));
@@ -441,10 +483,14 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
           set({ busy: null, exportProgress: null, exportReady: file });
         } else {
           deps.download(file);
-          set({ busy: null, exportProgress: null, notice: strings.savedNotice(file.name) });
+          set({ busy: null, exportProgress: null, notice: strings.savedNotice(file.name, formatSize(file.size)) });
         }
-      } catch {
-        if (own === session) set({ busy: null, exportProgress: null, error: strings.exportError });
+      } catch (e) {
+        if (own !== session) return;
+        const cancelled = ctrl.signal.aborted && (e as { name?: string })?.name === 'AbortError';
+        set({ busy: null, exportProgress: null, error: cancelled ? null : strings.exportError });
+      } finally {
+        if (exportCtrl === ctrl) exportCtrl = null;
       }
     },
 

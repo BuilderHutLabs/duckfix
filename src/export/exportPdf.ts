@@ -6,6 +6,7 @@ import { DICTS, strings } from '../i18n';
 export type Rasterizer = (
   page: Page,
   source: SourceFile,
+  opts?: { compress: boolean },
 ) => Promise<{ bytes: Uint8Array; format: 'png' | 'jpg'; widthPt: number; heightPt: number }>;
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -28,7 +29,10 @@ export async function exportPdf(
   rasterize: Rasterizer,
   /** Called after each page with (pages done, total pages). */
   onProgress?: (done: number, total: number) => void,
+  opts: { compress?: boolean; signal?: AbortSignal } = {},
 ): Promise<Uint8Array> {
+  const compress = opts.compress === true;
+  opts.signal?.throwIfAborted();
   const out = await PDFDocument.create();
   const loaded = new Map<string, Promise<PDFDocument>>();
   const loadSource = (fileId: string, source: SourceFile): Promise<PDFDocument> => {
@@ -46,8 +50,8 @@ export async function exportPdf(
     const source = sources.get(page.source.fileId);
     if (!source) throw new Error(`Missing source file ${page.source.fileId}`);
 
-    if (needsRaster(page)) {
-      const r = await rasterize(page, source);
+    if (compress || needsRaster(page)) {
+      const r = await rasterize(page, source, { compress });
       const image = r.format === 'png' ? await out.embedPng(r.bytes) : await out.embedJpg(r.bytes);
       const outPage = out.addPage([r.widthPt, r.heightPt]);
       outPage.drawImage(image, { x: 0, y: 0, width: r.widthPt, height: r.heightPt });
@@ -59,6 +63,7 @@ export async function exportPdf(
       out.addPage(copied);
     }
     onProgress?.(++done, total);
+    opts.signal?.throwIfAborted();
   }
   return out.save();
 }

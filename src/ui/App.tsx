@@ -6,6 +6,7 @@ import { AppStoreProvider, createAppStore, useAppStore, type AppStore } from './
 import { Home } from './Home';
 import { Toolbar } from './Toolbar';
 import { ActionBar } from './ActionBar';
+import { SaveSheet } from './SaveSheet';
 import { Progress } from './Progress';
 import { ReviewGrid } from './ReviewGrid';
 import { Diagnostics, DIAG_HASH } from './Diagnostics';
@@ -99,10 +100,16 @@ function Shell() {
           </div>
           <ReviewGrid />
           <ActionBar />
+          <SaveSheetHost />
         </div>
       )}
     </>
   );
+}
+
+function SaveSheetHost() {
+  const { saveSheetOpen } = useAppStore();
+  return saveSheetOpen ? <SaveSheet /> : null;
 }
 
 function ErrorBanner() {

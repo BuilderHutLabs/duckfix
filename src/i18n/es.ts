@@ -36,7 +36,15 @@ export const es: Strings = {
   inAppWarning: 'Este navegador integrado (p. ej. Messenger) no puede guardar archivos PDF.',
   openInChrome: 'Abrir en Chrome',
   openInSafariHint: 'Toca ⋯ en la esquina de la pantalla y elige «Abrir en Safari».',
-  savedNotice: (name) => `Se guardó «${name}» en Descargas.`,
+  savedNotice: (name, size) => `Se guardó «${name}» (${size}) en Descargas.`,
+
+  saveOptions: 'Guardar PDF',
+  smallerFile: 'Archivo más pequeño',
+  smallerFileHint: 'Las páginas se guardan como imágenes más ligeras. Ideal para correo y trámites.',
+  searchableText: 'Texto con búsqueda',
+  searchableTextHint: 'Reconoce el texto para que puedas buscarlo y copiarlo. Tarda más.',
+  saveConfirm: 'Guardar',
+  cancel: 'Cancelar',
 
   select: 'Seleccionar',
   selectDone: 'Listo',

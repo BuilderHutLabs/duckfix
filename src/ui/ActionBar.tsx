@@ -26,18 +26,23 @@ export function ActionBar() {
         <button type="button" className="btn btn-primary" onClick={() => void s.shareExport()}>
           {strings.shareExport}
         </button>
+      ) : s.busy === 'exporting' ? (
+        <>
+          <button type="button" className="btn btn-primary" disabled>
+            {s.exportProgress ? strings.savingProgress(s.exportProgress.done, s.exportProgress.total) : strings.saving}
+          </button>
+          <button type="button" className="btn" onClick={() => s.cancelExport()}>
+            {strings.cancel}
+          </button>
+        </>
       ) : (
         <button
           type="button"
           className="btn btn-primary"
           disabled={s.busy !== null || s.phase === 'analyzing' || s.doc.pages.length === 0}
-          onClick={() => void s.export()}
+          onClick={() => s.openSaveSheet()}
         >
-          {s.busy !== 'exporting'
-            ? strings.save
-            : s.exportProgress
-              ? strings.savingProgress(s.exportProgress.done, s.exportProgress.total)
-              : strings.saving}
+          {strings.save}
         </button>
       )}
     </footer>
