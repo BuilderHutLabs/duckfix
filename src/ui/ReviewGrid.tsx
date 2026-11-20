@@ -135,7 +135,8 @@ export function ReviewGrid() {
               </button>
             )}
             {!s.selecting && (
-              <button type="button" className="add-cell" disabled={s.busy === 'opening'} onClick={openCamera}>
+              // off while opening or saving: a page added then would be dropped
+              <button type="button" className="add-cell" disabled={s.busy !== null} onClick={openCamera}>
                 <IconCamera size={26} />
                 {strings.takePhoto}
               </button>

@@ -70,6 +70,17 @@ describe('camera scan', () => {
     click.mockRestore();
   });
 
+  it('the camera tile is off while a PDF is being saved (a photo then would be lost)', async () => {
+    const deps = fakeDeps({ exportPdf: vi.fn(() => new Promise<Uint8Array>(() => {})) });
+    const store = createAppStore(deps);
+    store.load({ pages: [page('p1')] }, [source]);
+    render(<App store={store} />);
+    const tile = () => screen.getAllByRole('button', { name: strings.takePhoto })[0] as HTMLButtonElement;
+    expect(tile().disabled).toBe(false);
+    act(() => void store.export({ compress: false, ocr: false }));
+    expect(tile().disabled).toBe(true);
+  });
+
   it('Anuluj closes the crop screen without adding anything', async () => {
     const deps = fakeDeps();
     render(<App store={createAppStore(deps)} />);
