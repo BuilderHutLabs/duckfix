@@ -12,7 +12,8 @@ export const de: Strings = {
   appDescription: 'Dreht und begradigt schiefe PDF-Scans automatisch.',
   steps: ['1. Öffnen', '2. Prüfen', '3. Speichern'],
 
-  open: 'PDF oder Fotos öffnen',
+  open: 'Dateien auswählen',
+  mergeHint: 'Mehrere Dateien werden zu einem PDF zusammengefügt.',
   opening: 'Wird geöffnet…',
   close: 'Schließen',
   confirmClose: 'Dokument schließen? Nicht gespeicherte Änderungen gehen verloren.',
@@ -64,7 +65,7 @@ export const de: Strings = {
   cropCorner: (n) => `Ecke ${n}`,
 
   insertHere: 'Seiten hier einfügen',
-  addAtEnd: 'Seiten hinzufügen',
+  addAtEnd: 'Dateien hinzufügen',
 
   settings: 'Einstellungen',
   more: 'Mehr',

@@ -1414,3 +1414,10 @@ body.splashing .home .duck {
   background: rgba(255, 255, 255, 0.14);
   color: #fff;
 }
+
+.home-hint {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: var(--text-2);
+  text-align: center;
+}

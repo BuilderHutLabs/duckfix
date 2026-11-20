@@ -12,7 +12,8 @@ export const en: Strings = {
   appDescription: 'Automatically rotates and straightens crooked PDF scans.',
   steps: ['1. Open', '2. Check', '3. Save'],
 
-  open: 'Open PDF or photos',
+  open: 'Choose files',
+  mergeHint: 'Several files are merged into one PDF.',
   opening: 'Opening…',
   close: 'Close',
   confirmClose: 'Close the document? Unsaved changes will be lost.',
@@ -64,7 +65,7 @@ export const en: Strings = {
   cropCorner: (n) => `Corner ${n}`,
 
   insertHere: 'Insert pages here',
-  addAtEnd: 'Add pages',
+  addAtEnd: 'Add files',
 
   settings: 'Settings',
   more: 'More',

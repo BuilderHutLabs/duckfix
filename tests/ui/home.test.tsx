@@ -19,6 +19,14 @@ describe('Home screen', () => {
     expect(document.querySelector('.home .duck svg')).not.toBeNull();
   });
 
+  it('says that several files are merged into one PDF, and the picker takes several files', () => {
+    render(<App store={createAppStore(fakeDeps())} />);
+    expect(screen.getByRole('button', { name: 'Wybierz pliki' })).toBeTruthy();
+    expect(screen.getByText(strings.mergeHint)).toBeTruthy();
+    const picker = document.querySelector('.home input[type=file]:not([capture])') as HTMLInputElement;
+    expect(picker.multiple).toBe(true);
+  });
+
   it('settings popover closes on outside pointerdown and on Escape', () => {
     render(<App store={createAppStore(fakeDeps())} />);
     const gear = () => screen.getByRole('button', { name: strings.settings });

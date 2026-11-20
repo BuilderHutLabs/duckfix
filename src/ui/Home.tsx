@@ -60,6 +60,7 @@ export function Home() {
           {busy === 'opening' ? strings.opening : strings.open}
         </button>
       )}
+      {!restorable && <p className="home-hint">{strings.mergeHint}</p>}
       {!restorable && (
         <button type="button" className="btn btn-camera" disabled={busy === 'opening'} onClick={openCamera}>
           <IconCamera size={20} />

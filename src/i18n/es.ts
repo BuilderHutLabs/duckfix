@@ -12,7 +12,8 @@ export const es: Strings = {
   appDescription: 'Gira y endereza automáticamente los escaneos PDF torcidos.',
   steps: ['1. Abrir', '2. Revisar', '3. Guardar'],
 
-  open: 'Abrir PDF o fotos',
+  open: 'Elegir archivos',
+  mergeHint: 'Varios archivos se unen en un solo PDF.',
   opening: 'Abriendo…',
   close: 'Cerrar',
   confirmClose: '¿Cerrar el documento? Se perderán los cambios no guardados.',
@@ -64,7 +65,7 @@ export const es: Strings = {
   cropCorner: (n) => `Esquina ${n}`,
 
   insertHere: 'Insertar páginas aquí',
-  addAtEnd: 'Añadir páginas',
+  addAtEnd: 'Añadir archivos',
 
   settings: 'Ajustes',
   more: 'Más',

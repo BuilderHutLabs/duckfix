@@ -19,7 +19,8 @@ export const pl = {
   appDescription: 'Automatycznie obraca i prostuje krzywe skany PDF.',
   steps: ['1. Otwórz', '2. Sprawdź', '3. Zapisz'] as string[],
 
-  open: 'Otwórz PDF lub zdjęcia',
+  open: 'Wybierz pliki',
+  mergeHint: 'Kilka plików połączy się w jeden PDF.',
   opening: 'Otwieram…',
   close: 'Zamknij',
   confirmClose: 'Zamknąć dokument? Niezapisane zmiany przepadną.',
@@ -71,7 +72,7 @@ export const pl = {
   cropCorner: (n: number) => `Róg ${n}`,
 
   insertHere: 'Wstaw strony tutaj',
-  addAtEnd: 'Dodaj strony',
+  addAtEnd: 'Dodaj pliki',
 
   settings: 'Ustawienia',
   more: 'Więcej',
