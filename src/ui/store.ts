@@ -1,3 +1,4 @@
+import { storageKey } from '../config';
 import { createContext, createElement, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import {
   applyAnalysis,
@@ -95,7 +96,7 @@ function browserDeps(): StoreDeps {
   };
 }
 
-const DESKEW_KEY = 'wduck.deskew';
+const DESKEW_KEY = storageKey('wduck.deskew');
 const ANALYZE = { concurrency: 2, maxSide: ANALYSIS_MAX_SIDE } as const;
 const SAVE_DOC_DELAY_MS = 500;
 /** While changes keep coming (analysis progress), the doc is still saved at least this often. */

@@ -1,8 +1,9 @@
 import { useState } from 'react';
+import { storageKey } from '../config';
 
 export type ThemeChoice = 'auto' | 'light' | 'dark';
 
-export const THEME_KEY = 'wduck-theme';
+export const THEME_KEY = storageKey('wduck-theme');
 const BAR_COLOR = { light: '#f2f2f7', dark: '#000000' } as const;
 
 export function loadTheme(): ThemeChoice {
@@ -57,7 +58,7 @@ export function initTheme(): void {
 
 export type PaletteChoice = 'warm' | 'blue' | 'mint' | 'lavender';
 
-export const PALETTE_KEY = 'duckfix-palette';
+export const PALETTE_KEY = storageKey('duckfix-palette');
 const PALETTES: PaletteChoice[] = ['warm', 'blue', 'mint', 'lavender'];
 
 export function loadPalette(): PaletteChoice {

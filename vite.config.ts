@@ -4,6 +4,16 @@ import { resolve } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { namespaceHtml } from './scripts/html-ns.mjs';
+
+// Test link (duckfix-v2): base path, app name and storage namespace come from the environment.
+const BASE = process.env.VITE_BASE || '/duckfix/';
+const APP_NAME = process.env.VITE_APP_NAME || 'DuckFix';
+const STORAGE_NS = process.env.VITE_STORAGE_NS ?? '';
+
+function namespaceInlineScript(): Plugin {
+  return { name: 'duckfix:namespace-inline-script', transformIndexHtml: (html) => namespaceHtml(html, STORAGE_NS).replaceAll('__APP_NAME__', APP_NAME) };
+}
 
 /** public/calibrate.html is a dev-only OSD calibration page: keep it for `vite dev`, drop it from production dist/. */
 function dropDevOnlyPages(): Plugin {
@@ -22,20 +32,21 @@ function dropDevOnlyPages(): Plugin {
 const THEME_COLOR = '#f2f2f7';
 
 export default defineConfig({
-  base: '/duckfix/',
+  base: BASE,
   plugins: [
     react(),
     dropDevOnlyPages(),
+    namespaceInlineScript(),
     VitePWA({
       registerType: 'prompt',
       includeAssets: ['icons/*.png'],
       manifest: {
-        name: 'DuckFix',
-        short_name: 'DuckFix',
+        name: APP_NAME,
+        short_name: APP_NAME,
         description: 'Automatyczne obracanie i prostowanie skanów PDF',
         lang: 'pl',
-        start_url: '/duckfix/',
-        scope: '/duckfix/',
+        start_url: BASE,
+        scope: BASE,
         display: 'standalone',
         theme_color: THEME_COLOR,
         background_color: THEME_COLOR,

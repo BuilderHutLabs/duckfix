@@ -27,7 +27,12 @@ jobs:
       # postinstall downloads the tesseract worker/core and traineddata into public/
       - run: npm ci
       - run: npm test
+      # the test link repo (duckfix-v2) builds with its own base path, name and storage namespace
       - run: npm run build
+        env:
+          VITE_BASE: ${{ github.repository == 'BuilderHutLabs/duckfix-v2' && '/duckfix-v2/' || '' }}
+          VITE_APP_NAME: ${{ github.repository == 'BuilderHutLabs/duckfix-v2' && 'DuckFix V2' || '' }}
+          VITE_STORAGE_NS: ${{ github.repository == 'BuilderHutLabs/duckfix-v2' && 'duckfix-v2' || '' }}
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

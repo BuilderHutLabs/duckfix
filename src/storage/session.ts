@@ -1,4 +1,5 @@
 import { createStore, delMany, getMany, set, setMany, type UseStore } from 'idb-keyval';
+import { IDB_NAME } from '../config';
 import type { Doc } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
 
@@ -17,7 +18,7 @@ const SOURCES = 'sources';
 
 let store: UseStore | null = null;
 /** Created lazily: createStore opens the database at once and may throw synchronously. */
-const db = (): UseStore => (store ??= createStore('wduck', 'session'));
+const db = (): UseStore => (store ??= createStore(IDB_NAME, 'session'));
 
 async function safely<T>(what: string, fallback: T, fn: () => Promise<T>): Promise<T> {
   try {
