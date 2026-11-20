@@ -82,9 +82,10 @@ export function ScanCrop({ file }: { file: File }) {
     if (next) openCamera(); // straight from the tap: the browser needs the user gesture
     handedOff.current = true;
     const p = photo;
+    const at = s.scanIndex;
     s.setScanPhoto(null);
     void warpToBlob(p, quad)
-      .then((blob) => s.addScan(blob))
+      .then((blob) => s.addScan(blob, at))
       .catch(() => s.showError(strings.genericError))
       .finally(() => p.close());
   };

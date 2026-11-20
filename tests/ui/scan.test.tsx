@@ -81,6 +81,38 @@ describe('camera scan', () => {
     expect(tile().disabled).toBe(true);
   });
 
+  it('one photo from "Wybierz pliki" (Android offers the camera there too) also goes through the crop screen', async () => {
+    const deps = fakeDeps();
+    render(<App store={createAppStore(deps)} />);
+    const picker = document.querySelector('.home input[type=file]:not([capture])') as HTMLInputElement;
+    await act(async () => fireEvent.change(picker, { target: { files: [photo()] } }));
+    expect(await screen.findByRole('dialog', { name: strings.cropTitle })).toBeTruthy();
+    expect(deps.importFiles).not.toHaveBeenCalled();
+  });
+
+  it('a PDF or several photos from the picker are added straight away', async () => {
+    const deps = fakeDeps();
+    render(<App store={createAppStore(deps)} />);
+    const picker = document.querySelector('.home input[type=file]:not([capture])') as HTMLInputElement;
+    await act(async () => fireEvent.change(picker, { target: { files: [photo(), photo()] } }));
+    expect(screen.queryByRole('dialog', { name: strings.cropTitle })).toBeNull();
+    await waitFor(() => expect(deps.importFiles).toHaveBeenCalledTimes(1));
+  });
+
+  it('a photo inserted with "+" between pages lands at that place after cropping', async () => {
+    const deps = fakeDeps();
+    const store = createAppStore(deps);
+    store.load({ pages: [page('p1'), page('p2')] }, [source]);
+    render(<App store={store} />);
+    const picker = document.querySelector('.grid-wrap input[type=file]') as HTMLInputElement;
+    store.setScanPhoto(photo(), 1);
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropDone })));
+    await waitFor(() => expect(deps.importFiles).toHaveBeenCalledTimes(1));
+    expect(picker).not.toBeNull();
+    await waitFor(() => expect(store.getState().doc.pages.map((p) => p.id)).toEqual(['p1', 'n1', 'p2']));
+  });
+
   it('Anuluj closes the crop screen without adding anything', async () => {
     const deps = fakeDeps();
     render(<App store={createAppStore(deps)} />);

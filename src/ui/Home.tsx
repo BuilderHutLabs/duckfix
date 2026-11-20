@@ -5,7 +5,7 @@ import { useAppStore } from './store';
 import { strings } from './strings';
 import { Settings } from './Toolbar';
 import { useSecretTaps } from './Diagnostics';
-import { openCamera } from './camera';
+import { isSinglePhoto, openCamera } from './camera';
 import { IconCamera } from './icons';
 
 export const FILE_ACCEPT = 'application/pdf,image/*';
@@ -13,7 +13,7 @@ export const FILE_ACCEPT = 'application/pdf,image/*';
 let introPlayed = false;
 
 export function Home() {
-  const { open, busy, restorable, restore, discardStored, openDiagnostics } = useAppStore();
+  const { open, setScanPhoto, busy, restorable, restore, discardStored, openDiagnostics } = useAppStore();
   const input = useRef<HTMLInputElement>(null);
   const onTitleTap = useSecretTaps(openDiagnostics);
   // the duck quacks once per app start, not every time the user comes back to the home screen
@@ -83,7 +83,8 @@ export function Home() {
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = ''; // allow picking the same file again
-          void open(files);
+          if (isSinglePhoto(files)) setScanPhoto(files[0]);
+          else void open(files);
         }}
       />
     </main>

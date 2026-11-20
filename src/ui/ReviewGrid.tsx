@@ -14,7 +14,7 @@ import { createThumbnailCache } from './thumbnails';
 import { PageThumb } from './PageThumb';
 import { PagePreview } from './PagePreview';
 import { FILE_ACCEPT } from './Home';
-import { openCamera } from './camera';
+import { isSinglePhoto, openCamera } from './camera';
 import { IconCamera } from './icons';
 import { strings } from './strings';
 
@@ -156,7 +156,8 @@ export function ReviewGrid() {
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);
           e.target.value = '';
-          void s.insertAt(insertIndex.current, files);
+          if (isSinglePhoto(files)) s.setScanPhoto(files[0], insertIndex.current);
+          else void s.insertAt(insertIndex.current, files);
         }}
       />
     </main>

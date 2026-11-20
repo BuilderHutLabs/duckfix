@@ -50,6 +50,8 @@ export interface AppState {
   saveSheetOpen: boolean;
   /** Camera photo waiting on the crop screen. */
   scanPhoto: File | null;
+  /** Where the cropped photo goes: a page index, or null for the end / a new document. */
+  scanIndex: number | null;
   /** Last choices in the save sheet (remembered). */
   exportOptions: ExportOptions;
   error: string | null;
@@ -218,6 +220,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     exportReady: null,
     saveSheetOpen: false,
     scanPhoto: null,
+    scanIndex: null,
     exportOptions: loadExportOptions(deps.storage),
     notice: null,
     error: null,
@@ -437,18 +440,18 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       });
     },
 
-    setScanPhoto(file: File | null) {
-      set({ scanPhoto: file });
+    setScanPhoto(file: File | null, index: number | null = null) {
+      set({ scanPhoto: file, scanIndex: file ? index : null });
     },
 
     /** Adds a straightened camera page: opens a new document from Home, else appends it. */
-    addScan(blob: Blob): Promise<void> {
+    addScan(blob: Blob, at: number | null = null): Promise<void> {
       scanChain = scanChain
         .then(async () => {
           const day = new Date().toISOString().slice(0, 10);
           const file = new File([blob], `${strings.scanName} ${day}.jpg`, { type: 'image/jpeg' });
           if (state.phase === 'home') await actions.open([file]);
-          else await actions.insertAt(history.present.pages.length, [file]);
+          else await actions.insertAt(at ?? history.present.pages.length, [file]);
         })
         .catch(() => set({ error: strings.genericError }));
       return scanChain;
