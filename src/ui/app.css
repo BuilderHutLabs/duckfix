@@ -1,7 +1,9 @@
 :root {
   --bg: #f2f2f7;
   --card: #ffffff;
-  --accent: #0a84ff;
+  --accent: #d4500f;
+  /* main buttons ("Wybierz plik", "Zapisz"); dark enough for white text */
+  --accent-grad: linear-gradient(135deg, #f2780c, #e04e1b);
   --flag: #ff9f0a;
   --danger: #ff3b30;
   --text: #1c1c1e;
@@ -27,7 +29,7 @@
   :root:not([data-theme='light']) {
     --bg: #000000;
     --card: #1c1c1e;
-    --accent: #0a84ff;
+    --accent: #ff9f40;
     --flag: #ff9f0a;
     --danger: #ff453a;
     --text: #f2f2f7;
@@ -46,7 +48,7 @@
 :root[data-theme='dark'] {
   --bg: #000000;
   --card: #1c1c1e;
-  --accent: #0a84ff;
+  --accent: #ff9f40;
   --flag: #ff9f0a;
   --danger: #ff453a;
   --text: #f2f2f7;
@@ -110,9 +112,10 @@ button {
   cursor: default;
 }
 .btn-primary {
-  background: var(--accent);
+  background: var(--accent-grad, var(--accent));
   color: #fff;
   font-weight: 600;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
 }
 .btn-plain {
   background: transparent;
@@ -1004,4 +1007,195 @@ body.splashing .home .duck {
 }
 @media (prefers-reduced-motion: reduce) {
   .splash-duck { animation: none; }
+}
+
+/* ---------- home: flowing warm gradient ---------- */
+
+:root {
+  --glow-1: #ffb15c; /* orange */
+  --glow-2: #ffd60a; /* duck yellow */
+  --glow-3: #ff8c69; /* coral */
+  --glow-4: #ffc9a3; /* peach */
+  --glow-opacity: 0.55;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --glow-1: #ff8a00;
+    --glow-2: #c98a00;
+    --glow-3: #ff5a1f;
+    --glow-4: #8a3b12;
+    --glow-opacity: 0.32;
+  }
+}
+:root[data-theme='dark'] {
+  --glow-1: #ff8a00;
+  --glow-2: #c98a00;
+  --glow-3: #ff5a1f;
+  --glow-4: #8a3b12;
+  --glow-opacity: 0.32;
+}
+
+/* own stacking context: the glow sits behind the home content, above the page background */
+.home {
+  isolation: isolate;
+}
+.home-glow {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: -1;
+}
+.glow {
+  position: absolute;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 50%;
+  opacity: var(--glow-opacity);
+  filter: blur(70px);
+  will-change: transform;
+  animation: glow-drift calc(18s * var(--glow-speed, 1)) ease-in-out infinite alternate;
+}
+.glow-1 {
+  background: var(--glow-1);
+  top: -30vmax;
+  left: -25vmax;
+}
+.glow-2 {
+  background: var(--glow-2);
+  top: -25vmax;
+  right: -30vmax;
+  width: 60vmax;
+  height: 60vmax;
+  animation-duration: calc(22s * var(--glow-speed, 1));
+  animation-delay: -6s;
+}
+.glow-3 {
+  background: var(--glow-3);
+  bottom: -35vmax;
+  right: -20vmax;
+  animation-duration: calc(26s * var(--glow-speed, 1));
+  animation-delay: -11s;
+  animation-direction: alternate-reverse;
+}
+.glow-4 {
+  background: var(--glow-4);
+  bottom: -30vmax;
+  left: -30vmax;
+  width: 60vmax;
+  height: 60vmax;
+  animation-duration: calc(20s * var(--glow-speed, 1));
+  animation-delay: -3s;
+}
+@keyframes glow-drift {
+  0% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(12vmax, 8vmax) scale(1.15); }
+  66% { transform: translate(-6vmax, 14vmax) scale(0.9); }
+  100% { transform: translate(8vmax, -6vmax) scale(1.08); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .glow { animation: none; }
+}
+
+/* ---------- colour sets ("Kolor"): accent, main button and home glow ----------
+   Ciepły is the default (the tokens above). Each set: light values, then dark ones
+   (explicit "Ciemny" or the system setting unless "Jasny" is chosen). */
+
+:root[data-palette='blue'] {
+  --accent: #0a6fe0;
+  --accent-grad: linear-gradient(135deg, #2a8cff, #0061d6);
+  --glow-1: #8ec5ff; --glow-2: #b8e0ff; --glow-3: #7aa8ff; --glow-4: #c9d8ff;
+  --glow-opacity: 0.55;
+}
+:root[data-palette='blue'][data-theme='dark'] {
+  --accent: #409cff;
+  --glow-1: #0a5cc2; --glow-2: #1e3a8a; --glow-3: #0e7490; --glow-4: #172554;
+  --glow-opacity: 0.4;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='blue']:not([data-theme='light']) {
+    --accent: #409cff;
+    --glow-1: #0a5cc2; --glow-2: #1e3a8a; --glow-3: #0e7490; --glow-4: #172554;
+    --glow-opacity: 0.4;
+  }
+}
+
+:root[data-palette='mint'] {
+  --accent: #0b7d62;
+  --accent-grad: linear-gradient(135deg, #17a884, #0b7d62);
+  --glow-1: #7fe0c0; --glow-2: #b8f2dc; --glow-3: #5ccfb0; --glow-4: #d9f7a8;
+  --glow-opacity: 0.5;
+}
+:root[data-palette='mint'][data-theme='dark'] {
+  --accent: #3dd6a8;
+  --glow-1: #0d9b78; --glow-2: #0f5e4c; --glow-3: #14b8a6; --glow-4: #064e3b;
+  --glow-opacity: 0.36;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='mint']:not([data-theme='light']) {
+    --accent: #3dd6a8;
+    --glow-1: #0d9b78; --glow-2: #0f5e4c; --glow-3: #14b8a6; --glow-4: #064e3b;
+    --glow-opacity: 0.36;
+  }
+}
+
+:root[data-palette='lavender'] {
+  --accent: #6d3fd1;
+  --accent-grad: linear-gradient(135deg, #9466ff, #6a3bd0);
+  --glow-1: #c9b3ff; --glow-2: #e3d6ff; --glow-3: #b39cff; --glow-4: #ffd1ec;
+  --glow-opacity: 0.55;
+}
+:root[data-palette='lavender'][data-theme='dark'] {
+  --accent: #b39cff;
+  --glow-1: #7c3aed; --glow-2: #4c1d95; --glow-3: #a855f7; --glow-4: #2e1065;
+  --glow-opacity: 0.38;
+}
+@media (prefers-color-scheme: dark) {
+  :root[data-palette='lavender']:not([data-theme='light']) {
+    --accent: #b39cff;
+    --glow-1: #7c3aed; --glow-2: #4c1d95; --glow-3: #a855f7; --glow-4: #2e1065;
+    --glow-opacity: 0.38;
+  }
+}
+
+/* colour picker: four round swatches with names */
+.swatches {
+  display: flex;
+  gap: 4px;
+}
+.swatch {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+.swatch-dot {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s cubic-bezier(0.34, 1.32, 0.64, 1);
+}
+.swatch[aria-pressed='true'] {
+  color: var(--text);
+  font-weight: 600;
+}
+.swatch[aria-pressed='true'] .swatch-dot {
+  box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--text-2);
+  transform: scale(1.06);
+}
+.swatch-warm { background: linear-gradient(135deg, #ffb15c, #e04e1b); }
+.swatch-blue { background: linear-gradient(135deg, #8ec5ff, #0061d6); }
+.swatch-mint { background: linear-gradient(135deg, #7fe0c0, #0b7d62); }
+.swatch-lavender { background: linear-gradient(135deg, #c9b3ff, #6a3bd0); }
+.palette-label {
+  margin-top: 12px;
 }

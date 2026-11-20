@@ -61,6 +61,11 @@ export const strings = {
   themeAuto: 'Automatyczny',
   themeLight: 'Jasny',
   themeDark: 'Ciemny',
+  palette: 'Kolor',
+  paletteWarm: 'Ciepły',
+  paletteBlue: 'Niebieski',
+  paletteMint: 'Miętowy',
+  paletteLavender: 'Lawendowy',
 
   page: (n: number) => `Strona ${n}`,
   preview: (n: number) => `Podgląd: strona ${n}`,

@@ -23,6 +23,13 @@ export function Home() {
 
   return (
     <main className="home">
+      {/* slowly drifting colour blobs (the chosen colour set) behind the content */}
+      <div className="home-glow" aria-hidden="true">
+        <span className="glow glow-1" />
+        <span className="glow glow-2" />
+        <span className="glow glow-3" />
+        <span className="glow glow-4" />
+      </div>
       <div className="home-top">
         <Settings />
       </div>
