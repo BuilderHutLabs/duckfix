@@ -1,10 +1,10 @@
 import { addRotation, type Page, type PageFlag, type Rotation, type SourceRef } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
 import { releaseCanvas, type renderPage } from '../imaging/render';
-import { inkRatio, otsuThreshold, toGray, type GrayImage } from '../imaging/gray';
+import { innerInkRatio, inkRatio, otsuThreshold, toGray, type GrayImage } from '../imaging/gray';
 import { MIN_SKEW_SCORE, estimateSkew } from '../imaging/deskew';
 import type { OrientationDetector } from '../orientation/detector';
-import { decideOrientation, type PolicyThresholds } from '../orientation/policy';
+import { BLANK_INK, BLANK_MAX_THRESHOLD, decideOrientation, type PolicyThresholds } from '../orientation/policy';
 import { runQueue } from './queue';
 
 export interface PageAnalysis {
@@ -77,12 +77,16 @@ async function analyzeOne(
 
     // Ink ratio is rotation-invariant: computed once on the raw image.
     const raw = deps.toGrayImage(canvas, 0);
-    const ink = inkRatio(raw, otsuThreshold(raw));
+    const otsu = otsuThreshold(raw);
+    const ink = inkRatio(raw, otsu);
+    const blank = innerInkRatio(raw, Math.min(otsu, BLANK_MAX_THRESHOLD)) < BLANK_INK;
 
     const decision = decideOrientation(result, ink, deps.thresholds);
-    // Low-text means "no change": keep the PDF's own orientation (model rotation 0).
-    let rawRotation: Rotation = decision.flags.includes('low-text') ? baseRotation : decision.rotation;
-    if (decision.needsVerify && deps.detector.verifyUpright) {
+    if (blank) decision.flags = ['blank'];
+    // Low-text and blank mean "no change": keep the PDF's own orientation (model rotation 0).
+    const keep = blank || decision.flags.includes('low-text');
+    let rawRotation: Rotation = keep ? baseRotation : decision.rotation;
+    if (!keep && decision.needsVerify && deps.detector.verifyUpright) {
       try {
         rawRotation = await deps.detector.verifyUpright(canvas, [rawRotation, addRotation(rawRotation, 180)]);
       } catch {

@@ -1306,3 +1306,19 @@ body.splashing .home .duck {
   .sheet-backdrop,
   .switch::after { animation: none; transition: none; }
 }
+
+/* ---------- blank pages: one-tap removal above the grid ---------- */
+
+.blank-bar {
+  display: flex;
+  justify-content: center;
+  padding: 10px 16px 0;
+}
+.capsule.blank-capsule {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 0;
+  color: var(--accent);
+  font-weight: 600;
+  cursor: pointer;
+}

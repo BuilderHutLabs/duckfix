@@ -1,5 +1,5 @@
 export type Rotation = 0 | 90 | 180 | 270;
-export type PageFlag = 'check-orientation' | 'low-text';
+export type PageFlag = 'check-orientation' | 'low-text' | 'blank';
 
 export type SourceRef =
   | { kind: 'pdf'; fileId: string; pageIndex: number; baseRotation: Rotation; hasTextLayer: boolean }
@@ -29,7 +29,7 @@ function mapPages(doc: Doc, ids: string[], fn: (p: Page) => Page): Doc {
 }
 
 /** Flags a manual rotation resolves: the user has looked at the page ("checked"). */
-const CHECKED_BY_ROTATION: readonly PageFlag[] = ['check-orientation', 'low-text'];
+const CHECKED_BY_ROTATION: readonly PageFlag[] = ['check-orientation', 'low-text', 'blank'];
 
 export function rotatePages(doc: Doc, ids: string[], delta: 90 | -90 | 180): Doc {
   return mapPages(doc, ids, (p) => ({

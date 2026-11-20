@@ -54,6 +54,7 @@ export function ReviewGrid() {
     setPinned({ on: s.filterFlagged, ids: new Set(s.doc.pages.filter(isFlagged).map((p) => p.id)) });
   }
   const flaggedCount = s.doc.pages.filter(isFlagged).length;
+  const blankCount = s.doc.pages.filter((p) => p.flags.includes('blank')).length;
   const all = s.doc.pages.map((page, index) => ({ page, index }));
   const visible = s.filterFlagged
     ? all.filter(({ page }) => isFlagged(page) || pinned.ids.has(page.id))
@@ -93,6 +94,13 @@ export function ReviewGrid() {
       {s.doc.pages.length === 0 && <p className="grid-note">{strings.emptyDoc}</p>}
       {s.filterFlagged && flaggedCount === 0 && s.doc.pages.length > 0 && (
         <p className="grid-note">{strings.nothingFlagged}</p>
+      )}
+      {blankCount > 0 && !s.selecting && (
+        <div className="blank-bar">
+          <button type="button" className="capsule blank-capsule" onClick={() => s.removeBlankPages()}>
+            {strings.removeBlank(blankCount)}
+          </button>
+        </div>
       )}
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={items} strategy={rectSortingStrategy} disabled={SORTING_ENABLED}>

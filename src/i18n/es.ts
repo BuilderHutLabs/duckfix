@@ -80,7 +80,9 @@ export const es: Strings = {
   flagLabels: {
     'check-orientation': 'Revisar',
     'low-text': 'Poco texto',
+    blank: '¿En blanco?',
   },
+  removeBlank: (n) => `Quitar páginas en blanco (${n})`,
   autoRotated: 'Girada automáticamente',
   selected: 'seleccionada',
   thumbError: 'No se puede mostrar',

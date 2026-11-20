@@ -87,7 +87,9 @@ export const pl = {
   flagLabels: {
     'check-orientation': 'Sprawdź',
     'low-text': 'Mało tekstu',
+    blank: 'Pusta?',
   } satisfies Record<PageFlag, string>,
+  removeBlank: (n: number) => `Usuń puste strony (${n})`,
   autoRotated: 'Obrócona automatycznie',
   selected: 'zaznaczona',
   thumbError: 'Nie można wyświetlić',

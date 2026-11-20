@@ -55,6 +55,25 @@ export function inkRatio(img: GrayImage, threshold: number): number {
   return dark / img.data.length;
 }
 
+/**
+ * Ink inside the page, ignoring a `margin` (fraction of each side) where scanners leave dark
+ * edges, shadows and punch holes. Used to tell blank pages from pages with a little text.
+ */
+export function innerInkRatio(img: GrayImage, threshold: number, margin = 0.05): number {
+  const mx = Math.floor(img.width * margin);
+  const my = Math.floor(img.height * margin);
+  const x1 = img.width - mx;
+  const y1 = img.height - my;
+  const area = (x1 - mx) * (y1 - my);
+  if (area <= 0) return 0;
+  let dark = 0;
+  for (let y = my; y < y1; y++) {
+    const row = y * img.width;
+    for (let x = mx; x < x1; x++) if (img.data[row + x] < threshold) dark++;
+  }
+  return dark / area;
+}
+
 /** True when at least 97% of pixels are near-black (<40) or near-white (>215). */
 export function isNearBitonal(img: GrayImage): boolean {
   if (img.data.length === 0) return false;

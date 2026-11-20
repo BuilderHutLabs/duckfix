@@ -30,3 +30,34 @@ describe('gray', () => {
     expect(isNearBitonal(mid)).toBe(false);
   });
 });
+
+describe('innerInkRatio (blank page detection)', () => {
+  const W = 400;
+  const H = 400;
+  const white = () => ({ data: new Uint8Array(W * H).fill(255), width: W, height: H });
+  const paint = (img: { data: Uint8Array }, x0: number, y0: number, w: number, h: number) => {
+    for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) img.data[y * W + x] = 0;
+  };
+
+  it('ignores a dark scanner border in the margins', async () => {
+    const { innerInkRatio } = await import('../../src/imaging/gray');
+    const img = white();
+    paint(img, 0, 0, W, 20);
+    paint(img, 0, H - 20, W, 20);
+    paint(img, 0, 0, 20, H);
+    paint(img, W - 20, 0, 20, H);
+    expect(innerInkRatio(img, 128)).toBeLessThan(0.0001);
+  });
+
+  it('a lone page number stays below the blank limit; a text page is far above it', async () => {
+    const { innerInkRatio } = await import('../../src/imaging/gray');
+    const { BLANK_INK } = await import('../../src/orientation/policy');
+    const numbered = white();
+    paint(numbered, 195, 360, 10, 6);
+    expect(innerInkRatio(numbered, 128)).toBeLessThan(BLANK_INK);
+
+    const text = white();
+    for (let row = 0; row < 30; row++) paint(text, 40, 40 + row * 11, 320, 4);
+    expect(innerInkRatio(text, 128)).toBeGreaterThan(0.01);
+  });
+});

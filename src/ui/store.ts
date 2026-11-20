@@ -432,6 +432,11 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       });
     },
 
+    /** "Usuń puste strony": removes every page flagged blank (undoable like any removal). */
+    removeBlankPages() {
+      actions.remove(history.present.pages.filter((p) => p.flags.includes('blank')).map((p) => p.id));
+    },
+
     async insertAt(index: number, files: File[]) {
       if (files.length === 0 || state.busy) return;
       const own = session;

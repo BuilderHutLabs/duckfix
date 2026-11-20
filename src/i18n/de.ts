@@ -80,7 +80,9 @@ export const de: Strings = {
   flagLabels: {
     'check-orientation': 'Prüfen',
     'low-text': 'Wenig Text',
+    blank: 'Leer?',
   },
+  removeBlank: (n) => `Leere Seiten entfernen (${n})`,
   autoRotated: 'Automatisch gedreht',
   selected: 'ausgewählt',
   thumbError: 'Kann nicht angezeigt werden',

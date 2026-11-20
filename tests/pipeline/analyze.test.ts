@@ -102,18 +102,27 @@ describe('analyzePages', () => {
     expect(r.error).toBe('boom');
   });
 
-  it('flags low-text and leaves rotation 0 on blank pages', async () => {
+  it('flags a little-text page low-text (not blank)', async () => {
+    const s = setup({ rotation: 90, confidence: 9 });
+    const data = new Uint8Array(100 * 100).fill(255);
+    for (let i = 0; i < 50; i++) data[50 * 100 + 25 + i] = 0; // a short line: 0.5 % ink
+    s.toGrayImage.mockReturnValue({ data, width: 100, height: 100 });
+    const [r] = await run([pdfPage('a')], s.deps);
+    expect(r).toMatchObject({ rotation: 0, flags: ['low-text'] });
+  });
+
+  it('flags blank and leaves rotation 0 on blank pages', async () => {
     const s = setup({ rotation: 90, confidence: 8 });
     s.toGrayImage.mockReturnValue(blankGray());
     const [r] = await run([pdfPage('a')], s.deps);
-    expect(r).toMatchObject({ rotation: 0, flags: ['low-text'] });
+    expect(r).toMatchObject({ rotation: 0, flags: ['blank'] });
   });
 
   it('keeps the PDF orientation (model rotation 0) for low-text pages with baseRotation', async () => {
     const s = setup({ rotation: 180, confidence: 8 });
     s.toGrayImage.mockReturnValue(blankGray());
     const [r] = await run([pdfPage('a', { baseRotation: 90 })], s.deps);
-    expect(r).toMatchObject({ rotation: 0, flags: ['low-text'] });
+    expect(r).toMatchObject({ rotation: 0, flags: ['blank'] });
   });
 
   it('emits model rotation 0 on error even with baseRotation', async () => {

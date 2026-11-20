@@ -6,6 +6,14 @@ export interface PolicyThresholds {
   minInk: number;
 }
 
+/**
+ * Inner ink below this is a blank page (offered for removal, never removed automatically).
+ * A lone page number (~60 px on a 400 px page) stays below it; a sparse text page is ~10x above.
+ */
+export const BLANK_INK = 0.0015;
+/** Darkest grey counted as ink on a blank check: scanner noise on white paper stays out. */
+export const BLANK_MAX_THRESHOLD = 160;
+
 export const DEFAULT_THRESHOLDS: PolicyThresholds = { minConfidence: 2.0, minInk: 0.01 };
 
 export interface OrientationDecision {
