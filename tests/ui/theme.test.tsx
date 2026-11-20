@@ -2,7 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { App } from '../../src/ui/App';
 import { createAppStore } from '../../src/ui/store';
 import { strings } from '../../src/ui/strings';
-import { THEME_KEY, applyTheme, loadTheme } from '../../src/ui/theme';
+import { PALETTE_KEY, THEME_KEY, applyTheme, initTheme, loadPalette, loadTheme } from '../../src/ui/theme';
 import { fakeDeps } from './fixtures';
 
 const themeAttr = () => document.documentElement.getAttribute('data-theme');
@@ -12,6 +12,7 @@ describe('theme choice', () => {
   beforeEach(() => {
     localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
+    document.documentElement.removeAttribute('data-palette');
     document.head.innerHTML = '<meta name="theme-color" content="#f2f2f7">';
   });
 
@@ -51,5 +52,31 @@ describe('theme choice', () => {
     expect(() => applyTheme('dark', true)).not.toThrow();
     expect(themeAttr()).toBe('dark');
     spy.mockRestore();
+  });
+
+  it('colour sets: Ciepły by default; a chosen set applies at once, is remembered and restored at start', () => {
+    expect(loadPalette()).toBe('warm');
+    localStorage.setItem(PALETTE_KEY, 'nonsense');
+    expect(loadPalette()).toBe('warm');
+    localStorage.clear();
+
+    render(<App store={createAppStore(fakeDeps())} />);
+    fireEvent.click(screen.getByRole('button', { name: strings.settings }));
+    const swatch = (name: string) => screen.getByRole('button', { name });
+    expect(swatch(strings.paletteWarm).getAttribute('aria-pressed')).toBe('true');
+    expect(document.documentElement.getAttribute('data-palette')).toBeNull();
+
+    fireEvent.click(swatch(strings.paletteMint));
+    expect(document.documentElement.getAttribute('data-palette')).toBe('mint');
+    expect(localStorage.getItem(PALETTE_KEY)).toBe('mint');
+    expect(swatch(strings.paletteMint).getAttribute('aria-pressed')).toBe('true');
+
+    document.documentElement.removeAttribute('data-palette');
+    initTheme();
+    expect(document.documentElement.getAttribute('data-palette')).toBe('mint');
+
+    fireEvent.click(swatch(strings.paletteWarm));
+    expect(document.documentElement.getAttribute('data-palette')).toBeNull();
+    expect(localStorage.getItem(PALETTE_KEY)).toBeNull();
   });
 });

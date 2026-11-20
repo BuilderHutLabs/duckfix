@@ -11,10 +11,12 @@
     <meta name="apple-mobile-web-app-title" content="DuckFix" />
     <title>DuckFix</title>
     <script>
-      // apply the saved theme before first paint (no white flash in dark mode)
+      // apply the saved theme and colour set before first paint (no white flash in dark mode)
       try {
         var t = localStorage.getItem('wduck-theme');
         if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t);
+        var c = localStorage.getItem('duckfix-palette');
+        if (c === 'blue' || c === 'mint' || c === 'lavender') document.documentElement.setAttribute('data-palette', c);
       } catch (e) {}
     </script>
   </head>
