@@ -1,18 +1,21 @@
 import { PDFDocument, degrees } from 'pdf-lib';
 import { effectiveRotation, type Doc, type Page } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
+import { DICTS, strings } from '../i18n';
 
 export type Rasterizer = (
   page: Page,
   source: SourceFile,
 ) => Promise<{ bytes: Uint8Array; format: 'png' | 'jpg'; widthPt: number; heightPt: number }>;
 
-export function exportFileName(original: string): string {
-  const base = original
-    .replace(/\.[^./\\]*$/, '')
-    // a corrected file opened again (Android may have added " (1)") keeps one suffix
-    .replace(/ \(poprawiony\)( \(\d+\))?$/, '');
-  return `${base} (poprawiony).pdf`;
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** The "(poprawiony)" suffix of any language, plus " (1)" that Android may add. */
+const ANY_SUFFIX = new RegExp(`(${Object.values(DICTS).map((d) => escapeRe(d.exportSuffix)).join('|')})( \\(\\d+\\))?$`);
+
+export function exportFileName(original: string, suffix: string = strings.exportSuffix): string {
+  // a corrected file opened again keeps one suffix
+  const base = original.replace(/\.[^./\\]*$/, '').replace(ANY_SUFFIX, '');
+  return `${base}${suffix}.pdf`;
 }
 
 function needsRaster(page: Page): boolean {

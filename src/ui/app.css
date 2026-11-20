@@ -1196,6 +1196,11 @@ body.splashing .home .duck {
 .swatch-blue { background: linear-gradient(135deg, #8ec5ff, #0061d6); }
 .swatch-mint { background: linear-gradient(135deg, #7fe0c0, #0b7d62); }
 .swatch-lavender { background: linear-gradient(135deg, #c9b3ff, #6a3bd0); }
-.palette-label {
+.palette-label,
+.theme-label-gap {
   margin-top: 12px;
+}
+.segmented-lang button {
+  font-size: 12px;
+  padding: 0 2px;
 }

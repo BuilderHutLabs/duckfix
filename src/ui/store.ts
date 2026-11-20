@@ -435,7 +435,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         });
         if (own !== session) return;
         const first = state.sources.values().next().value as SourceFile | undefined;
-        const file = pdfFile(bytes, exportFileName(first?.name ?? 'dokument.pdf'));
+        const file = pdfFile(bytes, exportFileName(first?.name ?? strings.defaultDocName));
         if (deps.shareFirst) {
           exportedDoc = doc;
           set({ busy: null, exportProgress: null, exportReady: file });

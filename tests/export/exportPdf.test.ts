@@ -116,6 +116,12 @@ describe('exportPdf', () => {
 });
 
 describe('exportFileName', () => {
+  it('uses the given language suffix and strips a suffix from any language', () => {
+    expect(exportFileName('scan.pdf', ' (fixed)')).toBe('scan (fixed).pdf');
+    expect(exportFileName('scan (corregido).pdf', ' (fixed)')).toBe('scan (fixed).pdf');
+    expect(exportFileName('a (korrigiert) (2).pdf', ' (poprawiony)')).toBe('a (poprawiony).pdf');
+  });
+
   it('appends " (poprawiony)" and uses .pdf', () => {
     expect(exportFileName('Scan_20261119_1345.pdf')).toBe('Scan_20261119_1345 (poprawiony).pdf');
     expect(exportFileName('foto.jpg')).toBe('foto (poprawiony).pdf');

@@ -1,0 +1,92 @@
+import type { Strings } from './pl';
+
+const s = (n: number, one: string, other: string) => (n === 1 ? one : other);
+
+export const de: Strings = {
+  appName: 'DuckFix',
+  language: 'Sprache',
+  exportSuffix: ' (korrigiert)',
+  defaultDocName: 'dokument.pdf',
+  updateAvailable: 'Neue Version verfügbar',
+  updateAction: 'Aktualisieren',
+  appDescription: 'Dreht und begradigt schiefe PDF-Scans automatisch.',
+  steps: ['1. Öffnen', '2. Prüfen', '3. Speichern'],
+
+  open: 'PDF oder Fotos öffnen',
+  opening: 'Wird geöffnet…',
+  close: 'Schließen',
+  confirmClose: 'Dokument schließen? Nicht gespeicherte Änderungen gehen verloren.',
+
+  restoreSession: 'Zurück zum letzten Dokument',
+  startOver: 'Neu beginnen',
+
+  analyzing: (done, total) => `Analysiere ${done}/${total}`,
+  toCheck: (n) => `${n} ${s(n, 'Seite', 'Seiten')} zu prüfen`,
+  toCheckShort: (n) => `${n} zu prüfen`,
+  showOnlyFlagged: 'Nur diese zeigen',
+  nothingFlagged: 'Alle Seiten geprüft.',
+  emptyDoc: 'Keine Seiten. Füge Seiten mit der „+“-Taste hinzu.',
+
+  undo: 'Rückgängig',
+  redo: 'Wiederholen',
+  save: 'PDF speichern',
+  saving: 'Wird gespeichert…',
+  savingProgress: (done, total) => `Speichere ${done}/${total}`,
+  shareExport: 'Teilen / Speichern',
+  inAppWarning: 'Dieser eingebaute Browser (z. B. Messenger) kann keine PDF-Dateien speichern.',
+  openInChrome: 'In Chrome öffnen',
+  openInSafariHint: 'Tippe auf ⋯ in der Bildschirmecke und wähle „In Safari öffnen“.',
+  savedNotice: (name) => `„${name}“ wurde unter Downloads gespeichert.`,
+
+  select: 'Auswählen',
+  selectDone: 'Fertig',
+  selectedCount: (n) => `Ausgewählt: ${n}`,
+  rotate: 'Drehen',
+  remove: 'Löschen',
+
+  insertHere: 'Seiten hier einfügen',
+  addAtEnd: 'Seiten hinzufügen',
+
+  settings: 'Einstellungen',
+  more: 'Mehr',
+  diagnostics: 'Diagnose',
+  deskew: 'Schräge Seiten begradigen',
+  deskewHint: 'Wirkt beim nächsten Öffnen einer Datei.',
+  quack: 'Quak quak!',
+  theme: 'Darstellung',
+  themeAuto: 'Automatisch',
+  themeLight: 'Hell',
+  themeDark: 'Dunkel',
+  palette: 'Farbe',
+  paletteWarm: 'Warm',
+  paletteBlue: 'Blau',
+  paletteMint: 'Mint',
+  paletteLavender: 'Lavendel',
+
+  page: (n) => `Seite ${n}`,
+  preview: (n) => `Vorschau: Seite ${n}`,
+  previousPage: 'Vorherige Seite',
+  nextPage: 'Nächste Seite',
+  flagLabels: {
+    'check-orientation': 'Prüfen',
+    'low-text': 'Wenig Text',
+  },
+  autoRotated: 'Automatisch gedreht',
+  selected: 'ausgewählt',
+  thumbError: 'Kann nicht angezeigt werden',
+
+  diagTitle: 'Diagnose',
+  copy: 'Kopieren',
+  copied: 'Kopiert',
+  share: 'Teilen',
+
+  dismiss: 'OK',
+  errors: {
+    encrypted: 'Dieses PDF ist passwortgeschützt. Entferne das Passwort und versuche es erneut.',
+    corrupt: 'Die Datei konnte nicht gelesen werden. Sie ist möglicherweise beschädigt.',
+    unsupported: 'Dieser Dateityp wird nicht unterstützt. Wähle ein PDF oder ein Foto.',
+  },
+  genericError: 'Etwas ist schiefgelaufen. Bitte versuche es erneut.',
+  exportError: 'Das PDF konnte nicht gespeichert werden. Bitte versuche es erneut.',
+  analysisError: 'Das automatische Drehen hat nicht funktioniert. Du kannst Seiten von Hand drehen.',
+};

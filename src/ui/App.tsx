@@ -1,6 +1,7 @@
 import { Splash, isStandaloneLaunch } from './Splash';
 import { chromeIntentUrl, detectInAppBrowser } from './inAppBrowser';
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
+import { useLanguage } from '../i18n';
 import { AppStoreProvider, createAppStore, useAppStore, type AppStore } from './store';
 import { Home } from './Home';
 import { Toolbar } from './Toolbar';
@@ -25,11 +26,15 @@ export function App({ store }: { store?: AppStore }) {
   }, []);
 
   const [splash, setSplash] = useState(isStandaloneLaunch);
+  const [lang] = useLanguage();
 
   return (
     <AppStoreProvider store={s}>
-      <Shell />
-      <UpdatePrompt />
+      {/* a language change re-renders the whole tree with the new texts */}
+      <Fragment key={lang}>
+        <Shell />
+        <UpdatePrompt />
+      </Fragment>
       {splash && <Splash onDone={() => setSplash(false)} />}
     </AppStoreProvider>
   );

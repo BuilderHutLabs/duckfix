@@ -1,13 +1,15 @@
 import { usePalette, useTheme, type PaletteChoice, type ThemeChoice } from './theme';
 import { strings } from './strings';
+import { LanguagePicker } from './LanguagePicker';
 
-const OPTIONS: [ThemeChoice, string][] = [
+// functions, not constants: the labels must follow a language change
+const themeOptions = (): [ThemeChoice, string][] => [
   ['auto', strings.themeAuto],
   ['light', strings.themeLight],
   ['dark', strings.themeDark],
 ];
 
-const PALETTES: [PaletteChoice, string][] = [
+const paletteOptions = (): [PaletteChoice, string][] => [
   ['warm', strings.paletteWarm],
   ['blue', strings.paletteBlue],
   ['mint', strings.paletteMint],
@@ -20,9 +22,10 @@ export function ThemePicker() {
   const [palette, setPalette] = usePalette();
   return (
     <div className="theme-picker">
-      <span className="theme-label">{strings.theme}</span>
+      <LanguagePicker />
+      <span className="theme-label theme-label-gap">{strings.theme}</span>
       <div className="segmented" role="group" aria-label={strings.theme}>
-        {OPTIONS.map(([value, label]) => (
+        {themeOptions().map(([value, label]) => (
           <button key={value} type="button" aria-pressed={theme === value} onClick={() => setTheme(value)}>
             {label}
           </button>
@@ -30,7 +33,7 @@ export function ThemePicker() {
       </div>
       <span className="theme-label palette-label">{strings.palette}</span>
       <div className="swatches" role="group" aria-label={strings.palette}>
-        {PALETTES.map(([value, label]) => (
+        {paletteOptions().map(([value, label]) => (
           <button
             key={value}
             type="button"

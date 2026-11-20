@@ -1,0 +1,92 @@
+import type { Strings } from './pl';
+
+const s = (n: number, one: string, other: string) => (n === 1 ? one : other);
+
+export const en: Strings = {
+  appName: 'DuckFix',
+  language: 'Language',
+  exportSuffix: ' (fixed)',
+  defaultDocName: 'document.pdf',
+  updateAvailable: 'New version available',
+  updateAction: 'Refresh',
+  appDescription: 'Automatically rotates and straightens crooked PDF scans.',
+  steps: ['1. Open', '2. Check', '3. Save'],
+
+  open: 'Open PDF or photos',
+  opening: 'Opening…',
+  close: 'Close',
+  confirmClose: 'Close the document? Unsaved changes will be lost.',
+
+  restoreSession: 'Back to the last document',
+  startOver: 'Start over',
+
+  analyzing: (done, total) => `Analyzing ${done}/${total}`,
+  toCheck: (n) => `${n} ${s(n, 'page', 'pages')} to check`,
+  toCheckShort: (n) => `${n} to check`,
+  showOnlyFlagged: 'Show only these',
+  nothingFlagged: 'All pages checked.',
+  emptyDoc: 'No pages. Add pages with the “+” button.',
+
+  undo: 'Undo',
+  redo: 'Redo',
+  save: 'Save PDF',
+  saving: 'Saving…',
+  savingProgress: (done, total) => `Saving ${done}/${total}`,
+  shareExport: 'Share / Save',
+  inAppWarning: 'This built-in browser (e.g. Messenger) cannot save PDF files.',
+  openInChrome: 'Open in Chrome',
+  openInSafariHint: 'Tap ⋯ in the corner of the screen and choose “Open in Safari”.',
+  savedNotice: (name) => `Saved “${name}” to Downloads.`,
+
+  select: 'Select',
+  selectDone: 'Done',
+  selectedCount: (n) => `Selected: ${n}`,
+  rotate: 'Rotate',
+  remove: 'Delete',
+
+  insertHere: 'Insert pages here',
+  addAtEnd: 'Add pages',
+
+  settings: 'Settings',
+  more: 'More',
+  diagnostics: 'Diagnostics',
+  deskew: 'Straighten tilted pages',
+  deskewHint: 'Takes effect the next time you open a file.',
+  quack: 'Quack quack!',
+  theme: 'Appearance',
+  themeAuto: 'Automatic',
+  themeLight: 'Light',
+  themeDark: 'Dark',
+  palette: 'Colour',
+  paletteWarm: 'Warm',
+  paletteBlue: 'Blue',
+  paletteMint: 'Mint',
+  paletteLavender: 'Lavender',
+
+  page: (n) => `Page ${n}`,
+  preview: (n) => `Preview: page ${n}`,
+  previousPage: 'Previous page',
+  nextPage: 'Next page',
+  flagLabels: {
+    'check-orientation': 'Check',
+    'low-text': 'Little text',
+  },
+  autoRotated: 'Rotated automatically',
+  selected: 'selected',
+  thumbError: 'Cannot display',
+
+  diagTitle: 'Diagnostics',
+  copy: 'Copy',
+  copied: 'Copied',
+  share: 'Share',
+
+  dismiss: 'OK',
+  errors: {
+    encrypted: 'This PDF is password-protected. Remove the password and try again.',
+    corrupt: 'The file could not be read. It may be damaged.',
+    unsupported: 'This file type is not supported. Choose a PDF or a photo.',
+  },
+  genericError: 'Something went wrong. Please try again.',
+  exportError: 'The PDF could not be saved. Please try again.',
+  analysisError: 'Automatic rotation did not work. You can rotate pages by hand.',
+};

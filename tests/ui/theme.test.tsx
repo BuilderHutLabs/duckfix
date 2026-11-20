@@ -80,3 +80,24 @@ describe('theme choice', () => {
     expect(localStorage.getItem(PALETTE_KEY)).toBeNull();
   });
 });
+
+describe('language choice', () => {
+  afterEach(async () => {
+    const { setLanguage } = await import('../../src/i18n');
+    setLanguage('pl');
+    localStorage.clear();
+  });
+
+  it('settings list the four languages by their own names; English applies at once', async () => {
+    const { en } = await import('../../src/i18n/en');
+    render(<App store={createAppStore(fakeDeps())} />);
+    fireEvent.click(screen.getByRole('button', { name: strings.settings }));
+    for (const name of ['Polski', 'English', 'Deutsch', 'Español']) expect(screen.getByRole('button', { name })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'English' }));
+    expect(screen.getByRole('button', { name: en.settings })).toBeTruthy();
+    // options built from the texts follow the language too (the tree re-renders, so reopen Settings)
+    fireEvent.click(screen.getByRole('button', { name: en.settings }));
+    expect(screen.getByRole('button', { name: en.themeDark })).toBeTruthy();
+    expect(screen.getByRole('button', { name: en.paletteMint })).toBeTruthy();
+  });
+});

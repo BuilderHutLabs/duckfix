@@ -1,0 +1,92 @@
+import type { Strings } from './pl';
+
+const s = (n: number, one: string, other: string) => (n === 1 ? one : other);
+
+export const es: Strings = {
+  appName: 'DuckFix',
+  language: 'Idioma',
+  exportSuffix: ' (corregido)',
+  defaultDocName: 'documento.pdf',
+  updateAvailable: 'Nueva versión disponible',
+  updateAction: 'Actualizar',
+  appDescription: 'Gira y endereza automáticamente los escaneos PDF torcidos.',
+  steps: ['1. Abrir', '2. Revisar', '3. Guardar'],
+
+  open: 'Abrir PDF o fotos',
+  opening: 'Abriendo…',
+  close: 'Cerrar',
+  confirmClose: '¿Cerrar el documento? Se perderán los cambios no guardados.',
+
+  restoreSession: 'Volver al último documento',
+  startOver: 'Empezar de nuevo',
+
+  analyzing: (done, total) => `Analizando ${done}/${total}`,
+  toCheck: (n) => `${n} ${s(n, 'página', 'páginas')} por revisar`,
+  toCheckShort: (n) => `${n} por revisar`,
+  showOnlyFlagged: 'Mostrar solo estas',
+  nothingFlagged: 'Todas las páginas revisadas.',
+  emptyDoc: 'No hay páginas. Añade páginas con el botón «+».',
+
+  undo: 'Deshacer',
+  redo: 'Rehacer',
+  save: 'Guardar PDF',
+  saving: 'Guardando…',
+  savingProgress: (done, total) => `Guardando ${done}/${total}`,
+  shareExport: 'Compartir / Guardar',
+  inAppWarning: 'Este navegador integrado (p. ej. Messenger) no puede guardar archivos PDF.',
+  openInChrome: 'Abrir en Chrome',
+  openInSafariHint: 'Toca ⋯ en la esquina de la pantalla y elige «Abrir en Safari».',
+  savedNotice: (name) => `Se guardó «${name}» en Descargas.`,
+
+  select: 'Seleccionar',
+  selectDone: 'Listo',
+  selectedCount: (n) => `Seleccionadas: ${n}`,
+  rotate: 'Girar',
+  remove: 'Eliminar',
+
+  insertHere: 'Insertar páginas aquí',
+  addAtEnd: 'Añadir páginas',
+
+  settings: 'Ajustes',
+  more: 'Más',
+  diagnostics: 'Diagnóstico',
+  deskew: 'Enderezar páginas inclinadas',
+  deskewHint: 'Se aplica la próxima vez que abras un archivo.',
+  quack: '¡Cuac cuac!',
+  theme: 'Apariencia',
+  themeAuto: 'Automático',
+  themeLight: 'Claro',
+  themeDark: 'Oscuro',
+  palette: 'Color',
+  paletteWarm: 'Cálido',
+  paletteBlue: 'Azul',
+  paletteMint: 'Menta',
+  paletteLavender: 'Lavanda',
+
+  page: (n) => `Página ${n}`,
+  preview: (n) => `Vista previa: página ${n}`,
+  previousPage: 'Página anterior',
+  nextPage: 'Página siguiente',
+  flagLabels: {
+    'check-orientation': 'Revisar',
+    'low-text': 'Poco texto',
+  },
+  autoRotated: 'Girada automáticamente',
+  selected: 'seleccionada',
+  thumbError: 'No se puede mostrar',
+
+  diagTitle: 'Diagnóstico',
+  copy: 'Copiar',
+  copied: 'Copiado',
+  share: 'Compartir',
+
+  dismiss: 'OK',
+  errors: {
+    encrypted: 'Este PDF está protegido con contraseña. Quita la contraseña e inténtalo de nuevo.',
+    corrupt: 'No se pudo leer el archivo. Puede estar dañado.',
+    unsupported: 'Este tipo de archivo no es compatible. Elige un PDF o una foto.',
+  },
+  genericError: 'Algo salió mal. Inténtalo de nuevo.',
+  exportError: 'No se pudo guardar el PDF. Inténtalo de nuevo.',
+  analysisError: 'El giro automático no funcionó. Puedes girar las páginas a mano.',
+};
