@@ -16,6 +16,13 @@ export interface Photo {
 
 /** Longest side of the copy the sheet is searched in. */
 const DETECT_SIDE = 400;
+/**
+ * Working size of a camera photo (longest side). Phones shoot 12–50 MP; keeping that decoded
+ * several times over (preview, detection, warp) ran Android out of memory. 2400 px is ~300 dpi on A4.
+ */
+export const WORK_SIDE = 2400;
+/** The crop screen shows a small copy, not the original photo. */
+const PREVIEW_SIDE = 1600;
 /** Longest side of the source copy the warp samples from (iPad memory). */
 const SOURCE_SIDE = 3200;
 const JPEG_QUALITY = 0.85;
@@ -24,26 +31,69 @@ function canvas(w: number, h: number): HTMLCanvasElement {
   return Object.assign(document.createElement('canvas'), { width: w, height: h });
 }
 
-async function decode(file: Blob): Promise<ImageBitmap> {
+async function decodeFull(file: Blob): Promise<ImageBitmap> {
+  // e.g. HEIC where createImageBitmap cannot decode it but <img> can (Safari)
+  const url = URL.createObjectURL(file);
   try {
-    return await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const img = new Image();
+    img.src = url;
+    await img.decode();
+    return await createImageBitmap(img);
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/** Shrinks a bitmap whose longest side is over the working size; the big one is freed at once. */
+async function shrink(bmp: ImageBitmap): Promise<ImageBitmap> {
+  const long = Math.max(bmp.width, bmp.height);
+  // resizeWidth fixes only the width, so a portrait photo may come back 2400×3200: that is fine
+  if (long <= (WORK_SIDE * 4) / 3) return bmp;
+  const k = WORK_SIDE / long;
+  const c = canvas(Math.round(bmp.width * k), Math.round(bmp.height * k));
+  try {
+    c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
+    bmp.close();
+    return await createImageBitmap(c);
+  } finally {
+    releaseCanvas(c);
+  }
+}
+
+async function decode(file: Blob): Promise<ImageBitmap> {
+  let bmp: ImageBitmap;
+  try {
+    // decode straight at the working size (Chrome/Android downsamples while decoding)
+    bmp = await createImageBitmap(file, { imageOrientation: 'from-image', resizeWidth: WORK_SIDE, resizeQuality: 'high' });
   } catch {
-    // e.g. HEIC where createImageBitmap cannot decode it but <img> can (Safari)
-    const url = URL.createObjectURL(file);
-    try {
-      const img = new Image();
-      img.src = url;
-      await img.decode();
-      return await createImageBitmap(img);
-    } finally {
-      URL.revokeObjectURL(url);
-    }
+    bmp = await decodeFull(file);
+  }
+  return shrink(bmp);
+}
+
+async function previewUrl(bmp: ImageBitmap): Promise<string> {
+  const k = Math.min(1, PREVIEW_SIDE / Math.max(bmp.width, bmp.height));
+  const c = canvas(Math.max(1, Math.round(bmp.width * k)), Math.max(1, Math.round(bmp.height * k)));
+  try {
+    c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise<Blob>((resolve, reject) =>
+      c.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', 0.8),
+    );
+    return URL.createObjectURL(blob);
+  } finally {
+    releaseCanvas(c);
   }
 }
 
 export async function loadPhoto(file: Blob): Promise<Photo> {
   const bitmap = await decode(file);
-  const url = URL.createObjectURL(file);
+  let url: string;
+  try {
+    url = await previewUrl(bitmap);
+  } catch (e) {
+    bitmap.close();
+    throw e;
+  }
   return {
     width: bitmap.width,
     height: bitmap.height,
