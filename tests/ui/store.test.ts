@@ -190,10 +190,10 @@ describe('app store', () => {
       store.getState().doc,
       new Map([['f1', source]]),
       expect.any(Function),
-      expect.objectContaining({ compress: false, ocr: false }),
+      expect.objectContaining({ compress: false, ocr: null }),
     );
     report!(1, 2);
-    expect(store.getState().exportProgress).toEqual({ done: 1, total: 2 });
+    expect(store.getState().exportProgress).toEqual({ done: 1, total: 2, ocr: false });
     finish(new Uint8Array([1]));
     await done;
 

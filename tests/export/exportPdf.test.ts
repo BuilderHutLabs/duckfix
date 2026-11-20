@@ -51,6 +51,13 @@ function imageCount(pdf: PDFDocument): number {
     }).length;
 }
 
+/** stand-in for tesseract's text-only page */
+async function textOnlyPdf(): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  pdf.addPage([50, 50]).drawText('x', { size: 8, opacity: 0 });
+  return pdf.save();
+}
+
 async function load(bytes: Uint8Array) {
   return PDFDocument.load(bytes);
 }
@@ -133,6 +140,30 @@ describe('exportPdf', () => {
       { signal: ctrl.signal },
     );
     await expect(run).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('searchable text: OCR runs on image pages, not on PDF pages that already have text', async () => {
+    const src = await makePdf([[100, 100]]);
+    const img: SourceFile = { id: 'i1', name: 'foto.jpg', type: 'image', blob: new Blob([PNG as BlobPart]) };
+    const layer = await textOnlyPdf();
+    const ocr = { textLayer: vi.fn(async () => layer), dispose: vi.fn(async () => {}) };
+    const imagePage: Page = { ...pdfPage(0), id: 'img', source: { kind: 'image', fileId: 'i1' } };
+    const doc: Doc = { pages: [pdfPage(0), imagePage] };
+    const out = await load(
+      await exportPdf(doc, new Map([['f1', src], ['i1', img]]), fakeRaster(), undefined, { ocr }),
+    );
+    expect(ocr.textLayer).toHaveBeenCalledTimes(1);
+    expect(out.getPageCount()).toBe(2);
+  });
+
+  it('searchable text: an untouched PDF page without text gets rasterized and recognized', async () => {
+    const src = await makePdf([[100, 100]]);
+    const r = fakeRaster();
+    const ocr = { textLayer: vi.fn(async () => textOnlyPdf()), dispose: vi.fn(async () => {}) };
+    const scan = pdfPage(0, { source: { kind: 'pdf', fileId: 'f1', pageIndex: 0, baseRotation: 0, hasTextLayer: false } });
+    await exportPdf({ pages: [scan] }, new Map([['f1', src]]), r, undefined, { ocr });
+    expect(r).toHaveBeenCalledTimes(1);
+    expect(ocr.textLayer).toHaveBeenCalledTimes(1);
   });
 
   it('always rasterizes image pages', async () => {

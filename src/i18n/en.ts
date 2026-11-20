@@ -32,6 +32,8 @@ export const en: Strings = {
   save: 'Save PDF',
   saving: 'Saving…',
   savingProgress: (done, total) => `Saving ${done}/${total}`,
+  ocrProgress: (done, total) => `Recognizing text ${done}/${total}`,
+  ocrUnavailable: 'Text recognition was not available (it needs the internet the first time). The file was saved without it.',
   shareExport: 'Share / Save',
   inAppWarning: 'This built-in browser (e.g. Messenger) cannot save PDF files.',
   openInChrome: 'Open in Chrome',

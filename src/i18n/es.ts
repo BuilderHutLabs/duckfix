@@ -32,6 +32,8 @@ export const es: Strings = {
   save: 'Guardar PDF',
   saving: 'Guardando…',
   savingProgress: (done, total) => `Guardando ${done}/${total}`,
+  ocrProgress: (done, total) => `Reconociendo texto ${done}/${total}`,
+  ocrUnavailable: 'El reconocimiento de texto no estaba disponible (la primera vez necesita internet). El archivo se guardó sin él.',
   shareExport: 'Compartir / Guardar',
   inAppWarning: 'Este navegador integrado (p. ej. Messenger) no puede guardar archivos PDF.',
   openInChrome: 'Abrir en Chrome',

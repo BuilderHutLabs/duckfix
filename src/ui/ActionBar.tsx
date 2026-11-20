@@ -29,7 +29,11 @@ export function ActionBar() {
       ) : s.busy === 'exporting' ? (
         <>
           <button type="button" className="btn btn-primary" disabled>
-            {s.exportProgress ? strings.savingProgress(s.exportProgress.done, s.exportProgress.total) : strings.saving}
+            {!s.exportProgress
+              ? strings.saving
+              : s.exportProgress.ocr
+                ? strings.ocrProgress(s.exportProgress.done, s.exportProgress.total)
+                : strings.savingProgress(s.exportProgress.done, s.exportProgress.total)}
           </button>
           <button type="button" className="btn" onClick={() => s.cancelExport()}>
             {strings.cancel}

@@ -59,7 +59,15 @@ export default defineConfig({
       workbox: {
         // pdf.js worker is a .mjs; tesseract core loaders are *.wasm.js; traineddata must be cached for offline OSD
         globPatterns: ['**/*.{js,mjs,css,html,png,svg,wasm,traineddata}'],
-        globIgnores: ['calibrate.html'],
+        // deu/spa (searchable text in German/Spanish) are cached on first use, not at install
+        globIgnores: ['calibrate.html', 'tessdata/deu.traineddata', 'tessdata/spa.traineddata'],
+        runtimeCaching: [
+          {
+            urlPattern: /\/tessdata\/(deu|spa)\.traineddata$/,
+            handler: 'CacheFirst',
+            options: { cacheName: 'duckfix-ocr-langs', expiration: { maxEntries: 4 } },
+          },
+        ],
         maximumFileSizeToCacheInBytes: 40 * 1024 * 1024,
       },
     }),

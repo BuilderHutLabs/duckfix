@@ -17,6 +17,9 @@ const TRAINEDDATA = [
   ['osd', `${RAW}/tessdata/main/osd.traineddata`],
   ['pol', `${RAW}/tessdata_fast/main/pol.traineddata`],
   ['eng', `${RAW}/tessdata_fast/main/eng.traineddata`],
+  // searchable text in German / Spanish: served, but not precached (downloaded on first use)
+  ['deu', `${RAW}/tessdata_fast/main/deu.traineddata`],
+  ['spa', `${RAW}/tessdata_fast/main/spa.traineddata`],
 ];
 
 // The browser worker loads the self-contained *.wasm.js variants (LSTM / legacy, SIMD / plain).

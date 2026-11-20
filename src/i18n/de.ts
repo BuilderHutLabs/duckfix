@@ -32,6 +32,8 @@ export const de: Strings = {
   save: 'PDF speichern',
   saving: 'Wird gespeichert…',
   savingProgress: (done, total) => `Speichere ${done}/${total}`,
+  ocrProgress: (done, total) => `Erkenne Text ${done}/${total}`,
+  ocrUnavailable: 'Die Texterkennung war nicht verfügbar (beim ersten Mal ist Internet nötig). Die Datei wurde ohne sie gespeichert.',
   shareExport: 'Teilen / Speichern',
   inAppWarning: 'Dieser eingebaute Browser (z. B. Messenger) kann keine PDF-Dateien speichern.',
   openInChrome: 'In Chrome öffnen',

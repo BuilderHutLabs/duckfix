@@ -1,5 +1,6 @@
 import { storageKey } from '../config';
-import { formatSize } from '../i18n';
+import { currentLanguage, formatSize, type Lang } from '../i18n';
+import { createOcrEngine, type OcrEngine } from '../export/ocr';
 import { loadExportOptions, saveExportOptions, type ExportOptions } from '../export/options';
 import { createContext, createElement, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import {
@@ -16,7 +17,7 @@ import { importFiles, type SourceFile } from '../import/importFiles';
 import { ImportError } from '../import/errors';
 import { forgetPdf, releaseCanvas, renderPage } from '../imaging/render';
 import { ANALYSIS_MAX_SIDE, analyzePages, canvasToGrayImage, type PageAnalysis } from '../pipeline/analyze';
-import { createTesseractDetector } from '../orientation/tesseract';
+import { createTesseractDetector, tesseractPaths } from '../orientation/tesseract';
 import type { OrientationDetector } from '../orientation/detector';
 import { DEFAULT_THRESHOLDS } from '../orientation/policy';
 import { exportFileName, exportPdf } from '../export/exportPdf';
@@ -42,7 +43,7 @@ export interface AppState {
   canRedo: boolean;
   busy: 'opening' | 'exporting' | null;
   /** Pages written so far while exporting. */
-  exportProgress: { done: number; total: number } | null;
+  exportProgress: { done: number; total: number; ocr: boolean } | null;
   /** Exported PDF waiting for the user's tap on "Udostępnij / Zapisz". */
   exportReady: File | null;
   /** "Zapisz PDF" opened the save options sheet. */
@@ -68,8 +69,10 @@ export interface StoreDeps {
     doc: Doc,
     sources: Map<string, SourceFile>,
     onProgress: (done: number, total: number) => void,
-    opts: ExportOptions & { signal: AbortSignal },
+    opts: { compress: boolean; ocr: OcrEngine | null; signal: AbortSignal },
   ): Promise<Uint8Array>;
+  /** OCR engine for "Tekst do wyszukiwania" in the given language (may download deu/spa data). */
+  createOcr(lang: Lang): Promise<OcrEngine>;
   share: typeof shareOrDownload;
   /** Plain download of the exported file (Windows, Android, Mac). */
   download(file: File): void;
@@ -94,7 +97,12 @@ function browserDeps(): StoreDeps {
     analyzePages,
     createDetector: () => createTesseractDetector({ basePath: import.meta.env.BASE_URL, workers: 2 }),
     exportPdf: (doc, sources, onProgress, opts) =>
-      exportPdf(doc, sources, browserRasterizer, onProgress, { compress: opts.compress, signal: opts.signal }),
+      exportPdf(doc, sources, browserRasterizer, onProgress, {
+        compress: opts.compress,
+        ocr: opts.ocr ?? undefined,
+        signal: opts.signal,
+      }),
+    createOcr: (lang) => createOcrEngine(lang, tesseractPaths(import.meta.env.BASE_URL)),
     share: shareOrDownload,
     download: downloadFile,
     shareFirst: prefersShareSheet(),
@@ -159,6 +167,26 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
   let exportedDoc: Doc | null = null;
   /** Aborts the running export ("Anuluj"). */
   let exportCtrl: AbortController | null = null;
+  /** OCR engine, created on the first searchable export and kept for the open document. */
+  let ocr: { lang: Lang; engine: Promise<OcrEngine> } | null = null;
+  const disposeOcr = () => {
+    const old = ocr;
+    ocr = null;
+    void old?.engine.then((e) => e.dispose()).catch(() => {});
+  };
+  const getOcr = (): Promise<OcrEngine> => {
+    const lang = currentLanguage();
+    if (ocr?.lang !== lang) {
+      disposeOcr();
+      const engine = deps.createOcr(lang);
+      // a failed start (offline, first deu/spa download) is retried on the next export
+      engine.catch(() => {
+        if (ocr?.engine === engine) ocr = null;
+      });
+      ocr = { lang, engine };
+    }
+    return ocr.engine;
+  };
   /** When the oldest unsaved change was scheduled (start of the max-wait window). */
   let savePendingSince: number | null = null;
 
@@ -300,6 +328,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
   };
 
   const closeSession = () => {
+    disposeOcr();
     session.controller.abort();
     session = { controller: new AbortController(), runs: 0 };
     for (const id of state.sources.keys()) void deps.forgetPdf(id).catch(() => {});
@@ -467,23 +496,33 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         exportOptions: opts,
       });
       try {
+        let engine: OcrEngine | null = null;
+        let ocrFailed = false;
+        if (opts.ocr) {
+          try {
+            engine = await getOcr();
+          } catch {
+            ocrFailed = true; // save without the text layer and say so
+          }
+        }
         const bytes = await deps.exportPdf(
           doc,
           state.sources,
           (done, total) => {
-            if (own === session) set({ exportProgress: { done, total } });
+            if (own === session) set({ exportProgress: { done, total, ocr: engine !== null } });
           },
-          { ...opts, signal: ctrl.signal },
+          { compress: opts.compress, ocr: engine, signal: ctrl.signal },
         );
         if (own !== session) return;
         const first = state.sources.values().next().value as SourceFile | undefined;
         const file = pdfFile(bytes, exportFileName(first?.name ?? strings.defaultDocName));
         if (deps.shareFirst) {
           exportedDoc = doc;
-          set({ busy: null, exportProgress: null, exportReady: file });
+          set({ busy: null, exportProgress: null, exportReady: file, notice: ocrFailed ? strings.ocrUnavailable : null });
         } else {
           deps.download(file);
-          set({ busy: null, exportProgress: null, notice: strings.savedNotice(file.name, formatSize(file.size)) });
+          const saved = strings.savedNotice(file.name, formatSize(file.size));
+          set({ busy: null, exportProgress: null, notice: ocrFailed ? `${saved} ${strings.ocrUnavailable}` : saved });
         }
       } catch (e) {
         if (own !== session) return;

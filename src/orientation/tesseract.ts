@@ -35,9 +35,10 @@ function rotatedCopy(src: PageCanvas, rotation: Rotation): PageCanvas {
   return out;
 }
 
-export async function createTesseractDetector(opts: TesseractDetectorOptions): Promise<OrientationDetector> {
-  const base = opts.basePath.endsWith('/') ? opts.basePath : `${opts.basePath}/`;
-  const paths = {
+/** Where the app serves tesseract's worker, cores and traineddata (shared with the OCR export). */
+export function tesseractPaths(basePath: string) {
+  const base = basePath.endsWith('/') ? basePath : `${basePath}/`;
+  return {
     workerPath: `${base}tesseract/worker.min.js`,
     corePath: `${base}tesseract`,
     langPath: `${base}tessdata`,
@@ -46,6 +47,10 @@ export async function createTesseractDetector(opts: TesseractDetectorOptions): P
     // reliably control blob workers, which would break offline analysis.
     workerBlobURL: false,
   };
+}
+
+export async function createTesseractDetector(opts: TesseractDetectorOptions): Promise<OrientationDetector> {
+  const paths = tesseractPaths(opts.basePath);
 
   const settled = await Promise.allSettled(
     Array.from({ length: Math.max(1, opts.workers) }, () =>

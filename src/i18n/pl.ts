@@ -39,6 +39,8 @@ export const pl = {
   save: 'Zapisz PDF',
   saving: 'Zapisuję…',
   savingProgress: (done: number, total: number) => `Zapisuję ${done}/${total}`,
+  ocrProgress: (done: number, total: number) => `Rozpoznaję tekst ${done}/${total}`,
+  ocrUnavailable: 'Nie udało się rozpoznać tekstu (potrzebny internet przy pierwszym użyciu). Plik zapisano bez niego.',
   shareExport: 'Udostępnij / Zapisz',
   inAppWarning: 'Ta wbudowana przeglądarka (np. Messenger) nie zapisuje plików PDF.',
   openInChrome: 'Otwórz w Chrome',
