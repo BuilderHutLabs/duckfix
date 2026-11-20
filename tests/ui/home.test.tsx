@@ -10,7 +10,7 @@ describe('Home screen', () => {
     expect(screen.getByRole('heading', { name: strings.appName })).toBeTruthy();
     expect(screen.getByRole('button', { name: strings.open })).toBeTruthy();
     expect(
-      screen.getByText('Automatycznie obraca i prostuje krzywe skany PDF.'),
+      screen.getByText('Skanuj aparatem, łącz pliki i popraw krzywe strony. Zapisz jeden czysty PDF.'),
     ).toBeTruthy();
     for (const step of ['1. Otwórz', '2. Sprawdź', '3. Zapisz']) {
       expect(screen.getByText(step)).toBeTruthy();

@@ -9,7 +9,7 @@ export const es: Strings = {
   defaultDocName: 'documento.pdf',
   updateAvailable: 'Nueva versión disponible',
   updateAction: 'Actualizar',
-  appDescription: 'Gira y endereza automáticamente los escaneos PDF torcidos.',
+  appDescription: 'Escanea con la cámara, une archivos y corrige páginas torcidas. Guarda un PDF limpio.',
   steps: ['1. Abrir', '2. Revisar', '3. Guardar'],
 
   open: 'Elegir archivos',

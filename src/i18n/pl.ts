@@ -16,7 +16,7 @@ export const pl = {
   defaultDocName: 'dokument.pdf',
   updateAvailable: 'Dostępna nowa wersja',
   updateAction: 'Odśwież',
-  appDescription: 'Automatycznie obraca i prostuje krzywe skany PDF.',
+  appDescription: 'Skanuj aparatem, łącz pliki i popraw krzywe strony. Zapisz jeden czysty PDF.',
   steps: ['1. Otwórz', '2. Sprawdź', '3. Zapisz'] as string[],
 
   open: 'Wybierz pliki',

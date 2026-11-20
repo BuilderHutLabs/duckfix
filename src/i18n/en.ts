@@ -9,7 +9,7 @@ export const en: Strings = {
   defaultDocName: 'document.pdf',
   updateAvailable: 'New version available',
   updateAction: 'Refresh',
-  appDescription: 'Automatically rotates and straightens crooked PDF scans.',
+  appDescription: 'Scan with your camera, merge files and fix crooked pages. Save one clean PDF.',
   steps: ['1. Open', '2. Check', '3. Save'],
 
   open: 'Choose files',

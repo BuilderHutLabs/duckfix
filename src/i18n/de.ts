@@ -9,7 +9,7 @@ export const de: Strings = {
   defaultDocName: 'dokument.pdf',
   updateAvailable: 'Neue Version verfügbar',
   updateAction: 'Aktualisieren',
-  appDescription: 'Dreht und begradigt schiefe PDF-Scans automatisch.',
+  appDescription: 'Mit der Kamera scannen, Dateien zusammenfügen und schiefe Seiten korrigieren. Ein sauberes PDF speichern.',
   steps: ['1. Öffnen', '2. Prüfen', '3. Speichern'],
 
   open: 'Dateien auswählen',
