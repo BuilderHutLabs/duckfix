@@ -14,6 +14,8 @@ import { createThumbnailCache } from './thumbnails';
 import { PageThumb } from './PageThumb';
 import { PagePreview } from './PagePreview';
 import { FILE_ACCEPT } from './Home';
+import { openCamera } from './camera';
+import { IconCamera } from './icons';
 import { strings } from './strings';
 
 // dnd-kit turns a boolean `disabled` into a new object on every render, which changes the
@@ -130,6 +132,12 @@ export function ReviewGrid() {
                   +
                 </span>
                 {s.busy === 'opening' ? strings.opening : strings.addAtEnd}
+              </button>
+            )}
+            {!s.selecting && (
+              <button type="button" className="add-cell" disabled={s.busy === 'opening'} onClick={openCamera}>
+                <IconCamera size={26} />
+                {strings.takePhoto}
               </button>
             )}
           </div>

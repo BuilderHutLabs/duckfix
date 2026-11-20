@@ -54,6 +54,15 @@ export const en: Strings = {
   rotate: 'Rotate',
   remove: 'Delete',
 
+  takePhoto: 'Take a photo',
+  scanName: 'Scan',
+  cropTitle: 'Adjust the page',
+  cropDone: 'Done',
+  cropNext: 'Next page',
+  cropRetake: 'Retake',
+  cropHint: 'Drag the circles to the corners of the page.',
+  cropCorner: (n) => `Corner ${n}`,
+
   insertHere: 'Insert pages here',
   addAtEnd: 'Add pages',
 

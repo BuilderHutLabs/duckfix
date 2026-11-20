@@ -61,6 +61,15 @@ export const pl = {
   rotate: 'Obróć',
   remove: 'Usuń',
 
+  takePhoto: 'Zrób zdjęcie',
+  scanName: 'Skan',
+  cropTitle: 'Dopasuj kartkę',
+  cropDone: 'Gotowe',
+  cropNext: 'Następna strona',
+  cropRetake: 'Powtórz',
+  cropHint: 'Przeciągnij kółka do rogów kartki.',
+  cropCorner: (n: number) => `Róg ${n}`,
+
   insertHere: 'Wstaw strony tutaj',
   addAtEnd: 'Dodaj strony',
 

@@ -54,6 +54,15 @@ export const de: Strings = {
   rotate: 'Drehen',
   remove: 'Löschen',
 
+  takePhoto: 'Foto aufnehmen',
+  scanName: 'Scan',
+  cropTitle: 'Seite anpassen',
+  cropDone: 'Fertig',
+  cropNext: 'Nächste Seite',
+  cropRetake: 'Wiederholen',
+  cropHint: 'Ziehe die Kreise auf die Ecken der Seite.',
+  cropCorner: (n) => `Ecke ${n}`,
+
   insertHere: 'Seiten hier einfügen',
   addAtEnd: 'Seiten hinzufügen',
 

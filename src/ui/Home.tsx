@@ -5,6 +5,8 @@ import { useAppStore } from './store';
 import { strings } from './strings';
 import { Settings } from './Toolbar';
 import { useSecretTaps } from './Diagnostics';
+import { openCamera } from './camera';
+import { IconCamera } from './icons';
 
 export const FILE_ACCEPT = 'application/pdf,image/*';
 
@@ -56,6 +58,12 @@ export function Home() {
           onClick={() => input.current?.click()}
         >
           {busy === 'opening' ? strings.opening : strings.open}
+        </button>
+      )}
+      {!restorable && (
+        <button type="button" className="btn btn-camera" disabled={busy === 'opening'} onClick={openCamera}>
+          <IconCamera size={20} />
+          {strings.takePhoto}
         </button>
       )}
       <ul className="home-steps">

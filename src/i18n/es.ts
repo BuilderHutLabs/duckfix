@@ -54,6 +54,15 @@ export const es: Strings = {
   rotate: 'Girar',
   remove: 'Eliminar',
 
+  takePhoto: 'Hacer una foto',
+  scanName: 'Escaneo',
+  cropTitle: 'Ajustar la página',
+  cropDone: 'Listo',
+  cropNext: 'Página siguiente',
+  cropRetake: 'Repetir',
+  cropHint: 'Arrastra los círculos a las esquinas de la página.',
+  cropCorner: (n) => `Esquina ${n}`,
+
   insertHere: 'Insertar páginas aquí',
   addAtEnd: 'Añadir páginas',
 

@@ -7,6 +7,8 @@ import { Home } from './Home';
 import { Toolbar } from './Toolbar';
 import { ActionBar } from './ActionBar';
 import { SaveSheet } from './SaveSheet';
+import { ScanCrop } from './ScanCrop';
+import { CameraInput } from './camera';
 import { Progress } from './Progress';
 import { ReviewGrid } from './ReviewGrid';
 import { Diagnostics, DIAG_HASH } from './Diagnostics';
@@ -34,6 +36,8 @@ export function App({ store }: { store?: AppStore }) {
       {/* a language change re-renders the whole tree with the new texts */}
       <Fragment key={lang}>
         <Shell />
+        <CameraInput />
+        <ScanHost />
         <UpdatePrompt />
       </Fragment>
       {splash && <Splash onDone={() => setSplash(false)} />}
@@ -105,6 +109,11 @@ function Shell() {
       )}
     </>
   );
+}
+
+function ScanHost() {
+  const { scanPhoto } = useAppStore();
+  return scanPhoto ? <ScanCrop key={`${scanPhoto.name}-${scanPhoto.lastModified}-${scanPhoto.size}`} file={scanPhoto} /> : null;
 }
 
 function SaveSheetHost() {

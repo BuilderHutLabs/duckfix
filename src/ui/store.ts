@@ -48,6 +48,8 @@ export interface AppState {
   exportReady: File | null;
   /** "Zapisz PDF" opened the save options sheet. */
   saveSheetOpen: boolean;
+  /** Camera photo waiting on the crop screen. */
+  scanPhoto: File | null;
   /** Last choices in the save sheet (remembered). */
   exportOptions: ExportOptions;
   error: string | null;
@@ -167,6 +169,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
   let exportedDoc: Doc | null = null;
   /** Aborts the running export ("Anuluj"). */
   let exportCtrl: AbortController | null = null;
+  /** Straightened camera pages are added one after another, in the order they were taken. */
+  let scanChain: Promise<void> = Promise.resolve();
   /** OCR engine, created on the first searchable export and kept for the open document. */
   let ocr: { lang: Lang; engine: Promise<OcrEngine> } | null = null;
   const disposeOcr = () => {
@@ -213,6 +217,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     exportProgress: null,
     exportReady: null,
     saveSheetOpen: false,
+    scanPhoto: null,
     exportOptions: loadExportOptions(deps.storage),
     notice: null,
     error: null,
@@ -430,6 +435,27 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         selecting: false,
         previewId: state.previewId !== null && valid.includes(state.previewId) ? null : state.previewId,
       });
+    },
+
+    setScanPhoto(file: File | null) {
+      set({ scanPhoto: file });
+    },
+
+    /** Adds a straightened camera page: opens a new document from Home, else appends it. */
+    addScan(blob: Blob): Promise<void> {
+      scanChain = scanChain
+        .then(async () => {
+          const day = new Date().toISOString().slice(0, 10);
+          const file = new File([blob], `${strings.scanName} ${day}.jpg`, { type: 'image/jpeg' });
+          if (state.phase === 'home') await actions.open([file]);
+          else await actions.insertAt(history.present.pages.length, [file]);
+        })
+        .catch(() => set({ error: strings.genericError }));
+      return scanChain;
+    },
+
+    showError(message: string) {
+      set({ error: message });
     },
 
     /** "Usuń puste strony": removes every page flagged blank (undoable like any removal). */
