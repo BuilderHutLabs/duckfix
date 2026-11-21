@@ -1,10 +1,10 @@
-import type { Doc, Page } from '../model/document';
+import type { Doc } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
 import type { Rasterizer } from './exportPdf';
 
 /**
  * "JPG": every page as a picture, exactly as it would be saved in the PDF (rotation, straightening,
- * look and signatures included).
+ * look, signatures, marks and crop included — the rasterizer draws them).
  */
 export async function exportImages(
   doc: Doc,
@@ -20,13 +20,13 @@ export async function exportImages(
     const source = sources.get(page.source.fileId);
     if (!source) throw new Error(`Missing source file ${page.source.fileId}`);
     const r = await rasterize(page, source, { compress: opts.compress === true });
-    out.push(await toJpeg(r.bytes, r.format, page, opts.compress === true));
+    out.push(await toJpeg(r.bytes, r.format, opts.compress === true));
     onProgress?.(out.length, total);
   }
   return out;
 }
 
-async function toJpeg(bytes: Uint8Array, format: 'png' | 'jpg', page: Page, compress: boolean): Promise<Blob> {
+async function toJpeg(bytes: Uint8Array, format: 'png' | 'jpg', compress: boolean): Promise<Blob> {
   const bmp = await createImageBitmap(new Blob([bytes as BlobPart], { type: format === 'png' ? 'image/png' : 'image/jpeg' }));
   const c = Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
   try {
@@ -35,18 +35,6 @@ async function toJpeg(bytes: Uint8Array, format: 'png' | 'jpg', page: Page, comp
     ctx.fillRect(0, 0, c.width, c.height);
     ctx.drawImage(bmp, 0, 0);
     bmp.close();
-    for (const s of page.stamps ?? []) {
-      const img = new Image();
-      img.src = s.src;
-      await img.decode();
-      const w = s.w * c.width;
-      const h = s.h * c.height;
-      ctx.save();
-      ctx.translate(s.x * c.width + w / 2, s.y * c.height + h / 2);
-      ctx.rotate(((s.rot ?? 0) * Math.PI) / 180);
-      ctx.drawImage(img, -w / 2, -h / 2, w, h);
-      ctx.restore();
-    }
     return await new Promise<Blob>((resolve, reject) =>
       c.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', compress ? 0.7 : 0.9),
     );

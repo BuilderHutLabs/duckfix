@@ -175,15 +175,25 @@ describe('exportPdf', () => {
     expect(r.mock.calls[0][0].filter).toBe('whiten');
   });
 
-  it('a signature is drawn onto its page at the chosen place (page is rasterized)', async () => {
+  it('a signed page is saved as one image with the signature in it (the rasterizer draws it)', async () => {
     const src = await makePdf([[100, 100]]);
     const r = fakeRaster();
     const sig = { id: 's1', src: `data:image/png;base64,${btoa(String.fromCharCode(...PNG))}`, x: 0.5, y: 0.75, w: 0.4, h: 0.1 };
     const doc: Doc = { pages: [pdfPage(0, { stamps: [sig] })] };
     const out = await load(await exportPdf(doc, new Map([['f1', src]]), r));
     expect(r).toHaveBeenCalledTimes(1);
+    expect(r.mock.calls[0][0].stamps).toEqual([sig]);
     const plain = await load(await exportPdf({ pages: [pdfPage(0, { skewDeg: 1 })] }, new Map([['f1', src]]), fakeRaster()));
-    expect(imageCount(out)).toBeGreaterThan(imageCount(plain));
+    expect(imageCount(out)).toBe(imageCount(plain)); // nothing drawn on top of the page image
+  });
+
+  it('a page with a cover or a crop is saved as an image (the PDF text under a cover is gone)', async () => {
+    const src = await makePdf([[100, 100], [100, 100], [100, 100]]);
+    const r = fakeRaster();
+    const cover = { id: 'm', kind: 'cover' as const, color: 'black' as const, x: 0, y: 0, w: 1, h: 0.2 };
+    const doc: Doc = { pages: [pdfPage(0, { marks: [cover] }), pdfPage(1, { crop: { x: 0, y: 0, w: 0.5, h: 1 } }), pdfPage(2)] };
+    await exportPdf(doc, new Map([['f1', src]]), r);
+    expect(r).toHaveBeenCalledTimes(2);
   });
 
   it('always rasterizes image pages', async () => {

@@ -14,7 +14,9 @@ export async function pageText(
   rasterize: Rasterizer,
   ocr: () => Promise<OcrEngine>,
 ): Promise<string> {
-  if (page.source.kind === 'pdf' && page.source.hasTextLayer) {
+  // a cover or crop hides part of the page: read only what will be saved, never the PDF's own text
+  const hidden = page.crop !== undefined || (page.marks ?? []).some((m) => m.kind === 'cover');
+  if (page.source.kind === 'pdf' && page.source.hasTextLayer && !hidden) {
     const pdf = await getPdf(source);
     const p = await pdf.getPage(page.source.pageIndex + 1);
     const content = await p.getTextContent();

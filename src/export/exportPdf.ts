@@ -1,5 +1,4 @@
 import { PDFDocument, degrees } from 'pdf-lib';
-import { stampPdfPlacement } from '../signature/geometry';
 import { effectiveRotation, type Doc, type Page } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
 import { DICTS, strings } from '../i18n';
@@ -26,13 +25,10 @@ function needsRaster(page: Page): boolean {
     page.source.kind === 'image' ||
     page.skewDeg !== 0 ||
     (page.filter !== undefined && page.filter !== 'color') ||
-    (page.stamps?.length ?? 0) > 0
+    (page.stamps?.length ?? 0) > 0 ||
+    (page.marks?.length ?? 0) > 0 ||
+    page.crop !== undefined
   );
-}
-
-function dataUrlBytes(url: string): Uint8Array {
-  const b64 = url.slice(url.indexOf(',') + 1);
-  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 }
 
 /** A PDF page copied as is keeps its own text; anything else has none until OCR adds it. */
@@ -74,12 +70,6 @@ export async function exportPdf(
       const image = r.format === 'png' ? await out.embedPng(r.bytes) : await out.embedJpg(r.bytes);
       const outPage = out.addPage([r.widthPt, r.heightPt]);
       outPage.drawImage(image, { x: 0, y: 0, width: r.widthPt, height: r.heightPt });
-      for (const s of page.stamps ?? []) {
-        // fractions of the saved page, origin top-left; PDF origin is bottom-left
-        const sig = await out.embedPng(dataUrlBytes(s.src));
-        const at = stampPdfPlacement(s, r.widthPt, r.heightPt);
-        outPage.drawImage(sig, { ...at, rotate: degrees(at.rotate) });
-      }
       if (ocrThis && opts.ocr) {
         // a page that originally had text and is now an image (compress/skew) also gets recognized
         const layer = await opts.ocr.textLayer(new Blob([r.bytes as BlobPart], { type: `image/${r.format === 'png' ? 'png' : 'jpeg'}` }));

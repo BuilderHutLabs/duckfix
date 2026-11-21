@@ -3,6 +3,7 @@ import { releaseCanvas, renderPage, getPdf } from '../imaging/render';
 import { isNearBitonal, toGray } from '../imaging/gray';
 import type { Rasterizer } from './exportPdf';
 import { applyCanvasFilter } from '../imaging/filter';
+import { cropRect, paintMarks, paintStamps } from '../edit/paint';
 
 const DPI = 300;
 const IMAGE_MAX_SIDE = 3508; // A4 @ 300 DPI
@@ -97,18 +98,36 @@ async function finish(
   compress: boolean,
 ) {
   const angle = (deg * Math.PI) / 180;
-  const { w, h } = rotatedSize(raw.width, raw.height, deg);
-  const out = document.createElement('canvas');
-  out.width = w;
-  out.height = h;
+  const full = rotatedSize(raw.width, raw.height, deg);
+  let out = document.createElement('canvas');
+  out.width = full.w;
+  out.height = full.h;
   try {
-    const ctx = out.getContext('2d')!;
+    let ctx = out.getContext('2d')!;
     ctx.fillStyle = '#fff';
-    ctx.fillRect(0, 0, w, h);
-    ctx.translate(w / 2, h / 2);
+    ctx.fillRect(0, 0, full.w, full.h);
+    ctx.translate(full.w / 2, full.h / 2);
     ctx.rotate(angle); // canvas rotate is clockwise for positive angles
     ctx.drawImage(raw, -raw.width / 2, -raw.height / 2);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     releaseCanvas(raw); // free the raw render before encoding (peak memory on iPad)
+
+    // signatures and "Edytuj" marks become part of the page (a black cover really hides what is under it)
+    await paintStamps(ctx, page.stamps, full.w, full.h);
+    paintMarks(ctx, page.marks, full.w, full.h);
+    // "Kadruj": keep only the chosen part
+    const c = cropRect(page.crop, full.w, full.h);
+    if (page.crop) {
+      const cut = document.createElement('canvas');
+      cut.width = c.w;
+      cut.height = c.h;
+      cut.getContext('2d')!.drawImage(out, c.x, c.y, c.w, c.h, 0, 0, c.w, c.h);
+      releaseCanvas(out);
+      out = cut;
+      ctx = cut.getContext('2d')!;
+    }
+    const w = c.w;
+    const h = c.h;
 
     // a smaller file is always JPEG; otherwise near-bitonal pages stay crisp as PNG
     const png = !compress && isNearBitonal(toGray(ctx.getImageData(0, 0, w, h).data, w, h));
@@ -120,11 +139,12 @@ async function finish(
     if (page.source.kind === 'pdf') {
       // true physical size, independent of the (budgeted) render DPI
       const box = rotatedBox(dims.w, dims.h, deg);
-      widthPt = box.w;
-      heightPt = box.h;
+      widthPt = box.w * (c.w / full.w);
+      heightPt = box.h * (c.h / full.h);
     } else {
-      const box = w > h ? { w: A4.h, h: A4.w } : A4;
-      const k = Math.min(box.w / w, box.h / h);
+      // the whole page fits A4; a crop keeps that scale (a cut-out is not blown up)
+      const box = full.w > full.h ? { w: A4.h, h: A4.w } : A4;
+      const k = Math.min(box.w / full.w, box.h / full.h);
       widthPt = w * k;
       heightPt = h * k;
     }
