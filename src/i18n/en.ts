@@ -90,6 +90,10 @@ export const en: Strings = {
   signatureSave: 'Save signature',
   signatureTitle: 'My signature',
   signatureLocal: 'Your signature is kept only on this phone.',
+  copyText: 'Text',
+  pageText: 'Page text',
+  readingText: 'Reading the text…',
+  noText: 'There is no text on this page.',
   insertHere: 'Insert pages here',
   addAtEnd: 'Add files',
 

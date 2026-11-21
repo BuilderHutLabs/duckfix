@@ -97,6 +97,10 @@ export const pl = {
   signatureSave: 'Zapisz podpis',
   signatureTitle: 'Mój podpis',
   signatureLocal: 'Twój podpis jest zapisany tylko w tym telefonie.',
+  copyText: 'Tekst',
+  pageText: 'Tekst strony',
+  readingText: 'Rozpoznaję tekst…',
+  noText: 'Na tej stronie nie ma tekstu.',
   insertHere: 'Wstaw strony tutaj',
   addAtEnd: 'Dodaj pliki',
 

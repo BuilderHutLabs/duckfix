@@ -90,6 +90,10 @@ export const es: Strings = {
   signatureSave: 'Guardar firma',
   signatureTitle: 'Mi firma',
   signatureLocal: 'Tu firma se guarda solo en este teléfono.',
+  copyText: 'Texto',
+  pageText: 'Texto de la página',
+  readingText: 'Leyendo el texto…',
+  noText: 'No hay texto en esta página.',
   insertHere: 'Insertar páginas aquí',
   addAtEnd: 'Añadir archivos',
 

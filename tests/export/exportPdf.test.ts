@@ -146,7 +146,7 @@ describe('exportPdf', () => {
     const src = await makePdf([[100, 100]]);
     const img: SourceFile = { id: 'i1', name: 'foto.jpg', type: 'image', blob: new Blob([PNG as BlobPart]) };
     const layer = await textOnlyPdf();
-    const ocr = { textLayer: vi.fn(async () => layer), dispose: vi.fn(async () => {}) };
+    const ocr = { textLayer: vi.fn(async () => layer), text: vi.fn(async () => ''), dispose: vi.fn(async () => {}) };
     const imagePage: Page = { ...pdfPage(0), id: 'img', source: { kind: 'image', fileId: 'i1' } };
     const doc: Doc = { pages: [pdfPage(0), imagePage] };
     const out = await load(
@@ -159,7 +159,7 @@ describe('exportPdf', () => {
   it('searchable text: an untouched PDF page without text gets rasterized and recognized', async () => {
     const src = await makePdf([[100, 100]]);
     const r = fakeRaster();
-    const ocr = { textLayer: vi.fn(async () => textOnlyPdf()), dispose: vi.fn(async () => {}) };
+    const ocr = { textLayer: vi.fn(async () => textOnlyPdf()), text: vi.fn(async () => ''), dispose: vi.fn(async () => {}) };
     const scan = pdfPage(0, { source: { kind: 'pdf', fileId: 'f1', pageIndex: 0, baseRotation: 0, hasTextLayer: false } });
     await exportPdf({ pages: [scan] }, new Map([['f1', src]]), r, undefined, { ocr });
     expect(r).toHaveBeenCalledTimes(1);

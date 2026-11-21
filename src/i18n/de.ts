@@ -90,6 +90,10 @@ export const de: Strings = {
   signatureSave: 'Unterschrift speichern',
   signatureTitle: 'Meine Unterschrift',
   signatureLocal: 'Deine Unterschrift bleibt nur auf diesem Telefon.',
+  copyText: 'Text',
+  pageText: 'Seitentext',
+  readingText: 'Text wird erkannt…',
+  noText: 'Auf dieser Seite ist kein Text.',
   insertHere: 'Seiten hier einfügen',
   addAtEnd: 'Dateien hinzufügen',
 

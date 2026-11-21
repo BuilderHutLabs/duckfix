@@ -1596,3 +1596,18 @@ body.splashing .home .duck {
 .action-bar-select .btn {
   font-size: 15px;
 }
+.text-box {
+  width: 100%;
+  min-height: 200px;
+  max-height: 50vh;
+  padding: 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--fill);
+  color: var(--text);
+  font: 15px/1.45 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  resize: vertical;
+}
+.preview-bar .preview-rotate {
+  padding: 0 8px;
+}

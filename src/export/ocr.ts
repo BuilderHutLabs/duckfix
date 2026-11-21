@@ -11,6 +11,8 @@ import type { Lang } from '../i18n';
 export interface OcrEngine {
   /** One-page PDF with only invisible text, laid out over `image` (PNG or JPEG bytes). */
   textLayer(image: Blob | Uint8Array): Promise<Uint8Array>;
+  /** Recognized plain text of an upright page image. */
+  text(image: Blob | Uint8Array): Promise<string>;
   dispose(): Promise<void>;
 }
 
@@ -27,6 +29,10 @@ export async function createOcrEngine(lang: Lang, paths: Partial<WorkerOptions>)
       const { data } = await worker.recognize(input as Parameters<Worker['recognize']>[0], { pdfTextOnly: true }, { pdf: true, text: false, blocks: false });
       if (!data.pdf) throw new Error('OCR produced no PDF');
       return Uint8Array.from(data.pdf);
+    },
+    async text(image) {
+      const { data } = await worker.recognize((await toWorkerInput(image)) as Parameters<Worker['recognize']>[0]);
+      return data.text ?? '';
     },
     async dispose() {
       await worker.terminate();

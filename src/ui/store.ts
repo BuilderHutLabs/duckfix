@@ -3,6 +3,7 @@ import { storageKey } from '../config';
 import { currentLanguage, formatSize, type Lang } from '../i18n';
 import { createOcrEngine, type OcrEngine } from '../export/ocr';
 import { exportImages } from '../export/images';
+import { pageText } from '../export/pageText';
 import { loadExportOptions, saveExportOptions, type ExportOptions } from '../export/options';
 import { createContext, createElement, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import {
@@ -93,6 +94,9 @@ export interface StoreDeps {
     onProgress: (done: number, total: number) => void,
     opts: { compress: boolean; signal: AbortSignal },
   ): Promise<Blob[]>;
+  /** Text of one page (own text layer or OCR). */
+  pageText(page: Page, source: SourceFile, ocr: () => Promise<OcrEngine>): Promise<string>;
+  copyText(text: string): Promise<void>;
   /** OCR engine for "Tekst do wyszukiwania" in the given language (may download deu/spa data). */
   createOcr(lang: Lang): Promise<OcrEngine>;
   share: typeof shareOrDownload;
@@ -125,6 +129,8 @@ function browserDeps(): StoreDeps {
         signal: opts.signal,
       }),
     exportImages: (doc, sources, onProgress, opts) => exportImages(doc, sources, browserRasterizer, onProgress, opts),
+    pageText: (page, source, ocr) => pageText(page, source, browserRasterizer, ocr),
+    copyText: (text) => navigator.clipboard.writeText(text),
     createOcr: (lang) => createOcrEngine(lang, tesseractPaths(import.meta.env.BASE_URL)),
     share: shareOrDownload,
     download: downloadFile,
@@ -505,6 +511,18 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
 
     removeStamp(pageId: string, stampId: string) {
       commit(removeStampFrom(history.present, pageId, stampId));
+    },
+
+    /** Text of a page for "Kopiuj tekst". */
+    pageText(pageId: string): Promise<string> {
+      const page = history.present.pages.find((p) => p.id === pageId);
+      const source = page && state.sources.get(page.source.fileId);
+      if (!page || !source) return Promise.resolve('');
+      return deps.pageText(page, source, getOcr);
+    },
+
+    copyText(text: string): Promise<void> {
+      return deps.copyText(text);
     },
 
     showError(message: string) {

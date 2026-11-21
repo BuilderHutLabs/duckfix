@@ -7,6 +7,7 @@ import { useAppStore } from './store';
 import { strings } from './strings';
 import { IconChevronLeft, IconChevronRight, IconClose } from './icons';
 import { StampLayer } from './StampLayer';
+import { TextSheet } from './TextSheet';
 import { SignatureSheet } from './SignatureSheet';
 import { loadSignature, type SavedSignature } from '../signature/storage';
 
@@ -39,6 +40,7 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp } = useAppStore();
   const [signing, setSigning] = useState(false);
+  const [reading, setReading] = useState(false);
   const imgRef = useRef<HTMLImageElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const page = previewId === null ? undefined : doc.pages.find((p) => p.id === previewId);
@@ -153,6 +155,9 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
         <span className="preview-title" aria-hidden="true">
           {strings.page(number)}
         </span>
+        <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => setReading(true))}>
+          {strings.copyText}
+        </button>
         <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(sign)}>
           {strings.sign}
         </button>
@@ -173,6 +178,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
         )}
         <StampLayer page={page} img={imgRef} stage={stageRef} />
       </div>
+      {reading && <TextSheet pageId={page.id} onClose={() => setReading(false)} />}
       {signing && (
         <SignatureSheet
           onClose={() => setSigning(false)}
