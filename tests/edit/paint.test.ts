@@ -1,4 +1,5 @@
 import { cropRect, paintMarks } from '../../src/edit/paint';
+import { fontFrac, newTextBox, tickBox, INK } from '../../src/edit/text';
 import { pageText } from '../../src/export/pageText';
 import type { Mark, Page } from '../../src/model/document';
 import { getPdf } from '../../src/imaging/render';
@@ -9,7 +10,7 @@ vi.mock('../../src/imaging/render', () => ({ getPdf: vi.fn(), releaseCanvas: vi.
 function fakeCtx() {
   const calls: Array<[string, unknown[]]> = [];
   const ctx: Record<string, unknown> = { calls };
-  for (const f of ['fillRect', 'save', 'restore', 'beginPath', 'moveTo', 'lineTo', 'stroke', 'fill', 'fillText', 'ellipse', 'strokeRect', 'translate', 'rotate'])
+  for (const f of ['fillRect', 'setLineDash', 'save', 'restore', 'beginPath', 'moveTo', 'lineTo', 'stroke', 'fill', 'fillText', 'ellipse', 'strokeRect', 'translate', 'rotate'])
     ctx[f] = (...a: unknown[]) => {
       calls.push([f === 'fillRect' ? `fillRect:${String(ctx.fillStyle)}` : f, a]);
     };
@@ -26,6 +27,41 @@ describe('painting marks for the saved page', () => {
     paintMarks(ctx, marks, 1000, 2000);
     expect(ctx.calls).toContainEqual(['fillRect:#000000', [100, 1000, 500, 200]]);
     expect(ctx.calls).toContainEqual(['fillRect:#ffffff', [0, 0, 1000, 500]]);
+  });
+
+  it('text is written line by line in its colour; the font follows the box height', () => {
+    const ctx = fakeCtx();
+    // two lines, box 10 % of the page high → font = 0.1 / (2 × 1.25) = 4 % of 2000 px = 80 px
+    paintMarks(ctx, [{ id: 't', kind: 'text', text: 'Zażółć gęślą\njaźń', color: 'blue', size: 2, x: 0.1, y: 0.2, w: 0.5, h: 0.1 }], 1000, 2000);
+    expect(ctx.font).toBe('80px sans-serif');
+    expect(ctx.fillStyle).toBe(INK.blue);
+    const texts = ctx.calls.filter(([f]) => f === 'fillText').map(([, a]) => a);
+    expect(texts[0][0]).toBe('Zażółć gęślą');
+    expect(texts[1][0]).toBe('jaźń');
+    expect(texts[0][1]).toBe(100);
+    expect((texts[1][2] as number) - (texts[0][2] as number)).toBe(100); // line height 1.25 × 80
+  });
+
+  it('tick and cross are strokes inside their box', () => {
+    const ctx = fakeCtx();
+    paintMarks(ctx, [
+      { id: 'a', kind: 'check', color: 'black', x: 0.5, y: 0.5, w: 0.1, h: 0.05 },
+      { id: 'b', kind: 'cross', color: 'red', x: 0, y: 0, w: 0.1, h: 0.05 },
+    ], 1000, 2000);
+    expect(ctx.calls.filter(([f]) => f === 'stroke')).toHaveLength(3); // one per line
+    expect(ctx.calls.filter(([f]) => f === 'moveTo')).toHaveLength(3); // tick: 1 path, cross: 2 lines
+    expect(ctx.lineWidth).toBeCloseTo(100 * 0.12);
+  });
+
+  it('box helpers: new text fits its lines, font size from the box, tick is square on screen', () => {
+    const b = newTextBox('Jan\nKowalski', 2, { x: 0.2, y: 0.3 }, 600, 800);
+    expect(b.h).toBeCloseTo(2 * 1.25 * 0.024);
+    expect(fontFrac({ text: 'Jan\nKowalski', h: b.h })).toBeCloseTo(0.024);
+    expect(b.w).toBeGreaterThan(0.05);
+    expect(b.x + b.w).toBeLessThanOrEqual(1);
+    const t = tickBox(2, { x: 0.5, y: 0.5 }, 600, 800);
+    expect(t.w * 600).toBeCloseTo(t.h * 800); // square in pixels
+    expect(t.x + t.w / 2).toBeCloseTo(0.5); // centred on the tap
   });
 
   it('cropRect is in whole pixels, inside the canvas and never empty', () => {
