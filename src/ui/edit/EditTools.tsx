@@ -24,6 +24,7 @@ const HINT: Record<PlaceTool | DrawTool, () => string> = {
   date: () => strings.dateHint,
   pen: () => strings.penHint,
   highlight: () => strings.highlightHint,
+  eraser: () => strings.eraserHint,
   arrow: () => strings.arrowHint,
   rect: () => strings.shapeHint,
   ellipse: () => strings.shapeHint,
@@ -42,6 +43,7 @@ const GROUPS: Record<ToolGroup, Array<[Tool, string, () => string]>> = {
   draw: [
     ['pen', '✎', () => strings.toolPen],
     ['highlight', '🖍', () => strings.toolHighlight],
+    ['eraser', '⌫', () => strings.toolEraser],
     ['arrow', '↗', () => strings.toolArrow],
     ['rect', '▭', () => strings.toolRect],
     ['ellipse', '◯', () => strings.toolEllipse],
@@ -186,12 +188,12 @@ export function EditTools({
             <div className="edit-options">
               <p className="edit-hint">{HINT[tool as PlaceTool | DrawTool]()}</p>
               <div className="edit-style">
-                {tool === 'highlight' ? (
+                {tool === 'eraser' ? null : tool === 'highlight' ? (
                   <Swatches colors={HIGHLIGHT_COLORS} value={highlight} paint={HIGHLIGHT} label={HL_LABEL} onPick={onHighlight} />
                 ) : (
                   <Swatches colors={INK_COLORS} value={ink} paint={INK} label={INK_LABEL} onPick={onInk} />
                 )}
-                {placing && <SizePicker value={size} onPick={onSize} />}
+                {(placing || tool === 'pen') && <SizePicker value={size} onPick={onSize} />}
               </div>
             </div>
           )}

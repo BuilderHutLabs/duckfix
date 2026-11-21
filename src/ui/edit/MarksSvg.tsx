@@ -1,6 +1,6 @@
 import type { Box, Mark } from '../../model/document';
 import { CROSS_PATH, INK, LINE_HEIGHT, TICK_PATH, fontFrac } from '../../edit/text';
-import { HEAD_FRAC, HIGHLIGHT, HIGHLIGHT_ALPHA, HIGHLIGHT_FRAC, PEN_FRAC, arrowHead } from '../../edit/draw';
+import { HEAD_FRAC, HIGHLIGHT, HIGHLIGHT_ALPHA, HIGHLIGHT_FRAC, PEN_FRAC, arrowHead, penFrac } from '../../edit/draw';
 
 const COVER_FILL = { black: '#000', white: '#fff' } as const;
 type BoxMark = Extract<Mark, Box>;
@@ -28,7 +28,7 @@ export function Marks({ marks, pageW, pageH }: { marks: Mark[] | undefined; page
             const pts = m.points.length === 2 ? [...m.points, m.points[0] + 0.0001, m.points[1]] : m.points;
             const points = pts.reduce((s, v, i) => s + (i % 2 ? `,${v}` : ` ${v}`), '').trim();
             return m.kind === 'pen' ? (
-              <polyline key={m.id} data-kind="pen" points={points} stroke={INK[m.color]} strokeWidth={pen} {...line} />
+              <polyline key={m.id} data-kind="pen" points={points} stroke={INK[m.color]} strokeWidth={Math.max(1, penFrac(m.width) * pageW)} {...line} />
             ) : (
               <polyline
                 key={m.id}

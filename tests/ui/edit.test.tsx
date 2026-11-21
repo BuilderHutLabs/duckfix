@@ -385,3 +385,106 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     expect(document.querySelector('.thumb-box')!.textContent).toContain('Zażółć');
   });
 });
+
+describe('Edytuj: gumka, grubość, na wszystkie strony, podpis, powiększanie', () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
+
+  const layer = () => document.querySelector('.mark-layer') as HTMLElement;
+  const drag = (el: Element, pts: Array<[number, number]>, pointerId = 1) => {
+    fireEvent.pointerDown(el, { clientX: pts[0][0], clientY: pts[0][1], pointerId });
+    for (const [x, y] of pts.slice(1)) fireEvent.pointerMove(el, { clientX: x, clientY: y, pointerId });
+    const [x, y] = pts[pts.length - 1];
+    fireEvent.pointerUp(el, { clientX: x, clientY: y, pointerId });
+  };
+  const tap = (el: Element, x: number, y: number) => drag(el, [[x, y]]);
+  const draw = () => {
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    openGroup(strings.groupDraw);
+  };
+  const bubble = () => screen.getByRole('group', { name: strings.selectedItem });
+
+  it('Gumka rubs out the drawings the finger passes over, in one undo step; text stays', () => {
+    let doc = addMark(docWithFlags(1), 'p1', { id: 'a', kind: 'pen', color: 'black', points: [0.1, 0.5, 0.9, 0.5] });
+    doc = addMark(doc, 'p1', { id: 'b', kind: 'highlight', color: 'yellow', points: [0.1, 0.7, 0.9, 0.7] });
+    doc = addMark(doc, 'p1', { id: 'c', kind: 'pen', color: 'red', points: [0.1, 0.1, 0.3, 0.1] });
+    doc = addMark(doc, 'p1', { id: 't', kind: 'text', text: 'Jan', color: 'black', size: 2, x: 0.45, y: 0.55, w: 0.1, h: 0.03 });
+    const store = openPreview(doc);
+    draw();
+    fireEvent.click(screen.getByRole('button', { name: strings.toolEraser }));
+    drag(layer(), [[250, 300], [250, 360], [250, 400], [250, 500]]); // down across y 0.5 and 0.7
+    expect(marks(store).map((m) => m.id)).toEqual(['c', 't']);
+    act(() => store.undo());
+    expect(marks(store)).toHaveLength(4);
+  });
+
+  it('Pióro has a thickness; a thick line is stored as width 3 and a selected line can be made thinner', () => {
+    const store = openPreview();
+    draw();
+    fireEvent.click(screen.getByRole('button', { name: strings.toolPen }));
+    fireEvent.click(screen.getByRole('button', { name: strings.sizeLarge }));
+    drag(layer(), [[100, 100], [200, 150], [300, 120]]);
+    expect(marks(store)[0]).toMatchObject({ kind: 'pen', width: 3 });
+    fireEvent.click(screen.getByRole('button', { name: strings.toolPen })); // tool off
+    tap(document.querySelector(`[data-mark="${marks(store)[0].id}"]`)!, 200, 140);
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.sizeSmall }));
+    expect(marks(store)[0]).toMatchObject({ width: 1 });
+  });
+
+  it('"Na wszystkie strony" copies the item to every other page in the same place, in one undo step', () => {
+    const doc = addMark(docWithFlags(3), 'p1', { id: 'd', kind: 'text', text: '21.11.2026', color: 'blue', size: 2, x: 0.6, y: 0.9, w: 0.2, h: 0.03 });
+    const store = openPreview(doc);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    tap(document.querySelector('[data-mark="d"]')!, 350, 640);
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.onAllPages }));
+    const pages = store.getState().doc.pages;
+    expect(pages.map((p) => p.marks?.length ?? 0)).toEqual([1, 1, 1]);
+    expect(pages[2].marks![0]).toMatchObject({ text: '21.11.2026', x: 0.6, y: 0.9, color: 'blue' });
+    expect(pages[2].marks![0].id).not.toBe('d');
+    act(() => store.undo());
+    expect(store.getState().doc.pages.map((p) => p.marks?.length ?? 0)).toEqual([1, 0, 0]);
+  });
+
+  it('a signature in Edytuj: handles only when touched; its bubble duplicates it and puts it on all pages', () => {
+    const doc = docWithFlags(2);
+    const store = openPreview(doc);
+    act(() => store.addStamp('p1', { id: 's1', src: 'data:image/png;base64,AA', x: 0.5, y: 0.7, w: 0.3, h: 0.1 }));
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    const stamp = document.querySelector('.stamp') as HTMLElement;
+    expect(stamp.classList.contains('quiet')).toBe(true);
+    expect(document.querySelector('.stamp-rotate')).toBeNull();
+    tap(stamp, 300, 520);
+    expect(document.querySelector('.stamp-rotate')).not.toBeNull();
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.duplicate }));
+    expect(store.getState().doc.pages[0].stamps).toHaveLength(2);
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.onAllPages }));
+    expect(store.getState().doc.pages[1].stamps).toHaveLength(1);
+  });
+
+  it('a tiny tick is marked small, so its corner dots sit further out', () => {
+    const doc = addMark(docWithFlags(1), 'p1', { id: 'k', kind: 'check', color: 'black', x: 0.1, y: 0.1, w: 0.05, h: 0.035 });
+    openPreview(doc);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    expect(document.querySelector('[data-mark="k"]')!.classList.contains('small')).toBe(true);
+  });
+
+  it('two fingers zoom the page in and nothing is drawn; "Pomniejsz" brings it back', () => {
+    const store = openPreview();
+    draw();
+    fireEvent.click(screen.getByRole('button', { name: strings.toolPen }));
+    const l = layer();
+    const t = { pointerType: 'touch' };
+    fireEvent.pointerDown(l, { clientX: 200, clientY: 300, pointerId: 1, ...t });
+    fireEvent.pointerMove(l, { clientX: 205, clientY: 305, pointerId: 1, ...t });
+    fireEvent.pointerDown(l, { clientX: 300, clientY: 300, pointerId: 2, ...t });
+    fireEvent.pointerMove(l, { clientX: 150, clientY: 300, pointerId: 1, ...t });
+    fireEvent.pointerMove(l, { clientX: 350, clientY: 300, pointerId: 2, ...t });
+    fireEvent.pointerUp(l, { clientX: 150, clientY: 300, pointerId: 1, ...t });
+    fireEvent.pointerUp(l, { clientX: 350, clientY: 300, pointerId: 2, ...t });
+    expect(marks(store)).toHaveLength(0);
+    const zoomed = document.querySelector('.preview-zoom') as HTMLElement;
+    expect(zoomed.style.transform).toMatch(/scale\(2/);
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(strings.zoomOut) }));
+    expect((document.querySelector('.preview-zoom') as HTMLElement).style.transform).toBe('');
+  });
+});

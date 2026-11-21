@@ -9,10 +9,10 @@ import { Marks } from './MarksSvg';
 /** Tools that put something on the page with a tap. */
 export type PlaceTool = 'write' | 'tick' | 'cross' | 'date';
 /** Tools that draw with a finger drag. */
-export type DrawTool = 'pen' | 'highlight' | 'arrow' | 'rect' | 'ellipse';
+export type DrawTool = 'pen' | 'highlight' | 'eraser' | 'arrow' | 'rect' | 'ellipse';
 export type EditTool = 'cover' | 'crop' | PlaceTool | DrawTool | null;
 export const PLACE_TOOLS: readonly PlaceTool[] = ['write', 'tick', 'cross', 'date'];
-export const DRAW_TOOLS: readonly DrawTool[] = ['pen', 'highlight', 'arrow', 'rect', 'ellipse'];
+export const DRAW_TOOLS: readonly DrawTool[] = ['pen', 'highlight', 'eraser', 'arrow', 'rect', 'ellipse'];
 const isPlaceTool = (t: EditTool): t is PlaceTool => PLACE_TOOLS.includes(t as PlaceTool);
 export type CoverColor = 'black' | 'white';
 
@@ -22,6 +22,10 @@ const MIN = 0.02;
 const CORNERS: CropHandle[] = ['nw', 'ne', 'sw', 'se'];
 /** Rough size of the bubble over a selected item (px) and its distance from the item. */
 const BUBBLE = { w: 300, h: 104, gap: 22 };
+/** Gumka: how close (fraction of the page width) the finger must pass to a drawing to rub it out. */
+const ERASE = 0.025;
+/** An item smaller than this on screen (px) gets its corner dots further out, so they do not hide it. */
+const SMALL_PX = 48;
 /** Room around a thin drawing so it can still be grabbed (fraction of the page). */
 const GRAB = 0.015;
 
@@ -44,6 +48,57 @@ function hitBox(m: Mark): Box {
   return m;
 }
 
+/** Distance from point p to the segment a–b (all in the same units). */
+function segDist(px: number, py: number, ax: number, ay: number, bx: number, by: number): number {
+  const vx = bx - ax;
+  const vy = by - ay;
+  const len = vx * vx + vy * vy;
+  const t = len ? Math.min(1, Math.max(0, ((px - ax) * vx + (py - ay) * vy) / len)) : 0;
+  return Math.hypot(px - (ax + t * vx), py - (ay + t * vy));
+}
+
+/** Whether the gumka at (x, y) (page fractions; aspect = page height / width) touches a drawing. */
+export function erases(m: Mark, x: number, y: number, aspect: number): boolean {
+  const r = ERASE;
+  if (m.kind === 'pen' || m.kind === 'highlight') {
+    const pts = m.points;
+    if (pts.length === 2) return Math.hypot(pts[0] - x, (pts[1] - y) * aspect) < r;
+    for (let i = 0; i + 3 < pts.length; i += 2) {
+      if (segDist(x, y * aspect, pts[i], pts[i + 1] * aspect, pts[i + 2], pts[i + 3] * aspect) < r) return true;
+    }
+    return false;
+  }
+  if (m.kind === 'arrow') return segDist(x, y * aspect, m.x, m.y * aspect, m.x + m.w, (m.y + m.h) * aspect) < r;
+  if (m.kind === 'rect' || m.kind === 'ellipse') {
+    const inX = x > m.x - r && x < m.x + m.w + r;
+    const inY = y * aspect > m.y * aspect - r && y * aspect < (m.y + m.h) * aspect + r;
+    return inX && inY;
+  }
+  return false;
+}
+
+/** Where the bubble over a selected item goes: over it (under it near the top of the screen), inside the screen sideways. */
+export function bubblePlace(b: Box, rect: PageBox, zoom = 1): { left: number; top: number; above: boolean } {
+  const half = Math.min(BUBBLE.w, rect.stageW - 16) / 2 / zoom;
+  const cx = rect.left + (b.x + b.w / 2) * rect.width;
+  const left = Math.min(Math.max(cx, half + 8), rect.stageW - half - 8) - rect.left;
+  const above = rect.top + b.y * rect.height - (BUBBLE.h + BUBBLE.gap) / zoom > 0;
+  const top = above ? b.y * rect.height - BUBBLE.gap / zoom : (b.y + b.h) * rect.height + BUBBLE.gap / zoom;
+  return { left, top, above };
+}
+
+/** The bubble at a place from bubblePlace; `shift` moves it from page to stage coordinates (signatures). */
+export function BubbleAnchor({ at, zoom, shift, children }: { at: { left: number; top: number; above: boolean }; zoom: number; shift?: { x: number; y: number }; children: ReactNode }) {
+  return (
+    <div
+      className="mark-bubble-anchor"
+      style={{ left: at.left + (shift?.x ?? 0), top: at.top + (shift?.y ?? 0), transform: zoom !== 1 ? `scale(${1 / zoom})` : undefined }}
+    >
+      <div style={{ transform: at.above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' }}>{children}</div>
+    </div>
+  );
+}
+
 /** A mark moved by (dx, dy) page fractions. */
 export function moved(m: Mark, dx: number, dy: number): Mark {
   if (!hasBox(m)) return { ...m, points: m.points.map((v, i) => clamp01(v + (i % 2 ? dy : dx))) };
@@ -60,6 +115,8 @@ export function MarkLayer({
   coverColor,
   ink,
   highlight,
+  penWidth = 1,
+  zoom = 1,
   selectedId,
   onSelect,
   onPlace,
@@ -75,6 +132,10 @@ export function MarkLayer({
   ink: InkColor;
   /** Colour of new highlighter strokes. */
   highlight: HighlightColor;
+  /** Thickness of new pen lines. */
+  penWidth?: 1 | 2 | 3;
+  /** Pinch zoom of the page in "Edytuj" (the bubble keeps its size). */
+  zoom?: number;
   selectedId: string | null;
   onSelect(id: string | null): void;
   /** A tap on the page with Wpisz / ✓ / ✗ / Data, at page fractions. */
@@ -84,14 +145,17 @@ export function MarkLayer({
   /** Panel shown over the selected item (colour, size, duplicate, remove). */
   bubble?(m: Mark): ReactNode;
 }) {
-  const { addMark, updateMark } = useAppStore();
+  const { addMark, updateMark, removeMarks } = useAppStore();
   /** A mark being drawn or changed, shown before it is committed (one undo step per gesture). */
   const [live, setLive] = useState<Mark | null>(null);
+  /** Drawings the gumka went over in the gesture under way (removed when the finger lifts). */
+  const [erased, setErased] = useState<string[]>([]);
 
   /** Pointer position as fractions of the page. */
   const frac = (e: { clientX: number; clientY: number }, layer: HTMLElement) => {
+    // the drawn size of the layer (it is bigger on screen when the page is zoomed in)
     const b = layer.getBoundingClientRect();
-    return { x: (e.clientX - b.left) / rect.width, y: (e.clientY - b.top) / rect.height };
+    return { x: (e.clientX - b.left) / (b.width || rect.width), y: (e.clientY - b.top) / (b.height || rect.height) };
   };
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
     Math.hypot((b.x - a.x) * rect.width, (b.y - a.y) * rect.height);
@@ -102,15 +166,24 @@ export function MarkLayer({
     } catch {
       // a pointer the browser no longer tracks: follow it without capture
     }
-    const end = (e: PointerEvent) => {
+    const off = () => {
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', end);
-      el.removeEventListener('pointercancel', end);
+      el.removeEventListener('pointercancel', cancel);
+    };
+    const end = (e: PointerEvent) => {
+      off();
       up(e);
+    };
+    // a second finger (pinch zoom) or the browser took the pointer: nothing is made
+    const cancel = () => {
+      off();
+      setLive(null);
+      setErased([]);
     };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', end);
-    el.addEventListener('pointercancel', end);
+    el.addEventListener('pointercancel', cancel);
   };
 
   /** A finger on an empty part of the page: place, draw or cover, depending on the tool. */
@@ -139,10 +212,38 @@ export function MarkLayer({
       return;
     }
 
+    if (tool === 'eraser') {
+      const aspect = rect.height / rect.width;
+      const hit = new Set<string>();
+      const rub = (p: { x: number; y: number }) => {
+        let more = false;
+        for (const m of page.marks ?? []) {
+          if (!hit.has(m.id) && erases(m, p.x, p.y, aspect)) {
+            hit.add(m.id);
+            more = true;
+          }
+        }
+        if (more) setErased([...hit]);
+      };
+      rub(a);
+      follow(
+        layer,
+        e.pointerId,
+        (ev) => rub(frac(ev, layer)),
+        () => {
+          setErased([]);
+          removeMarks(page.id, [...hit]); // one undo step for the whole rub
+        },
+      );
+      return;
+    }
+
     if (tool === 'pen' || tool === 'highlight') {
       const points = [clamp01(a.x), clamp01(a.y)];
       const make = (): Mark =>
-        tool === 'pen' ? { id, kind: 'pen', color: ink, points: [...points] } : { id, kind: 'highlight', color: highlight, points: [...points] };
+        tool === 'pen'
+          ? { id, kind: 'pen', color: ink, points: [...points], ...(penWidth !== 1 ? { width: penWidth } : {}) }
+          : { id, kind: 'highlight', color: highlight, points: [...points] };
       setLive(make());
       follow(
         layer,
@@ -239,19 +340,10 @@ export function MarkLayer({
     );
   };
 
-  const marks = page.marks ?? [];
+  const marks = (page.marks ?? []).filter((m) => !erased.includes(m.id));
   const shown = live ? (marks.some((m) => m.id === live.id) ? marks.map((m) => (m.id === live.id ? live : m)) : [...marks, live]) : marks;
   const pct = (v: number) => `${v * 100}%`;
   const chosen = marks.find((m) => m.id === selectedId);
-  /** Over the item (under it near the top of the screen), kept inside the screen sideways. */
-  const bubbleAt = (b: Box) => {
-    const half = Math.min(BUBBLE.w, rect.stageW - 16) / 2;
-    const cx = rect.left + (b.x + b.w / 2) * rect.width;
-    const left = Math.min(Math.max(cx, half + 8), rect.stageW - half - 8) - rect.left;
-    const above = rect.top + b.y * rect.height - BUBBLE.h - BUBBLE.gap > 0;
-    const top = above ? b.y * rect.height - BUBBLE.gap : (b.y + b.h) * rect.height + BUBBLE.gap;
-    return { left, top, transform: above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' };
-  };
   const drawing = editing && tool !== null && tool !== 'crop';
 
   return (
@@ -271,7 +363,7 @@ export function MarkLayer({
             <div
               key={m.id}
               data-mark={m.id}
-              className={selected ? 'mark-item selected' : 'mark-item'}
+              className={`mark-item${selected ? ' selected' : ''}${b.w * rect.width < SMALL_PX || b.h * rect.height < SMALL_PX ? ' small' : ''}`}
               style={{ left: pct(b.x), top: pct(b.y), width: pct(b.w), height: pct(b.h) }}
               onPointerDown={onItemDown(m, 'move')}
             >
@@ -302,9 +394,9 @@ export function MarkLayer({
           );
         })}
       {editing && bubble && chosen && !live && (
-        <div className="mark-bubble-anchor" style={bubbleAt(hitBox(chosen))}>
+        <BubbleAnchor at={bubblePlace(hitBox(chosen), rect, zoom)} zoom={zoom}>
           {bubble(chosen)}
-        </div>
+        </BubbleAnchor>
       )}
     </div>
   );

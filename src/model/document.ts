@@ -47,11 +47,12 @@ export type Mark =
   /** arrow: from (x, y) to (x + w, y + h); w and h may be negative */
   | ({ id: string; kind: 'rect' | 'ellipse' | 'arrow'; color: InkColor } & Box)
   /** points: flat [x0, y0, x1, y1, …] */
-  | { id: string; kind: 'pen'; color: InkColor; points: number[] }
+  /** width: line thickness step (1 thin, 2 normal, 3 thick); missing = 1 */
+  | { id: string; kind: 'pen'; color: InkColor; points: number[]; width?: 1 | 2 | 3 }
   | { id: string; kind: 'highlight'; color: HighlightColor; points: number[] };
 
 /** Patch for a mark: any of its fields (kind and id stay). */
-export type MarkPatch = Partial<{ x: number; y: number; w: number; h: number; color: string; text: string; size: 1 | 2 | 3; points: number[] }>;
+export type MarkPatch = Partial<{ x: number; y: number; w: number; h: number; color: string; text: string; size: 1 | 2 | 3; points: number[]; width: 1 | 2 | 3 }>;
 
 /**
  * An image (signature) on a page: position and size as fractions of the page as it is saved
@@ -135,7 +136,23 @@ export function updateMark(doc: Doc, pageId: string, markId: string, patch: Mark
 }
 
 export function removeMark(doc: Doc, pageId: string, markId: string): Doc {
-  return mapPages(doc, [pageId], (p) => ({ ...p, marks: (p.marks ?? []).filter((m) => m.id !== markId) }));
+  return removeMarks(doc, pageId, [markId]);
+}
+
+/** Gumka: several marks gone at once (one undo step). */
+export function removeMarks(doc: Doc, pageId: string, markIds: string[]): Doc {
+  const gone = new Set(markIds);
+  return mapPages(doc, [pageId], (p) => ({ ...p, marks: (p.marks ?? []).filter((m) => !gone.has(m.id)) }));
+}
+
+/** "Na wszystkie strony": a copy of the mark (same place on the page) on each of the other pages. */
+export function copyMarkToPages(doc: Doc, mark: Mark, pageIds: string[], newId: () => string): Doc {
+  return mapPages(doc, pageIds, (p) => ({ ...p, marks: [...(p.marks ?? []), { ...mark, id: newId() }] }));
+}
+
+/** "Na wszystkie strony" for a signature. */
+export function copyStampToPages(doc: Doc, stamp: Stamp, pageIds: string[], newId: () => string): Doc {
+  return mapPages(doc, pageIds, (p) => ({ ...p, stamps: [...(p.stamps ?? []), { ...stamp, id: newId() }] }));
 }
 
 const WHOLE = 0.005;

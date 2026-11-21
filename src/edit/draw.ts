@@ -12,6 +12,9 @@ export const HIGHLIGHT_ALPHA = 0.35;
 /** Line widths as fractions of the page width. */
 export const PEN_FRAC = 0.004;
 export const HIGHLIGHT_FRAC = 0.024;
+/** Pen thickness steps (Cienkie / Średnie / Grube) as multiples of PEN_FRAC. */
+export const PEN_WIDTH = { 1: 1, 2: 2, 3: 3.5 } as const;
+export const penFrac = (width: 1 | 2 | 3 | undefined) => PEN_FRAC * PEN_WIDTH[width ?? 1];
 /** Arrow head length as a fraction of the page width. */
 export const HEAD_FRAC = 0.03;
 

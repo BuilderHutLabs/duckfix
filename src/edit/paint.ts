@@ -1,6 +1,6 @@
 import type { Box, Mark, Stamp } from '../model/document';
 import { CROSS_PATH, INK, LINE_HEIGHT, TICK_PATH, fontFrac } from './text';
-import { HEAD_FRAC, HIGHLIGHT, HIGHLIGHT_ALPHA, HIGHLIGHT_FRAC, PEN_FRAC, arrowHead } from './draw';
+import { HEAD_FRAC, HIGHLIGHT, HIGHLIGHT_ALPHA, HIGHLIGHT_FRAC, PEN_FRAC, arrowHead, penFrac } from './draw';
 
 /** Pixel rectangle of a crop on a w×h canvas: whole pixels, inside the canvas, at least 1×1. */
 export function cropRect(crop: Box | undefined, w: number, h: number): { x: number; y: number; w: number; h: number } {
@@ -45,7 +45,7 @@ export function paintMarks(ctx: CanvasRenderingContext2D, marks: Mark[] | undefi
       const pen = m.kind === 'pen';
       ctx.save();
       ctx.strokeStyle = pen ? INK[m.color] : HIGHLIGHT[m.color];
-      ctx.lineWidth = (pen ? PEN_FRAC : HIGHLIGHT_FRAC) * w;
+      ctx.lineWidth = (pen ? penFrac(m.width) : HIGHLIGHT_FRAC) * w;
       ctx.globalAlpha = pen ? 1 : HIGHLIGHT_ALPHA;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';

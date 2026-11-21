@@ -1,5 +1,6 @@
-import { useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { Rect } from './edit/pageBox';
+import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import type { PageBox, Rect } from './edit/pageBox';
+import { BubbleAnchor, bubblePlace } from './edit/MarkLayer';
 import type { Page, Stamp } from '../model/document';
 import { useAppStore } from './store';
 import { strings } from './strings';
@@ -9,8 +10,25 @@ type Box = Pick<Stamp, 'x' | 'y' | 'w' | 'h' | 'rot'>;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
-/** Signatures on the page in the preview: drag to move, corner to resize, ↻ to turn, × to remove. */
-export function StampLayer({ page, rect }: { page: Page; rect: Rect | null }) {
+/**
+ * Signatures on the page in the preview: drag to move, corner to resize, ↻ to turn, × to remove.
+ * In "Edytuj" (`onSelect` given) the handles show only on the touched signature, with a bubble instead of ×.
+ */
+export function StampLayer({
+  page,
+  rect,
+  zoom = 1,
+  selectedId,
+  onSelect,
+  bubble,
+}: {
+  page: Page;
+  rect: Rect | PageBox | null;
+  zoom?: number;
+  selectedId?: string | null;
+  onSelect?(id: string): void;
+  bubble?(s: Stamp): ReactNode;
+}) {
   const { moveStamp, removeStamp } = useAppStore();
   const [live, setLive] = useState<{ id: string; box: Box } | null>(null);
 
@@ -18,16 +36,23 @@ export function StampLayer({ page, rect }: { page: Page; rect: Rect | null }) {
     if (!rect || !rect.width) return;
     e.preventDefault();
     e.stopPropagation();
+    onSelect?.(s.id);
     const el = e.currentTarget;
-    el.setPointerCapture?.(e.pointerId);
+    try {
+      el.setPointerCapture?.(e.pointerId);
+    } catch {
+      // a pointer the browser no longer tracks
+    }
     const x0 = e.clientX;
     const y0 = e.clientY;
+    let moved = false;
     const aspect = (s.w * rect.width) / (s.h * rect.height);
     let box: Box = { x: s.x, y: s.y, w: s.w, h: s.h, rot: s.rot };
     const t = ((s.rot ?? 0) * Math.PI) / 180;
     const move = (ev: PointerEvent) => {
-      const px = ev.clientX - x0;
-      const py = ev.clientY - y0;
+      const px = (ev.clientX - x0) / zoom;
+      const py = (ev.clientY - y0) / zoom;
+      if (Math.hypot(px, py) > 3) moved = true;
       if (kind === 'move') {
         const dx = px / rect.width;
         const dy = py / rect.height;
@@ -45,7 +70,7 @@ export function StampLayer({ page, rect }: { page: Page; rect: Rect | null }) {
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
       setLive(null);
-      moveStamp(page.id, s.id, box); // one undo step per drag
+      if (moved) moveStamp(page.id, s.id, box); // one undo step per drag
     };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
@@ -88,14 +113,17 @@ export function StampLayer({ page, rect }: { page: Page; rect: Rect | null }) {
   };
 
   const r = rect ?? { left: 0, top: 0, width: 0, height: 0 };
+  const editing = onSelect !== undefined;
+  const chosen = editing ? (page.stamps ?? []).find((s) => s.id === selectedId) : undefined;
   return (
     <>
       {(page.stamps ?? []).map((s) => {
         const b = live?.id === s.id ? live.box : s;
+        const handles = !editing || s.id === selectedId;
         return (
           <div
             key={s.id}
-            className="stamp"
+            className={handles ? 'stamp' : 'stamp quiet'}
             style={{
               left: r.left + b.x * r.width,
               top: r.top + b.y * r.height,
@@ -106,6 +134,7 @@ export function StampLayer({ page, rect }: { page: Page; rect: Rect | null }) {
             onPointerDown={startDrag(s, 'move')}
           >
             <img src={s.src} alt={strings.signature} draggable={false} />
+            {!editing && (
             <button
               type="button"
               className="stamp-remove"
@@ -115,6 +144,9 @@ export function StampLayer({ page, rect }: { page: Page; rect: Rect | null }) {
             >
               ×
             </button>
+            )}
+            {handles && (
+              <>
             <span className="stamp-resize" aria-hidden="true" onPointerDown={startDrag(s, 'size')} />
             <button
               type="button"
@@ -125,9 +157,16 @@ export function StampLayer({ page, rect }: { page: Page; rect: Rect | null }) {
             >
               ↻
             </button>
+              </>
+            )}
           </div>
         );
       })}
+      {chosen && bubble && rect && 'stageW' in rect && !live && (
+        <BubbleAnchor at={bubblePlace(chosen, rect, zoom)} zoom={zoom} shift={{ x: rect.left, y: rect.top }}>
+          {bubble(chosen)}
+        </BubbleAnchor>
+      )}
     </>
   );
 }

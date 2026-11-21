@@ -153,3 +153,66 @@ describe('camera scan', () => {
     expect(deps.importFiles).not.toHaveBeenCalled();
   });
 });
+
+describe('built-in camera', () => {
+  const stop = vi.fn();
+  const applyConstraints = vi.fn(async () => {});
+  const track = { stop, applyConstraints, getCapabilities: () => ({ torch: true }) };
+  const stream = { getTracks: () => [track], getVideoTracks: () => [track] };
+
+  beforeEach(() => {
+    stop.mockClear();
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn(async () => stream) },
+    });
+  });
+  afterEach(() => {
+    // @ts-expect-error back to jsdom's "no camera API"
+    delete navigator.mediaDevices;
+    vi.restoreAllMocks();
+  });
+
+  it('"Zrób zdjęcie" opens the camera inside the app (the page is not left); ✕ turns it off', async () => {
+    render(<App store={createAppStore(fakeDeps())} />);
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+    fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
+    expect(click).not.toHaveBeenCalled();
+    const cam = await screen.findByRole('dialog', { name: strings.cameraTitle });
+    await waitFor(() => expect((screen.getByRole('button', { name: strings.cameraShoot }) as HTMLButtonElement).disabled).toBe(false));
+    expect(cam.querySelector('video')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: strings.cameraTorch }));
+    await waitFor(() => expect(applyConstraints).toHaveBeenCalledWith({ advanced: [{ torch: true }] }));
+    fireEvent.click(screen.getByRole('button', { name: strings.close }));
+    expect(screen.queryByRole('dialog', { name: strings.cameraTitle })).toBeNull();
+    expect(stop).toHaveBeenCalled();
+  });
+
+  it('the shutter takes the picture and goes on to the crop screen', async () => {
+    render(<App store={createAppStore(fakeDeps())} />);
+    fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
+    await screen.findByRole('dialog', { name: strings.cameraTitle });
+    const video = document.querySelector('video') as HTMLVideoElement;
+    Object.defineProperty(video, 'videoWidth', { value: 1600 });
+    Object.defineProperty(video, 'videoHeight', { value: 1200 });
+    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({ drawImage: vi.fn() } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (cb: BlobCallback) {
+      cb(new Blob(['jpg'], { type: 'image/jpeg' }));
+    });
+    await waitFor(() => expect((screen.getByRole('button', { name: strings.cameraShoot }) as HTMLButtonElement).disabled).toBe(false));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraShoot })));
+    expect(await screen.findByRole('dialog', { name: strings.cropTitle })).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: strings.cameraTitle })).toBeNull();
+  });
+
+  it('when the camera cannot start (no permission), the phone camera is offered', async () => {
+    (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('NotAllowedError'));
+    render(<App store={createAppStore(fakeDeps())} />);
+    fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
+    expect(await screen.findByText(strings.cameraFailed)).toBeTruthy();
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
+    fireEvent.click(screen.getAllByRole('button', { name: strings.cameraPhone })[0]);
+    expect(click).toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: strings.cameraTitle })).toBeNull();
+  });
+});

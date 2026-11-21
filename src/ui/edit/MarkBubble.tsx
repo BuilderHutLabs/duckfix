@@ -22,6 +22,7 @@ export function MarkBubble({
   onSize,
   onEditText,
   onDuplicate,
+  onAllPages,
   onRemove,
 }: {
   mark: Mark;
@@ -31,10 +32,12 @@ export function MarkBubble({
   onSize(s: MarkSize): void;
   onEditText(): void;
   onDuplicate(): void;
+  /** Missing when the document has one page. */
+  onAllPages?(): void;
   onRemove(): void;
 }) {
-  const sized = mark.kind === 'text' || mark.kind === 'check' || mark.kind === 'cross';
-  const size = mark.kind === 'text' ? (mark.size as MarkSize) : sized ? tickSize(mark.w) : undefined;
+  const sized = mark.kind === 'text' || mark.kind === 'check' || mark.kind === 'cross' || mark.kind === 'pen';
+  const size = mark.kind === 'text' ? (mark.size as MarkSize) : mark.kind === 'pen' ? (mark.width ?? 1) : sized ? tickSize(mark.w) : undefined;
   return (
     <div className="mark-bubble" role="group" aria-label={strings.selectedItem} onPointerDown={(e) => e.stopPropagation()}>
       <div className="mark-bubble-row">
@@ -56,6 +59,11 @@ export function MarkBubble({
         <button type="button" className="mark-bubble-btn" aria-label={strings.duplicate} title={strings.duplicate} onClick={onDuplicate}>
           ⧉
         </button>
+        {onAllPages && (
+          <button type="button" className="mark-bubble-btn wide" onClick={onAllPages}>
+            {strings.onAllPages}
+          </button>
+        )}
         <button type="button" className="mark-bubble-btn danger" aria-label={strings.removeMark} title={strings.removeMark} onClick={onRemove}>
           🗑
         </button>

@@ -20,7 +20,7 @@ import { MarkTextSheet } from './edit/MarkTextSheet';
 import { loadEditStyle, saveEditStyle, type EditStyle } from './edit/style';
 import { FONT_FRAC, TICK_FRAC, newTextBox, tickBox, todayText, type MarkSize } from '../edit/text';
 import { currentLanguage } from '../i18n';
-import type { HighlightColor, InkColor, Mark } from '../model/document';
+import type { HighlightColor, InkColor, Mark, Stamp } from '../model/document';
 
 interface Props {
   /** Visible pages in grid order; the arrows walk this list. */
@@ -36,6 +36,10 @@ const GHOST_CLICK_MS = 400;
 const noSubscribe = () => () => {};
 /** A sideways finger move longer than this (px), and clearly more sideways than up/down, turns the page. */
 const SWIPE_PX = 60;
+/** Pinch zoom of the page in Edytuj. */
+const MAX_ZOOM = 4;
+type Zoom = { z: number; x: number; y: number };
+const NO_ZOOM: Zoom = { z: 1, x: 0, y: 0 };
 
 /** Long side of the sharp render: enough for the screen at its pixel density, bounded for iOS memory. */
 function previewMaxSide(): number {
@@ -60,7 +64,7 @@ function measureText(line: string, px: number): number {
 
 /** Full-screen view of one page, rotated the way it will be saved. */
 export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
-  const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp, setCrop, addMark, updateMark, removeMark, undo, redo, canUndo, canRedo } =
+  const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp, setCrop, addMark, updateMark, removeMark, removeStamp, markOnAllPages, stampOnAllPages, undo, redo, canUndo, canRedo } =
     useAppStore();
   const [signing, setSigning] = useState(false);
   const [reading, setReading] = useState(false);
@@ -69,6 +73,12 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   const [group, setGroup] = useState<ToolGroup>('write');
   const [folded, setFolded] = useState(false);
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
+  const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
+  /** Fingers on the page in Edytuj, and the pinch they make once there are two. */
+  const fingers = useRef(new Map<number, { x: number; y: number; target: EventTarget | null }>());
+  const pinch = useRef<{ d0: number; mx: number; my: number; from: Zoom } | null>(null);
+  const pinchDone = useRef(false);
+  const callingOff = useRef(false);
   const [coverColor, setCoverColor] = useState<CoverColor>('black');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [style, setStyle] = useState<EditStyle>(loadEditStyle);
@@ -93,6 +103,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     setSelectedId(null);
     setWriting(null);
     setFolded(false);
+    setZoom(NO_ZOOM);
   }, [pageId]);
   const angleNow = page ? effectiveRotation(page) + page.skewDeg : 0;
   // measured again when the picture changes (miniature → sharp) and when the tool strip takes room
@@ -172,7 +183,9 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     const pageAspect = box && box.height ? box.width / box.height : 0.707;
     const w = 0.35;
     const h = Math.min(0.5, (w * pageAspect) / sig.aspect);
-    addStamp(page.id, { id: crypto.randomUUID(), src: sig.src, x: 0.55, y: Math.max(0, 0.82 - h), w, h });
+    const id = crypto.randomUUID();
+    addStamp(page.id, { id, src: sig.src, x: 0.55, y: Math.max(0, 0.82 - h), w, h });
+    setSelectedId(id); // a new signature comes with its handles, ready to be moved
   };
   const sign = () => {
     const saved = loadSignature();
@@ -199,6 +212,8 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     if (next.size && selected.kind === 'text') {
       const h = selected.text.split('\n').length * 1.25 * FONT_FRAC[next.size];
       updateMark(page.id, selected.id, { size: next.size, h, w: Math.min(1 - selected.x, selected.w * (h / selected.h)) });
+    } else if (next.size && selected.kind === 'pen') {
+      updateMark(page.id, selected.id, { width: next.size });
     } else if (next.size && (selected.kind === 'check' || selected.kind === 'cross')) {
       const w = TICK_FRAC[next.size];
       updateMark(page.id, selected.id, { w, h: (w * pageW) / pageH });
@@ -256,7 +271,75 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     else if (dx > 0 && prevId) openPreview(prevId);
   };
 
+  /** Two fingers zoom and move the page in Edytuj; one finger keeps drawing and placing. */
+  const stagePoint = (e: { clientX: number; clientY: number }) => {
+    const b = stageRef.current?.getBoundingClientRect();
+    return { x: e.clientX - (b?.left ?? 0), y: e.clientY - (b?.top ?? 0) };
+  };
+  const pinchState = () => {
+    const [a, b] = [...fingers.current.values()];
+    return { d: Math.hypot(b.x - a.x, b.y - a.y), mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
+  };
+  const onFingerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!editing || e.pointerType === 'mouse') return;
+    fingers.current.set(e.pointerId, { ...stagePoint(e), target: e.target });
+    if (fingers.current.size === 2) {
+      // the first finger had started drawing or placing: that is called off
+      for (const [id, f] of fingers.current) {
+        if (id !== e.pointerId && f.target) {
+          const ev =
+            typeof PointerEvent !== 'undefined'
+              ? new PointerEvent('pointercancel', { pointerId: id, bubbles: true })
+              : Object.assign(new Event('pointercancel', { bubbles: true }), { pointerId: id });
+          callingOff.current = true;
+          try {
+            f.target.dispatchEvent(ev);
+          } finally {
+            callingOff.current = false;
+          }
+        }
+      }
+      const p = pinchState();
+      pinch.current = { d0: p.d || 1, mx: p.mx, my: p.my, from: zoom };
+      pinchDone.current = true;
+    }
+    if (pinchDone.current) e.stopPropagation();
+  };
+  const onFingerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const f = fingers.current.get(e.pointerId);
+    if (!f) return;
+    Object.assign(f, stagePoint(e));
+    const st = pinch.current;
+    if (st && fingers.current.size === 2) {
+      const p = pinchState();
+      const z = Math.min(MAX_ZOOM, Math.max(1, (st.from.z * p.d) / st.d0));
+      // the point of the page under the fingers stays under them
+      const px = (st.mx - st.from.x) / st.from.z;
+      const py = (st.my - st.from.y) / st.from.z;
+      const w = rect?.stageW ?? 0;
+      const h = rect?.stageH ?? 0;
+      const x = Math.min(0, Math.max(w * (1 - z), p.mx - px * z));
+      const y = Math.min(0, Math.max(h * (1 - z), p.my - py * z));
+      setZoom(z < 1.03 ? NO_ZOOM : { z, x, y });
+    }
+    if (pinchDone.current) e.stopPropagation();
+  };
+  const onFingerUp = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (callingOff.current || !fingers.current.delete(e.pointerId)) return;
+    if (fingers.current.size < 2) pinch.current = null;
+    const wasPinch = pinchDone.current;
+    if (fingers.current.size === 0) pinchDone.current = false;
+    if (wasPinch) e.stopPropagation();
+  };
+
+  const duplicateStamp = (s: Stamp) => {
+    const id = crypto.randomUUID();
+    addStamp(page.id, { ...s, id, x: Math.min(1 - s.w, s.x + 0.03), y: Math.min(1 - s.h, s.y + 0.03) });
+    setSelectedId(id);
+  };
+
   const leaveEdit = () => {
+    setZoom(NO_ZOOM);
     setEditing(false);
     setTool(null);
     setSelectedId(null);
@@ -317,8 +400,13 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
         onPointerCancel={() => {
           swipe.current = null;
         }}
+        onPointerDownCapture={onFingerDown}
+        onPointerMoveCapture={onFingerMove}
+        onPointerUpCapture={onFingerUp}
+        onPointerCancelCapture={onFingerUp}
         style={page.crop && rect && tool !== 'crop' ? { clipPath: cropClip(page.crop, rect, rect.stageW, rect.stageH) } : undefined}
       >
+        <div className="preview-zoom" style={zoom.z !== 1 ? { transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.z})` } : undefined}>
         {src && (
           <img
             ref={imgRef}
@@ -338,6 +426,8 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             coverColor={coverColor}
             ink={style.ink}
             highlight={style.highlight}
+            penWidth={style.size}
+            zoom={zoom.z}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onPlace={placeMark}
@@ -354,6 +444,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
                 onSize={(size) => changeStyle({ size })}
                 onEditText={() => m.kind === 'text' && setWriting({ id: m.id, text: m.text })}
                 onDuplicate={() => duplicate(m)}
+                onAllPages={doc.pages.length > 1 ? () => markOnAllPages(page.id, m) : undefined}
                 onRemove={() => {
                   removeMark(page.id, m.id);
                   setSelectedId(null);
@@ -362,9 +453,47 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             )}
           />
         )}
-        <StampLayer page={page} rect={rect} />
+        <StampLayer
+          page={page}
+          rect={rect}
+          zoom={zoom.z}
+          selectedId={editing ? selectedId : undefined}
+          onSelect={editing ? setSelectedId : undefined}
+          bubble={(s) => (
+            <div className="mark-bubble" role="group" aria-label={strings.selectedItem} onPointerDown={(e) => e.stopPropagation()}>
+              <div className="mark-bubble-row">
+                <button type="button" className="mark-bubble-btn" aria-label={strings.duplicate} title={strings.duplicate} onClick={() => duplicateStamp(s)}>
+                  ⧉
+                </button>
+                {doc.pages.length > 1 && (
+                  <button type="button" className="mark-bubble-btn wide" onClick={() => stampOnAllPages(page.id, s)}>
+                    {strings.onAllPages}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="mark-bubble-btn danger"
+                  aria-label={strings.removeSignature}
+                  title={strings.removeSignature}
+                  onClick={() => {
+                    removeStamp(page.id, s.id);
+                    setSelectedId(null);
+                  }}
+                >
+                  🗑
+                </button>
+              </div>
+            </div>
+          )}
+        />
         {editing && tool === 'crop' && rect && (
-          <CropFrame rect={rect} crop={page.crop} onCommit={(b) => setCrop([page.id], b)} />
+          <CropFrame rect={rect} zoom={zoom.z} crop={page.crop} onCommit={(b) => setCrop([page.id], b)} />
+        )}
+        </div>
+        {editing && zoom.z > 1 && (
+          <button type="button" className="preview-zoom-reset" onClick={() => setZoom(NO_ZOOM)}>
+            {strings.zoomOut} · {zoom.z.toFixed(1)}×
+          </button>
         )}
       </div>
       {editing && (

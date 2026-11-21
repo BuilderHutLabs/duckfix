@@ -19,6 +19,9 @@ import {
   addMark as addMarkTo,
   updateMark as updateMarkOn,
   removeMark as removeMarkFrom,
+  removeMarks as removeMarksFrom,
+  copyMarkToPages,
+  copyStampToPages,
   setCrop as setCropOn,
   type Stamp,
   type Mark,
@@ -526,6 +529,22 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
 
     removeMark(pageId: string, markId: string) {
       commit(removeMarkFrom(history.present, pageId, markId));
+    },
+
+    removeMarks(pageId: string, markIds: string[]) {
+      if (markIds.length) commit(removeMarksFrom(history.present, pageId, markIds));
+    },
+
+    /** Copies a mark of one page onto every other page, same place (one undo step). */
+    markOnAllPages(pageId: string, mark: Mark) {
+      const others = history.present.pages.filter((p) => p.id !== pageId).map((p) => p.id);
+      if (others.length) commit(copyMarkToPages(history.present, mark, others, () => crypto.randomUUID()));
+    },
+
+    /** Copies a signature of one page onto every other page, same place (one undo step). */
+    stampOnAllPages(pageId: string, stamp: Stamp) {
+      const others = history.present.pages.filter((p) => p.id !== pageId).map((p) => p.id);
+      if (others.length) commit(copyStampToPages(history.present, stamp, others, () => crypto.randomUUID()));
     },
 
     /** "Kadruj" on the given pages (undefined = whole page). */
