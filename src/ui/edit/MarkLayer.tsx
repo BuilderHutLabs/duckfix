@@ -57,7 +57,11 @@ export function MarkLayer({
   };
 
   const follow = (el: HTMLElement, pointerId: number, move: (e: PointerEvent) => void, up: (e: PointerEvent) => void) => {
-    el.setPointerCapture?.(pointerId);
+    try {
+      el.setPointerCapture?.(pointerId);
+    } catch {
+      // a pointer the browser no longer tracks: follow it without capture
+    }
     const end = (e: PointerEvent) => {
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', end);

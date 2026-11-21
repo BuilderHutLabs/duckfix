@@ -46,6 +46,15 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
   );
 }
 
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+/** Width of a line of text in the font marks use (sans-serif); estimated when there is no canvas. */
+function measureText(line: string, px: number): number {
+  if (measureCtx === undefined) measureCtx = document.createElement('canvas').getContext('2d');
+  if (!measureCtx) return line.length * 0.55 * px;
+  measureCtx.font = `${px}px sans-serif`;
+  return measureCtx.measureText(line).width;
+}
+
 /** Full-screen view of one page, rotated the way it will be saved. */
 export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp, setCrop, addMark, updateMark } = useAppStore();
@@ -190,7 +199,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     if (tool === 'write') return setWriting({ at });
     if (tool === 'date') {
       const text = todayText(currentLanguage());
-      addMark(page.id, { id, kind: 'text', text, color: style.ink, size: style.size, ...newTextBox(text, style.size, at, pageW, pageH) });
+      addMark(page.id, { id, kind: 'text', text, color: style.ink, size: style.size, ...newTextBox(text, style.size, at, pageW, pageH, measureText) });
     } else {
       addMark(page.id, { id, kind: tool === 'tick' ? 'check' : 'cross', color: style.ink, ...tickBox(style.size, at, pageW, pageH) });
     }
@@ -201,14 +210,14 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     if (!writing) return;
     if ('at' in writing) {
       const id = crypto.randomUUID();
-      addMark(page.id, { id, kind: 'text', text, color: style.ink, size: style.size, ...newTextBox(text, style.size, writing.at, pageW, pageH) });
+      addMark(page.id, { id, kind: 'text', text, color: style.ink, size: style.size, ...newTextBox(text, style.size, writing.at, pageW, pageH, measureText) });
       setSelectedId(id);
     } else {
       const m = page.marks?.find((x) => x.id === writing.id);
       if (m?.kind === 'text') {
         // same font size, box fitted to the new text
         const size = m.size as MarkSize;
-        const fresh = newTextBox(text, size, { x: m.x, y: m.y }, pageW, pageH);
+        const fresh = newTextBox(text, size, { x: m.x, y: m.y }, pageW, pageH, measureText);
         const k = m.h / (m.text.split('\n').length * 1.25 * FONT_FRAC[size]);
         updateMark(page.id, m.id, { text, w: Math.min(1 - m.x, fresh.w * k), h: Math.min(1 - m.y, fresh.h * k) });
       }

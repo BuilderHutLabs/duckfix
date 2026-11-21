@@ -27,12 +27,14 @@ export function newTextBox(
   at: { x: number; y: number },
   pageW: number,
   pageH: number,
+  /** Width in px of a line at a font size in px (real measuring on screen); a rough estimate without it. */
+  measure: (line: string, fontPx: number) => number = (line, px) => line.length * CHAR_W * px,
 ): { x: number; y: number; w: number; h: number } {
   const lines = text.split('\n');
   const f = FONT_FRAC[size];
   const h = Math.min(1, lines.length * LINE_HEIGHT * f);
-  const longest = Math.max(1, ...lines.map((l) => l.length));
-  const w = Math.min(1, (longest * CHAR_W * f * pageH) / pageW);
+  const widest = Math.max(1, ...lines.map((l) => measure(l, f * pageH)));
+  const w = Math.min(1, (widest * 1.04) / pageW);
   return { x: Math.min(Math.max(0, at.x), 1 - w), y: Math.min(Math.max(0, at.y), 1 - h), w, h };
 }
 
