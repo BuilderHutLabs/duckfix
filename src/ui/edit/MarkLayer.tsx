@@ -4,8 +4,9 @@ import { dragCrop, type CropHandle } from '../../signature/geometry';
 import { useAppStore } from '../store';
 import { strings } from '../strings';
 import type { Rect } from './pageBox';
+import { MarksSvg } from './MarksSvg';
 
-export type EditTool = 'cover' | null;
+export type EditTool = 'cover' | 'crop' | null;
 export type CoverColor = 'black' | 'white';
 
 const COVER_FILL = { black: '#000', white: '#fff' } as const;
@@ -129,21 +130,16 @@ export function MarkLayer({
 
   return (
     <div
-      className={editing && tool ? 'mark-layer drawing' : editing ? 'mark-layer editing' : 'mark-layer'}
+      className={editing && tool === 'cover' ? 'mark-layer drawing' : editing ? 'mark-layer editing' : 'mark-layer'}
       style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
       onPointerDown={onLayerDown}
     >
-      <svg viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
-        {items.map((m) => {
-          const b = boxOf(m);
-          return m.kind === 'cover' ? (
-            <rect key={m.id} data-kind="cover" x={b.x} y={b.y} width={b.w} height={b.h} fill={COVER_FILL[m.color]} />
-          ) : null;
-        })}
-        {drawing && (
+      <MarksSvg marks={page.marks} boxOf={boxOf} />
+      {drawing && (
+        <svg className="marks-svg" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
           <rect x={drawing.x} y={drawing.y} width={drawing.w} height={drawing.h} fill={COVER_FILL[coverColor]} opacity={0.8} />
-        )}
-      </svg>
+        </svg>
+      )}
       {editing &&
         items.map((m) => {
           const b = boxOf(m);

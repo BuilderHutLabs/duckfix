@@ -1,4 +1,6 @@
-import { memo, useEffect, useRef, useSyncExternalStore, type PointerEvent } from 'react';
+import { memo, useEffect, useRef, useSyncExternalStore, type PointerEvent, type RefObject } from 'react';
+import { useFramedBox } from './edit/pageBox';
+import { MarksSvg, cropClip } from './edit/MarksSvg';
 import { useSortable } from '@dnd-kit/sortable';
 import { effectiveRotation, type Page } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
@@ -106,6 +108,7 @@ export const PageThumb = memo(function PageThumb({
     disabled: selecting,
   });
   const box = useRef<HTMLDivElement>(null);
+  const frame = useRef<HTMLElement>(null);
   const thumb = useSyncExternalStore(
     (cb) => cache.subscribe(page.id, cb),
     () => cache.get(page.id),
@@ -144,6 +147,9 @@ export const PageThumb = memo(function PageThumb({
     .join(', ');
 
   const frameStyle = { transform: `rotate(${angle}deg)` };
+  const edited = (page.marks?.length ?? 0) > 0 || page.crop !== undefined;
+  const pageBox = useFramedBox(box, frame, effectiveRotation(page) + page.skewDeg, edited, thumb?.status);
+  const boxStyle = page.crop && pageBox ? { clipPath: cropClip(page.crop, pageBox, pageBox.stageW, pageBox.stageH) } : undefined;
   const cls = ['thumb', flagged && 'flagged', selected && 'selected', isDragging && 'dragging']
     .filter(Boolean)
     .join(' ');
@@ -168,14 +174,19 @@ export const PageThumb = memo(function PageThumb({
         onPointerLeave={hold.cancel}
         onPointerCancel={hold.cancel}
       >
-        <div className="thumb-box" ref={box}>
+        <div className="thumb-box" ref={box} style={boxStyle}>
           {thumb?.status === 'ready' ? (
-            <img className="thumb-frame" src={thumb.url} style={frameStyle} alt="" draggable={false} />
+            <img ref={frame as RefObject<HTMLImageElement>} className="thumb-frame" src={thumb.url} style={frameStyle} alt="" draggable={false} />
           ) : thumb?.status === 'error' ? (
             <div className="thumb-error">{strings.thumbError}</div>
           ) : (
-            <div className="thumb-frame thumb-pending" style={frameStyle} />
+            <div ref={frame as RefObject<HTMLDivElement>} className="thumb-frame thumb-pending" style={frameStyle} />
           )}
+          {pageBox && page.marks?.length ? (
+            <div className="thumb-marks" style={{ left: pageBox.left, top: pageBox.top, width: pageBox.width, height: pageBox.height }}>
+              <MarksSvg marks={page.marks} />
+            </div>
+          ) : null}
         </div>
         <span className="thumb-number" aria-hidden="true">
           {number}

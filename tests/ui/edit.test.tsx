@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { App } from '../../src/ui/App';
 import { createAppStore } from '../../src/ui/store';
 import { strings } from '../../src/ui/strings';
-import { addMark } from '../../src/model/document';
+import { addMark, setCrop } from '../../src/model/document';
 import { docWithFlags, fakeDeps, source } from './fixtures';
 
 vi.mock('../../src/imaging/render', () => ({
@@ -90,5 +90,50 @@ describe('Edytuj', () => {
     const doc = addMark(docWithFlags(1), 'p1', { id: 'c1', kind: 'cover', color: 'black', x: 0.1, y: 0.1, w: 0.3, h: 0.1 });
     openPreview(doc);
     expect(document.querySelector('.mark-layer rect[data-kind="cover"]')).toBeTruthy();
+  });
+
+  it('Kadruj: dragging a corner of the frame crops the page (one undo step per drag)', () => {
+    const store = openPreview();
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    fireEvent.click(screen.getByRole('button', { name: strings.pageCrop }));
+    const se = document.querySelector('.crop-frame [data-handle="se"]') as HTMLElement;
+    fireEvent.pointerDown(se, { clientX: 500, clientY: 700, pointerId: 1 });
+    fireEvent.pointerMove(se, { clientX: 400, clientY: 560, pointerId: 1 });
+    fireEvent.pointerUp(se, { clientX: 400, clientY: 560, pointerId: 1 });
+    const crop = store.getState().doc.pages[0].crop!;
+    expect(crop.x).toBeCloseTo(0);
+    expect(crop.w).toBeCloseTo(0.8);
+    expect(crop.h).toBeCloseTo(0.8);
+    act(() => store.undo());
+    expect(store.getState().doc.pages[0].crop).toBeUndefined();
+  });
+
+  it('"Dla wszystkich stron" gives every page the same crop; "Bez kadrowania" takes it off this page', () => {
+    const store = openPreview(setCrop(docWithFlags(3), ['p1'], { x: 0.1, y: 0.1, w: 0.8, h: 0.8 }));
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    fireEvent.click(screen.getByRole('button', { name: strings.pageCrop }));
+    fireEvent.click(screen.getByRole('button', { name: strings.pageCropAll }));
+    expect(store.getState().doc.pages.map((p) => p.crop?.w)).toEqual([0.8, 0.8, 0.8]);
+    fireEvent.click(screen.getByRole('button', { name: strings.pageCropNone }));
+    expect(store.getState().doc.pages.map((p) => p.crop?.w)).toEqual([undefined, 0.8, 0.8]);
+  });
+
+  it('outside Kadruj the preview shows only the cropped part', () => {
+    openPreview(setCrop(docWithFlags(1), ['p1'], { x: 0.1, y: 0.2, w: 0.5, h: 0.5 }));
+    const stage = document.querySelector('.preview-stage') as HTMLElement;
+    // page box 500×700 at the origin: inset top 140, right 200, bottom 210, left 50
+    expect(stage.style.clipPath).toBe('inset(140px 200px 210px 50px)');
+  });
+
+  it('miniatures show covers and the crop', () => {
+    fakeLayout();
+    let doc = addMark(docWithFlags(2), 'p1', { id: 'c1', kind: 'cover', color: 'black', x: 0.1, y: 0.1, w: 0.3, h: 0.1 });
+    doc = setCrop(doc, ['p2'], { x: 0, y: 0, w: 0.5, h: 1 });
+    const store = createAppStore(fakeDeps());
+    store.load(doc, [source]);
+    render(<App store={store} />);
+    const thumbs = document.querySelectorAll('.thumb-box');
+    expect(thumbs[0].querySelector('rect[data-kind="cover"]')).toBeTruthy();
+    expect((thumbs[1] as HTMLElement).style.clipPath).toBe('inset(0px 250px 0px 0px)');
   });
 });

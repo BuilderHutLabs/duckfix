@@ -8,12 +8,16 @@ export function EditTools({
   coverColor,
   onCoverColor,
   onSign,
+  onCropAll,
+  onCropNone,
 }: {
   tool: EditTool;
   onTool(t: EditTool): void;
   coverColor: CoverColor;
   onCoverColor(c: CoverColor): void;
   onSign(): void;
+  onCropAll(): void;
+  onCropNone(): void;
 }) {
   const toggle = (t: Exclude<EditTool, null>) => () => onTool(tool === t ? null : t);
   return (
@@ -31,10 +35,27 @@ export function EditTools({
           </div>
         </div>
       )}
+      {tool === 'crop' && (
+        <div className="edit-options">
+          <p className="edit-hint">{strings.pageCropHint}</p>
+          <div className="edit-buttons">
+            <button type="button" className="btn" onClick={onCropAll}>
+              {strings.pageCropAll}
+            </button>
+            <button type="button" className="btn" onClick={onCropNone}>
+              {strings.pageCropNone}
+            </button>
+          </div>
+        </div>
+      )}
       <div className="edit-strip">
         <button type="button" className="edit-tool" aria-pressed={tool === 'cover'} onClick={toggle('cover')}>
           <span className="edit-tool-icon" aria-hidden="true">▬</span>
           {strings.cover}
+        </button>
+        <button type="button" className="edit-tool" aria-pressed={tool === 'crop'} onClick={toggle('crop')}>
+          <span className="edit-tool-icon" aria-hidden="true">⛶</span>
+          {strings.pageCrop}
         </button>
         <button type="button" className="edit-tool" onClick={onSign}>
           <span className="edit-tool-icon" aria-hidden="true">✍</span>

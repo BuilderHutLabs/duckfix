@@ -10,6 +10,8 @@ import { StampLayer } from './StampLayer';
 import { usePageBox } from './edit/pageBox';
 import { MarkLayer, type CoverColor, type EditTool } from './edit/MarkLayer';
 import { EditTools } from './edit/EditTools';
+import { CropFrame } from './edit/CropFrame';
+import { cropClip } from './edit/MarksSvg';
 import { TextSheet } from './TextSheet';
 import { SignatureSheet } from './SignatureSheet';
 import { loadSignature, type SavedSignature } from '../signature/storage';
@@ -41,7 +43,7 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 
 /** Full-screen view of one page, rotated the way it will be saved. */
 export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
-  const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp } = useAppStore();
+  const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp, setCrop } = useAppStore();
   const [signing, setSigning] = useState(false);
   const [reading, setReading] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -197,7 +199,11 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           </>
         )}
       </div>
-      <div className="preview-stage" ref={stageRef}>
+      <div
+        className="preview-stage"
+        ref={stageRef}
+        style={page.crop && rect && tool !== 'crop' ? { clipPath: cropClip(page.crop, rect, rect.stageW, rect.stageH) } : undefined}
+      >
         {src && (
           <img
             ref={imgRef}
@@ -212,7 +218,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           <MarkLayer
             page={page}
             rect={rect}
-            editing={editing}
+            editing={editing && tool !== 'crop'}
             tool={tool}
             coverColor={coverColor}
             selectedId={selectedId}
@@ -220,9 +226,23 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           />
         )}
         <StampLayer page={page} rect={rect} />
+        {editing && tool === 'crop' && rect && (
+          <CropFrame rect={rect} crop={page.crop} onCommit={(b) => setCrop([page.id], b)} />
+        )}
       </div>
       {editing && (
-        <EditTools tool={tool} onTool={setTool} coverColor={coverColor} onCoverColor={setCoverColor} onSign={sign} />
+        <EditTools
+          tool={tool}
+          onTool={(t) => {
+            setTool(t);
+            setSelectedId(null);
+          }}
+          coverColor={coverColor}
+          onCoverColor={setCoverColor}
+          onSign={sign}
+          onCropAll={() => setCrop(doc.pages.map((p) => p.id), page.crop)}
+          onCropNone={() => setCrop([page.id], undefined)}
+        />
       )}
       {reading && <TextSheet pageId={page.id} onClose={() => setReading(false)} />}
       {signing && (

@@ -2,6 +2,8 @@ import { useEffect, useState, type RefObject } from 'react';
 import { rotatedBox } from '../../export/rasterize';
 
 export type Rect = { left: number; top: number; width: number; height: number };
+/** The page box plus the size of the stage it sits in. */
+export type PageBox = Rect & { stageW: number; stageH: number };
 
 /**
  * Where the saved page sits in the preview stage. The image element is centred in the stage, its
@@ -23,8 +25,8 @@ export function pageBoxIn(
 }
 
 /** The page box of the preview image, kept up to date (image load, resize, zoom-in animation). */
-export function usePageBox(img: RefObject<HTMLImageElement>, stage: RefObject<HTMLDivElement>, angleDeg: number, key: unknown): Rect | null {
-  const [rect, setRect] = useState<Rect | null>(null);
+export function usePageBox(img: RefObject<HTMLImageElement>, stage: RefObject<HTMLDivElement>, angleDeg: number, key: unknown): PageBox | null {
+  const [rect, setRect] = useState<PageBox | null>(null);
   useEffect(() => {
     const measure = () => {
       const el = img.current;
@@ -33,15 +35,16 @@ export function usePageBox(img: RefObject<HTMLImageElement>, stage: RefObject<HT
       const s = st.getBoundingClientRect();
       if (!el) {
         // no picture yet: the whole stage
-        setRect({ left: 0, top: 0, width: s.width, height: s.height });
+        setRect({ left: 0, top: 0, width: s.width, height: s.height, stageW: s.width, stageH: s.height });
         return;
       }
       if (el.naturalWidth && el.offsetWidth) {
-        setRect(pageBoxIn(s.width, s.height, el.offsetWidth, el.offsetHeight, el.naturalWidth, el.naturalHeight, angleDeg));
+        const box = pageBoxIn(s.width, s.height, el.offsetWidth, el.offsetHeight, el.naturalWidth, el.naturalHeight, angleDeg);
+        setRect({ ...box, stageW: s.width, stageH: s.height });
       } else {
         // picture not decoded yet (or no layout, as in tests): the element's own box
         const a = el.getBoundingClientRect();
-        setRect({ left: a.left - s.left, top: a.top - s.top, width: a.width, height: a.height });
+        setRect({ left: a.left - s.left, top: a.top - s.top, width: a.width, height: a.height, stageW: s.width, stageH: s.height });
       }
     };
     measure();
@@ -56,5 +59,48 @@ export function usePageBox(img: RefObject<HTMLImageElement>, stage: RefObject<HT
       clearTimeout(t);
     };
   }, [img, stage, angleDeg, key]);
+  return rect;
+}
+
+/**
+ * The page box of a miniature: `frame` is the (turned) picture centred in `box`. Measured only when
+ * `active` (the page has marks or a crop), again when the picture loads or the window resizes.
+ */
+export function useFramedBox(
+  box: RefObject<HTMLElement>,
+  frame: RefObject<HTMLElement>,
+  angleDeg: number,
+  active: boolean,
+  key: unknown,
+): PageBox | null {
+  const [rect, setRect] = useState<PageBox | null>(null);
+  useEffect(() => {
+    if (!active) return setRect(null);
+    const measure = () => {
+      const b = box.current;
+      const f = frame.current;
+      if (!b || !f) return;
+      const s = b.getBoundingClientRect();
+      const img = f instanceof HTMLImageElement ? f : null;
+      if (img?.naturalWidth && img.offsetWidth) {
+        const r = pageBoxIn(s.width, s.height, img.offsetWidth, img.offsetHeight, img.naturalWidth, img.naturalHeight, angleDeg);
+        setRect({ ...r, stageW: s.width, stageH: s.height });
+      } else {
+        const a = f.getBoundingClientRect();
+        setRect({ left: a.left - s.left, top: a.top - s.top, width: a.width, height: a.height, stageW: s.width, stageH: s.height });
+      }
+    };
+    measure();
+    const f = frame.current;
+    f?.addEventListener('load', measure);
+    window.addEventListener('resize', measure);
+    // the springy quarter turn of the miniature settles after ~0.4 s
+    const t = setTimeout(measure, 450);
+    return () => {
+      f?.removeEventListener('load', measure);
+      window.removeEventListener('resize', measure);
+      clearTimeout(t);
+    };
+  }, [box, frame, angleDeg, active, key]);
   return rect;
 }
