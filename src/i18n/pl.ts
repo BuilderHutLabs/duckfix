@@ -101,6 +101,8 @@ export const pl = {
   pageText: 'Tekst strony',
   readingText: 'Rozpoznaję tekst…',
   noText: 'Na tej stronie nie ma tekstu.',
+  inkBlue: 'Niebieski tusz',
+  inkBlack: 'Czarny tusz',
   insertHere: 'Wstaw strony tutaj',
   addAtEnd: 'Dodaj pliki',
 

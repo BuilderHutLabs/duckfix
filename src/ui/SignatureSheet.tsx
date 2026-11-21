@@ -7,7 +7,7 @@ import { strings } from './strings';
 
 const PAD_W = 900;
 const PAD_H = 360;
-const INK = '#1a2a6c';
+const INKS = { blue: '#1a2a6c', black: '#111111' } as const;
 
 function toSignature(data: Uint8ClampedArray, w: number, h: number): SavedSignature | null {
   const t = trimToInk(data, w, h);
@@ -28,6 +28,7 @@ function toSignature(data: Uint8ClampedArray, w: number, h: number): SavedSignat
 export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature): void; onClose(): void }) {
   const [mode, setMode] = useState<'draw' | 'scan'>('draw');
   const [drawn, setDrawn] = useState(false);
+  const [ink, setInk] = useState<keyof typeof INKS>('blue');
   const [scanned, setScanned] = useState<SavedSignature | null>(null);
   const [failed, setFailed] = useState(false);
   const pad = useRef<HTMLCanvasElement>(null);
@@ -52,7 +53,7 @@ export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature
     const ctx = pad.current?.getContext('2d');
     if (!last.current || !ctx) return;
     const p = point(e);
-    ctx.strokeStyle = INK;
+    ctx.strokeStyle = INKS[ink];
     ctx.lineWidth = 7;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -132,7 +133,20 @@ export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature
               onPointerUp={up}
               onPointerCancel={up}
             />
-            <p className="sheet-option-hint signature-hint">{strings.signatureDrawHint}</p>
+            <div className="ink-row">
+              <p className="sheet-option-hint">{strings.signatureDrawHint}</p>
+              {(['blue', 'black'] as const).map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className="ink-swatch"
+                  aria-pressed={ink === k}
+                  aria-label={k === 'blue' ? strings.inkBlue : strings.inkBlack}
+                  style={{ background: INKS[k] }}
+                  onClick={() => setInk(k)}
+                />
+              ))}
+            </div>
           </>
         ) : (
           <div className="signature-scan">

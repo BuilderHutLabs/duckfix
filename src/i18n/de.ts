@@ -94,6 +94,8 @@ export const de: Strings = {
   pageText: 'Seitentext',
   readingText: 'Text wird erkannt…',
   noText: 'Auf dieser Seite ist kein Text.',
+  inkBlue: 'Blaue Tinte',
+  inkBlack: 'Schwarze Tinte',
   insertHere: 'Seiten hier einfügen',
   addAtEnd: 'Dateien hinzufügen',
 

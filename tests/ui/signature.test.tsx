@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { App } from '../../src/ui/App';
 import { createAppStore } from '../../src/ui/store';
 import { strings } from '../../src/ui/strings';
@@ -63,10 +63,32 @@ describe('signature', () => {
     const stamps = () => store.getState().doc.pages[0].stamps ?? [];
     expect(stamps()).toHaveLength(1);
     expect(stamps()[0].src).toBe(SIG.src);
-    expect(screen.getByRole('img', { name: strings.signature })).toBeTruthy();
+    expect(within(screen.getByRole('dialog', { name: strings.preview(1) })).getByRole('img', { name: strings.signature })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: strings.removeSignature }));
     expect(stamps()).toHaveLength(0);
     act(() => store.undo());
     expect(stamps()).toHaveLength(1);
+  });
+
+  it('a signed page shows its signature on the thumbnail', () => {
+    const store = createAppStore(fakeDeps());
+    const doc = addStamp(docWithFlags(2), 'p2', { id: 's1', src: SIG.src, x: 0.5, y: 0.8, w: 0.3, h: 0.07 });
+    store.load(doc, [source]);
+    render(<App store={store} />);
+    expect(screen.getAllByRole('img', { name: strings.signature })).toHaveLength(1);
+  });
+
+  it('drawing: blue or black ink', () => {
+    const store = createAppStore(fakeDeps());
+    store.load(docWithFlags(1), [source]);
+    render(<App store={store} />);
+    act(() => store.openPreview('p1'));
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000);
+    fireEvent.click(screen.getByRole('button', { name: strings.sign }));
+    const blue = screen.getByRole('button', { name: strings.inkBlue });
+    const black = screen.getByRole('button', { name: strings.inkBlack });
+    expect(blue.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(black);
+    expect(black.getAttribute('aria-pressed')).toBe('true');
   });
 });

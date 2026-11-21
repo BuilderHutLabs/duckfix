@@ -94,6 +94,8 @@ export const es: Strings = {
   pageText: 'Texto de la página',
   readingText: 'Leyendo el texto…',
   noText: 'No hay texto en esta página.',
+  inkBlue: 'Tinta azul',
+  inkBlack: 'Tinta negra',
   insertHere: 'Insertar páginas aquí',
   addAtEnd: 'Añadir archivos',
 

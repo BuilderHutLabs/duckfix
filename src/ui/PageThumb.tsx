@@ -180,6 +180,11 @@ export const PageThumb = memo(function PageThumb({
         <span className="thumb-number" aria-hidden="true">
           {number}
         </span>
+        {page.stamps?.[0] && (
+          <span className="stamp-chip">
+            <img src={page.stamps[0].src} alt={strings.signature} draggable={false} />
+          </span>
+        )}
         {flagged && (
           <span className="flag-label" aria-hidden="true">
             {strings.flagLabels[page.flags[0]]}
