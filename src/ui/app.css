@@ -2025,3 +2025,41 @@ body.splashing .home .duck {
   position: absolute;
   pointer-events: none;
 }
+.mark-text {
+  position: absolute;
+  white-space: pre;
+  font-family: sans-serif;
+  pointer-events: none;
+}
+.mark-tick {
+  position: absolute;
+  overflow: visible;
+  pointer-events: none;
+}
+.edit-style {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.edit-style .ink-swatch {
+  outline-color: #fff;
+}
+.edit-sizes {
+  min-width: 0;
+}
+.edit-sizes button {
+  min-width: 40px;
+}
+.write-box {
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--sep);
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 17px;
+  resize: vertical;
+}

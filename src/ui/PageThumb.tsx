@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useSyncExternalStore, type PointerEvent, type RefObject } from 'react';
 import { useFramedBox } from './edit/pageBox';
-import { MarksSvg, cropClip } from './edit/MarksSvg';
+import { Marks, cropClip } from './edit/MarksSvg';
 import { useSortable } from '@dnd-kit/sortable';
 import { effectiveRotation, type Page } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
@@ -184,7 +184,7 @@ export const PageThumb = memo(function PageThumb({
           )}
           {pageBox && page.marks?.length ? (
             <div className="thumb-marks" style={{ left: pageBox.left, top: pageBox.top, width: pageBox.width, height: pageBox.height }}>
-              <MarksSvg marks={page.marks} />
+              <Marks marks={page.marks} pageW={pageBox.width} pageH={pageBox.height} />
             </div>
           ) : null}
         </div>

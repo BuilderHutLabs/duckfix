@@ -15,6 +15,11 @@ import { cropClip } from './edit/MarksSvg';
 import { TextSheet } from './TextSheet';
 import { SignatureSheet } from './SignatureSheet';
 import { loadSignature, type SavedSignature } from '../signature/storage';
+import { MarkTextSheet } from './edit/MarkTextSheet';
+import { loadEditStyle, saveEditStyle, type EditStyle } from './edit/style';
+import { FONT_FRAC, TICK_FRAC, newTextBox, tickBox, todayText, type MarkSize } from '../edit/text';
+import { currentLanguage } from '../i18n';
+import type { InkColor, Mark } from '../model/document';
 
 interface Props {
   /** Visible pages in grid order; the arrows walk this list. */
@@ -43,13 +48,16 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 
 /** Full-screen view of one page, rotated the way it will be saved. */
 export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
-  const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp, setCrop } = useAppStore();
+  const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp, setCrop, addMark, updateMark } = useAppStore();
   const [signing, setSigning] = useState(false);
   const [reading, setReading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [tool, setTool] = useState<EditTool>(null);
   const [coverColor, setCoverColor] = useState<CoverColor>('black');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [style, setStyle] = useState<EditStyle>(loadEditStyle);
+  /** The "Wpisz" sheet: a new text at a tap, or changing a text already on the page. */
+  const [writing, setWriting] = useState<{ at: { x: number; y: number } } | { id: string; text: string } | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const page = previewId === null ? undefined : doc.pages.find((p) => p.id === previewId);
@@ -67,6 +75,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     setEditing(false);
     setTool(null);
     setSelectedId(null);
+    setWriting(null);
   }, [pageId]);
   const angleNow = page ? effectiveRotation(page) + page.skewDeg : 0;
   // measured again when the picture changes (miniature → sharp) and when the tool strip takes room
@@ -154,6 +163,59 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     else setSigning(true);
   };
 
+  const pageW = rect?.width || 1;
+  const pageH = rect?.height || 1;
+  const selected = page.marks?.find((m) => m.id === selectedId);
+
+  const changeStyle = (next: Partial<EditStyle>) => {
+    const s = { ...style, ...next };
+    setStyle(s);
+    saveEditStyle(s);
+    // a selected text or tick takes the new colour / size at once
+    if (!selected) return;
+    if (next.ink && (selected.kind === 'text' || selected.kind === 'check' || selected.kind === 'cross')) {
+      updateMark(page.id, selected.id, { color: next.ink });
+    }
+    if (next.size && selected.kind === 'text') {
+      const h = selected.text.split('\n').length * 1.25 * FONT_FRAC[next.size];
+      updateMark(page.id, selected.id, { size: next.size, h, w: Math.min(1 - selected.x, selected.w * (h / selected.h)) });
+    } else if (next.size && (selected.kind === 'check' || selected.kind === 'cross')) {
+      const w = TICK_FRAC[next.size];
+      updateMark(page.id, selected.id, { w, h: (w * pageW) / pageH });
+    }
+  };
+
+  const placeMark = (tool: 'write' | 'tick' | 'cross' | 'date', at: { x: number; y: number }) => {
+    const id = crypto.randomUUID();
+    if (tool === 'write') return setWriting({ at });
+    if (tool === 'date') {
+      const text = todayText(currentLanguage());
+      addMark(page.id, { id, kind: 'text', text, color: style.ink, size: style.size, ...newTextBox(text, style.size, at, pageW, pageH) });
+    } else {
+      addMark(page.id, { id, kind: tool === 'tick' ? 'check' : 'cross', color: style.ink, ...tickBox(style.size, at, pageW, pageH) });
+    }
+    setSelectedId(id);
+  };
+
+  const finishWriting = (text: string) => {
+    if (!writing) return;
+    if ('at' in writing) {
+      const id = crypto.randomUUID();
+      addMark(page.id, { id, kind: 'text', text, color: style.ink, size: style.size, ...newTextBox(text, style.size, writing.at, pageW, pageH) });
+      setSelectedId(id);
+    } else {
+      const m = page.marks?.find((x) => x.id === writing.id);
+      if (m?.kind === 'text') {
+        // same font size, box fitted to the new text
+        const size = m.size as MarkSize;
+        const fresh = newTextBox(text, size, { x: m.x, y: m.y }, pageW, pageH);
+        const k = m.h / (m.text.split('\n').length * 1.25 * FONT_FRAC[size]);
+        updateMark(page.id, m.id, { text, w: Math.min(1 - m.x, fresh.w * k), h: Math.min(1 - m.y, fresh.h * k) });
+      }
+    }
+    setWriting(null);
+  };
+
   const leaveEdit = () => {
     setEditing(false);
     setTool(null);
@@ -223,6 +285,8 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             coverColor={coverColor}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            onPlace={placeMark}
+            onEditText={(m: Extract<Mark, { kind: 'text' }>) => setWriting({ id: m.id, text: m.text })}
           />
         )}
         <StampLayer page={page} rect={rect} />
@@ -239,9 +303,20 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           }}
           coverColor={coverColor}
           onCoverColor={setCoverColor}
+          ink={style.ink}
+          onInk={(ink: InkColor) => changeStyle({ ink })}
+          size={style.size}
+          onSize={(size: MarkSize) => changeStyle({ size })}
           onSign={sign}
           onCropAll={() => setCrop(doc.pages.map((p) => p.id), page.crop)}
           onCropNone={() => setCrop([page.id], undefined)}
+        />
+      )}
+      {writing && (
+        <MarkTextSheet
+          initial={'text' in writing ? writing.text : ''}
+          onDone={finishWriting}
+          onClose={() => setWriting(null)}
         />
       )}
       {reading && <TextSheet pageId={page.id} onClose={() => setReading(false)} />}

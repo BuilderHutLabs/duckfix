@@ -4,9 +4,13 @@ import { dragCrop, type CropHandle } from '../../signature/geometry';
 import { useAppStore } from '../store';
 import { strings } from '../strings';
 import type { Rect } from './pageBox';
-import { MarksSvg } from './MarksSvg';
+import { Marks } from './MarksSvg';
 
-export type EditTool = 'cover' | 'crop' | null;
+export type EditTool = 'cover' | 'crop' | PlaceTool | null;
+/** Tools that put something on the page with a tap. */
+export type PlaceTool = 'write' | 'tick' | 'cross' | 'date';
+export const PLACE_TOOLS: readonly PlaceTool[] = ['write', 'tick', 'cross', 'date'];
+const isPlaceTool = (t: EditTool): t is PlaceTool => PLACE_TOOLS.includes(t as PlaceTool);
 export type CoverColor = 'black' | 'white';
 
 const COVER_FILL = { black: '#000', white: '#fff' } as const;
@@ -27,6 +31,8 @@ export function MarkLayer({
   coverColor,
   selectedId,
   onSelect,
+  onPlace,
+  onEditText,
 }: {
   page: Page;
   rect: Rect;
@@ -35,6 +41,10 @@ export function MarkLayer({
   coverColor: CoverColor;
   selectedId: string | null;
   onSelect(id: string | null): void;
+  /** A tap on the page with Wpisz / ✓ / ✗ / Data, at page fractions. */
+  onPlace(tool: PlaceTool, at: { x: number; y: number }): void;
+  /** A second tap on a selected text: change it. */
+  onEditText(m: Extract<Mark, { kind: 'text' }>): void;
 }) {
   const { addMark, updateMark, removeMark } = useAppStore();
   /** The box being dragged (new cover, or a mark being moved/resized), before it is committed. */
@@ -61,7 +71,29 @@ export function MarkLayer({
 
   /** Drawing a new cover on an empty part of the page. */
   const onLayerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!editing || tool !== 'cover' || e.target !== e.currentTarget) return;
+    if (!editing || e.target !== e.currentTarget) return;
+    if (isPlaceTool(tool)) {
+      e.preventDefault();
+      const layer = e.currentTarget;
+      const a = frac(e, layer);
+      let moved = false;
+      follow(
+        layer,
+        e.pointerId,
+        (ev) => {
+          const b = frac(ev, layer);
+          if (Math.hypot((b.x - a.x) * rect.width, (b.y - a.y) * rect.height) > 10) moved = true;
+        },
+        () => {
+          if (!moved) onPlace(tool, a);
+        },
+      );
+      return;
+    }
+    if (tool !== 'cover') {
+      onSelect(null);
+      return;
+    }
     e.preventDefault();
     const layer = e.currentTarget;
     const a = frac(e, layer);
@@ -103,22 +135,33 @@ export function MarkLayer({
     if (!editing) return;
     e.preventDefault();
     e.stopPropagation();
+    const wasSelected = m.id === selectedId;
     onSelect(m.id);
     const layer = e.currentTarget.closest('.mark-layer') as HTMLElement;
     const a = frac(e, layer);
     const from: Box = { x: m.x, y: m.y, w: m.w, h: m.h };
+    // text and ticks keep their shape when resized (the text grows with the box height)
+    const keepShape = m.kind !== 'cover' && handle !== 'move';
     let box = from;
+    let moved = false;
     follow(
       e.currentTarget,
       e.pointerId,
       (ev) => {
         const b = frac(ev, layer);
+        if (Math.hypot((b.x - a.x) * rect.width, (b.y - a.y) * rect.height) > 6) moved = true;
+        if (!moved) return;
         box = dragCrop(from, handle, b.x - a.x, b.y - a.y, 1, 1, MIN);
+        if (keepShape) {
+          const w = Math.min(1 - box.x, from.w * (box.h / from.h));
+          box = { ...box, w, x: handle === 'nw' || handle === 'sw' ? from.x + from.w - w : box.x };
+        }
         setLive({ id: m.id, box });
       },
       () => {
         setLive(null);
-        if (box !== from) updateMark(page.id, m.id, box);
+        if (moved && box !== from) updateMark(page.id, m.id, box);
+        else if (!moved && wasSelected && handle === 'move' && m.kind === 'text') onEditText(m);
       },
     );
   };
@@ -130,11 +173,11 @@ export function MarkLayer({
 
   return (
     <div
-      className={editing && tool === 'cover' ? 'mark-layer drawing' : editing ? 'mark-layer editing' : 'mark-layer'}
+      className={editing && (tool === 'cover' || isPlaceTool(tool)) ? 'mark-layer drawing' : editing ? 'mark-layer editing' : 'mark-layer'}
       style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
       onPointerDown={onLayerDown}
     >
-      <MarksSvg marks={page.marks} boxOf={boxOf} />
+      <Marks marks={page.marks} pageW={rect.width} pageH={rect.height} boxOf={boxOf} />
       {drawing && (
         <svg className="marks-svg" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
           <rect x={drawing.x} y={drawing.y} width={drawing.w} height={drawing.h} fill={COVER_FILL[coverColor]} opacity={0.8} />
