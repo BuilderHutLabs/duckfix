@@ -1,10 +1,9 @@
-import { useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Box, HighlightColor, InkColor, Mark, Page } from '../../model/document';
 import { dragCrop, type CropHandle } from '../../signature/geometry';
 import { simplify, strokeBox } from '../../edit/draw';
 import { useAppStore } from '../store';
-import { strings } from '../strings';
-import type { Rect } from './pageBox';
+import type { PageBox } from './pageBox';
 import { Marks } from './MarksSvg';
 
 /** Tools that put something on the page with a tap. */
@@ -21,6 +20,8 @@ export type CoverColor = 'black' | 'white';
 const TAP_BOX = { w: 0.3, h: 0.05 };
 const MIN = 0.02;
 const CORNERS: CropHandle[] = ['nw', 'ne', 'sw', 'se'];
+/** Rough size of the bubble over a selected item (px) and its distance from the item. */
+const BUBBLE = { w: 300, h: 104, gap: 22 };
 /** Room around a thin drawing so it can still be grabbed (fraction of the page). */
 const GRAB = 0.015;
 
@@ -44,7 +45,7 @@ function hitBox(m: Mark): Box {
 }
 
 /** A mark moved by (dx, dy) page fractions. */
-function moved(m: Mark, dx: number, dy: number): Mark {
+export function moved(m: Mark, dx: number, dy: number): Mark {
   if (!hasBox(m)) return { ...m, points: m.points.map((v, i) => clamp01(v + (i % 2 ? dy : dx))) };
   if (m.kind === 'arrow') return { ...m, x: m.x + dx, y: m.y + dy };
   return { ...m, ...dragCrop(m, 'move', dx, dy, 1, 1, MIN) };
@@ -63,9 +64,10 @@ export function MarkLayer({
   onSelect,
   onPlace,
   onEditText,
+  bubble,
 }: {
   page: Page;
-  rect: Rect;
+  rect: PageBox;
   editing: boolean;
   tool: EditTool;
   coverColor: CoverColor;
@@ -79,8 +81,10 @@ export function MarkLayer({
   onPlace(tool: PlaceTool, at: { x: number; y: number }): void;
   /** A second tap on a selected text: change it. */
   onEditText(m: Extract<Mark, { kind: 'text' }>): void;
+  /** Panel shown over the selected item (colour, size, duplicate, remove). */
+  bubble?(m: Mark): ReactNode;
 }) {
-  const { addMark, updateMark, removeMark } = useAppStore();
+  const { addMark, updateMark } = useAppStore();
   /** A mark being drawn or changed, shown before it is committed (one undo step per gesture). */
   const [live, setLive] = useState<Mark | null>(null);
 
@@ -238,6 +242,16 @@ export function MarkLayer({
   const marks = page.marks ?? [];
   const shown = live ? (marks.some((m) => m.id === live.id) ? marks.map((m) => (m.id === live.id ? live : m)) : [...marks, live]) : marks;
   const pct = (v: number) => `${v * 100}%`;
+  const chosen = marks.find((m) => m.id === selectedId);
+  /** Over the item (under it near the top of the screen), kept inside the screen sideways. */
+  const bubbleAt = (b: Box) => {
+    const half = Math.min(BUBBLE.w, rect.stageW - 16) / 2;
+    const cx = rect.left + (b.x + b.w / 2) * rect.width;
+    const left = Math.min(Math.max(cx, half + 8), rect.stageW - half - 8) - rect.left;
+    const above = rect.top + b.y * rect.height - BUBBLE.h - BUBBLE.gap > 0;
+    const top = above ? b.y * rect.height - BUBBLE.gap : (b.y + b.h) * rect.height + BUBBLE.gap;
+    return { left, top, transform: above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' };
+  };
   const drawing = editing && tool !== null && tool !== 'crop';
 
   return (
@@ -282,23 +296,16 @@ export function MarkLayer({
                         />
                       );
                     })}
-                  <button
-                    type="button"
-                    className="mark-remove"
-                    aria-label={strings.removeMark}
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={() => {
-                      removeMark(page.id, m.id);
-                      onSelect(null);
-                    }}
-                  >
-                    ×
-                  </button>
                 </>
               )}
             </div>
           );
         })}
+      {editing && bubble && chosen && !live && (
+        <div className="mark-bubble-anchor" style={bubbleAt(hitBox(chosen))}>
+          {bubble(chosen)}
+        </div>
+      )}
     </div>
   );
 }

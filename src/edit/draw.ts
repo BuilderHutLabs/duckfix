@@ -1,7 +1,13 @@
 import type { HighlightColor } from '../model/document';
 
 /** Highlighter colours (see-through over the text). */
-export const HIGHLIGHT: Record<HighlightColor, string> = { yellow: '#ffd600', green: '#4cd964', pink: '#ff6fae' };
+export const HIGHLIGHT: Record<HighlightColor, string> = {
+  yellow: '#ffd600',
+  green: '#4cd964',
+  pink: '#ff6fae',
+  blue: '#4fc3f7',
+  orange: '#ffa726',
+};
 export const HIGHLIGHT_ALPHA = 0.35;
 /** Line widths as fractions of the page width. */
 export const PEN_FRAC = 0.004;

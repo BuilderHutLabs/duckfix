@@ -78,6 +78,32 @@ describe('page preview', () => {
     expect(dialog(2)).toBeNull();
   });
 
+  it('a finger swipe sideways walks the pages; a short or up-down move does not', () => {
+    const store = setup(docWithFlags(3));
+    render(
+      <AppStoreProvider store={store}>
+        <PagePreview pageIds={['p1', 'p2', 'p3']} />
+      </AppStoreProvider>,
+    );
+    act(() => store.openPreview('p1'));
+    const swipe = (x0: number, y0: number, x1: number, y1: number) => {
+      const stage = document.querySelector('.preview-stage') as HTMLElement;
+      fireEvent.pointerDown(stage, { clientX: x0, clientY: y0, pointerId: 1, isPrimary: true });
+      fireEvent.pointerUp(stage, { clientX: x1, clientY: y1, pointerId: 1, isPrimary: true });
+    };
+    swipe(300, 300, 280, 300); // too short
+    expect(dialog(1)).not.toBeNull();
+    swipe(300, 300, 200, 500); // mostly down
+    expect(dialog(1)).not.toBeNull();
+    swipe(300, 300, 150, 310); // to the left: next page
+    expect(dialog(2)).not.toBeNull();
+    swipe(100, 300, 300, 290); // to the right: back
+    expect(dialog(1)).not.toBeNull();
+    swipe(100, 300, 300, 290); // nothing before the first page
+    expect(dialog(1)).not.toBeNull();
+    expect(screen.getByText('1 / 3')).toBeTruthy();
+  });
+
   it('‹ › walk the visible pages and are disabled at the ends', () => {
     const store = setup(docWithFlags(3));
     render(

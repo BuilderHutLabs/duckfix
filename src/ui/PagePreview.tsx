@@ -1,15 +1,16 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from 'react';
 import { effectiveRotation } from '../model/document';
 import { releaseCanvas, renderPage } from '../imaging/render';
 import { applyCanvasFilter } from '../imaging/filter';
 import type { ThumbnailCache } from './thumbnails';
 import { useAppStore } from './store';
 import { strings } from './strings';
-import { IconChevronLeft, IconChevronRight, IconClose } from './icons';
+import { IconChevronLeft, IconChevronRight, IconClose, IconRedo, IconUndo } from './icons';
 import { StampLayer } from './StampLayer';
 import { usePageBox } from './edit/pageBox';
-import { MarkLayer, type CoverColor, type EditTool } from './edit/MarkLayer';
-import { EditTools } from './edit/EditTools';
+import { MarkLayer, moved, type CoverColor, type EditTool } from './edit/MarkLayer';
+import { EditTools, type ToolGroup } from './edit/EditTools';
+import { MarkBubble } from './edit/MarkBubble';
 import { CropFrame } from './edit/CropFrame';
 import { cropClip } from './edit/MarksSvg';
 import { TextSheet } from './TextSheet';
@@ -33,6 +34,8 @@ interface Props {
 /** A touch hold opens the preview under the finger; the click that follows the touchend must not hit it. */
 const GHOST_CLICK_MS = 400;
 const noSubscribe = () => () => {};
+/** A sideways finger move longer than this (px), and clearly more sideways than up/down, turns the page. */
+const SWIPE_PX = 60;
 
 /** Long side of the sharp render: enough for the screen at its pixel density, bounded for iOS memory. */
 function previewMaxSide(): number {
@@ -57,11 +60,15 @@ function measureText(line: string, px: number): number {
 
 /** Full-screen view of one page, rotated the way it will be saved. */
 export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
-  const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp, setCrop, addMark, updateMark } = useAppStore();
+  const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp, setCrop, addMark, updateMark, removeMark, undo, redo, canUndo, canRedo } =
+    useAppStore();
   const [signing, setSigning] = useState(false);
   const [reading, setReading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [tool, setTool] = useState<EditTool>(null);
+  const [group, setGroup] = useState<ToolGroup>('write');
+  const [folded, setFolded] = useState(false);
+  const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
   const [coverColor, setCoverColor] = useState<CoverColor>('black');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [style, setStyle] = useState<EditStyle>(loadEditStyle);
@@ -85,6 +92,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     setTool(null);
     setSelectedId(null);
     setWriting(null);
+    setFolded(false);
   }, [pageId]);
   const angleNow = page ? effectiveRotation(page) + page.skewDeg : 0;
   // measured again when the picture changes (miniature → sharp) and when the tool strip takes room
@@ -226,6 +234,28 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     setWriting(null);
   };
 
+  const duplicate = (m: Mark) => {
+    const id = crypto.randomUUID();
+    addMark(page.id, { ...moved(m, 0.03, 0.03), id } as Mark);
+    setSelectedId(id);
+  };
+
+  /** A finger swipe sideways on the page (not while editing or zoomed in) shows the next / previous page. */
+  const onSwipeStart = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (editing || !e.isPrimary || (e.target !== e.currentTarget && e.target !== imgRef.current)) return;
+    swipe.current = { x: e.clientX, y: e.clientY, id: e.pointerId };
+  };
+  const onSwipeEnd = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const s = swipe.current;
+    swipe.current = null;
+    if (!s || s.id !== e.pointerId || (window.visualViewport?.scale ?? 1) > 1.01) return;
+    const dx = e.clientX - s.x;
+    const dy = e.clientY - s.y;
+    if (Math.abs(dx) < SWIPE_PX || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    if (dx < 0 && nextId) openPreview(nextId);
+    else if (dx > 0 && prevId) openPreview(prevId);
+  };
+
   const leaveEdit = () => {
     setEditing(false);
     setTool(null);
@@ -247,33 +277,46 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
       tabIndex={-1}
     >
       <div className="preview-bar">
-        <button type="button" className="btn btn-icon preview-btn" aria-label={strings.close} onClick={guarded(closePreview)}>
-          <IconClose />
-        </button>
+        {editing ? (
+          <div className="preview-bar-side">
+            <button type="button" className="btn btn-icon preview-btn" aria-label={strings.undo} disabled={!canUndo} onClick={undo}>
+              <IconUndo />
+            </button>
+            <button type="button" className="btn btn-icon preview-btn" aria-label={strings.redo} disabled={!canRedo} onClick={redo}>
+              <IconRedo />
+            </button>
+          </div>
+        ) : (
+          <div className="preview-bar-side">
+            <button type="button" className="btn btn-icon preview-btn" aria-label={strings.close} onClick={guarded(closePreview)}>
+              <IconClose />
+            </button>
+          </div>
+        )}
         <span className="preview-title" aria-hidden="true">
           {strings.page(number)}
+          {pageIds.length > 1 && (
+            <small className="preview-count">
+              {index + 1} / {pageIds.length}
+            </small>
+          )}
         </span>
-        {editing ? (
-          <button type="button" className="btn btn-plain preview-rotate preview-done" onClick={leaveEdit}>
-            {strings.editDone}
-          </button>
-        ) : (
-          <>
-            <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => setReading(true))}>
-              {strings.copyText}
+        <div className="preview-bar-side end">
+          {editing && (
+            <button type="button" className="btn preview-done" onClick={leaveEdit}>
+              {strings.editDone}
             </button>
-            <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => setEditing(true))}>
-              {strings.edit}
-            </button>
-            <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => rotate([page.id], 90, () => (rect && rect.height > 0 ? rect.width / rect.height : undefined)))}>
-              {strings.rotate}
-            </button>
-          </>
-        )}
+          )}
+        </div>
       </div>
       <div
         className="preview-stage"
         ref={stageRef}
+        onPointerDown={onSwipeStart}
+        onPointerUp={onSwipeEnd}
+        onPointerCancel={() => {
+          swipe.current = null;
+        }}
         style={page.crop && rect && tool !== 'crop' ? { clipPath: cropClip(page.crop, rect, rect.stageW, rect.stageH) } : undefined}
       >
         {src && (
@@ -299,6 +342,24 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             onSelect={setSelectedId}
             onPlace={placeMark}
             onEditText={(m: Extract<Mark, { kind: 'text' }>) => setWriting({ id: m.id, text: m.text })}
+            bubble={(m) => (
+              <MarkBubble
+                mark={m}
+                onInk={(ink) => changeStyle({ ink })}
+                onHighlight={(highlight) => changeStyle({ highlight })}
+                onCover={(c) => {
+                  setCoverColor(c);
+                  updateMark(page.id, m.id, { color: c });
+                }}
+                onSize={(size) => changeStyle({ size })}
+                onEditText={() => m.kind === 'text' && setWriting({ id: m.id, text: m.text })}
+                onDuplicate={() => duplicate(m)}
+                onRemove={() => {
+                  removeMark(page.id, m.id);
+                  setSelectedId(null);
+                }}
+              />
+            )}
           />
         )}
         <StampLayer page={page} rect={rect} />
@@ -313,6 +374,13 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             setTool(t);
             setSelectedId(null);
           }}
+          group={group}
+          onGroup={(g) => {
+            if (g !== group) setTool(null);
+            setGroup(g);
+          }}
+          folded={folded}
+          onFold={setFolded}
           coverColor={coverColor}
           onCoverColor={setCoverColor}
           ink={style.ink}
@@ -345,24 +413,48 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
       )}
       {!editing && (
         <>
-      <button
-        type="button"
-        className="btn btn-icon preview-nav preview-prev"
-        aria-label={strings.previousPage}
-        disabled={!prevId}
-        onClick={guarded(() => prevId && openPreview(prevId))}
-      >
-        <IconChevronLeft />
-      </button>
-      <button
-        type="button"
-        className="btn btn-icon preview-nav preview-next"
-        aria-label={strings.nextPage}
-        disabled={!nextId}
-        onClick={guarded(() => nextId && openPreview(nextId))}
-      >
-        <IconChevronRight />
-      </button>
+          <div className="preview-actions">
+            <button
+              type="button"
+              className="preview-action"
+              onClick={guarded(() => rotate([page.id], 90, () => (rect && rect.height > 0 ? rect.width / rect.height : undefined)))}
+            >
+              <span className="preview-action-icon" aria-hidden="true">
+                ↻
+              </span>
+              {strings.rotate}
+            </button>
+            <button type="button" className="preview-action" onClick={guarded(() => setReading(true))}>
+              <span className="preview-action-icon" aria-hidden="true">
+                Aa
+              </span>
+              {strings.copyText}
+            </button>
+            <button type="button" className="preview-action primary" onClick={guarded(() => setEditing(true))}>
+              <span className="preview-action-icon" aria-hidden="true">
+                ✎
+              </span>
+              {strings.edit}
+            </button>
+          </div>
+          <button
+            type="button"
+            className="btn btn-icon preview-nav preview-prev"
+            aria-label={strings.previousPage}
+            disabled={!prevId}
+            onClick={guarded(() => prevId && openPreview(prevId))}
+          >
+            <IconChevronLeft />
+          </button>
+          <button
+            type="button"
+            className="btn btn-icon preview-nav preview-next"
+            aria-label={strings.nextPage}
+            disabled={!nextId}
+            onClick={guarded(() => nextId && openPreview(nextId))}
+          >
+            <IconChevronRight />
+          </button>
         </>
       )}
     </div>

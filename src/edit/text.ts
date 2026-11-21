@@ -1,7 +1,15 @@
 import type { InkColor } from '../model/document';
 
 /** Ink colours of "Edytuj" (text, ticks, pen). */
-export const INK: Record<InkColor, string> = { black: '#111111', blue: '#1a3a9c', red: '#c62828' };
+export const INK: Record<InkColor, string> = {
+  black: '#111111',
+  blue: '#1a3a9c',
+  red: '#c62828',
+  green: '#2e7d32',
+  orange: '#ef6c00',
+  purple: '#6a1b9a',
+  white: '#ffffff',
+};
 
 /** Font height as a fraction of the page height for the three sizes. */
 export const FONT_FRAC = { 1: 0.016, 2: 0.024, 3: 0.036 } as const;

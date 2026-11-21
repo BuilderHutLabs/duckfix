@@ -51,11 +51,15 @@ export function usePageBox(img: RefObject<HTMLImageElement>, stage: RefObject<HT
     const el = img.current;
     el?.addEventListener('load', measure);
     window.addEventListener('resize', measure);
+    // the tool panel opening or folding changes the stage without a window resize
+    const ro = typeof ResizeObserver !== 'undefined' && stage.current ? new ResizeObserver(measure) : null;
+    if (ro && stage.current) ro.observe(stage.current);
     // the zoom-in animation of the preview changes the box for a moment
     const t = setTimeout(measure, 400);
     return () => {
       el?.removeEventListener('load', measure);
       window.removeEventListener('resize', measure);
+      ro?.disconnect();
       clearTimeout(t);
     };
   }, [img, stage, angleDeg, key]);

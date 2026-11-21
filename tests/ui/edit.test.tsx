@@ -30,6 +30,8 @@ function openPreview(doc = docWithFlags(1)) {
 }
 
 const marks = (store: ReturnType<typeof createAppStore>) => store.getState().doc.pages[0].marks ?? [];
+/** Opens a group of tools in the edit panel (Pisz is open at first). */
+const openGroup = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
 
 describe('Edytuj', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -39,6 +41,8 @@ describe('Edytuj', () => {
     const preview = screen.getByRole('dialog', { name: strings.preview(1) });
     expect(within(preview).queryByRole('button', { name: strings.sign })).toBeNull(); // moved into the tools
     fireEvent.click(within(preview).getByRole('button', { name: strings.edit }));
+    expect(within(preview).getByRole('button', { name: strings.toolWrite })).toBeTruthy();
+    fireEvent.click(within(preview).getByRole('button', { name: strings.groupHide }));
     expect(within(preview).getByRole('button', { name: strings.cover })).toBeTruthy();
     expect(within(preview).getByRole('button', { name: strings.sign })).toBeTruthy();
     fireEvent.click(within(preview).getByRole('button', { name: strings.editDone }));
@@ -48,6 +52,7 @@ describe('Edytuj', () => {
   it('Zasłoń: dragging over the page adds a black cover there (one undo step)', () => {
     const store = openPreview();
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    openGroup(strings.groupHide);
     fireEvent.click(screen.getByRole('button', { name: strings.cover }));
     const layer = document.querySelector('.mark-layer') as HTMLElement;
     fireEvent.pointerDown(layer, { clientX: 50, clientY: 70, pointerId: 1 });
@@ -67,6 +72,7 @@ describe('Edytuj', () => {
   it('white cover: choose Biały first', () => {
     const store = openPreview();
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    openGroup(strings.groupHide);
     fireEvent.click(screen.getByRole('button', { name: strings.cover }));
     fireEvent.click(screen.getByRole('button', { name: strings.coverWhite }));
     const layer = document.querySelector('.mark-layer') as HTMLElement;
@@ -95,6 +101,7 @@ describe('Edytuj', () => {
   it('Kadruj: dragging a corner of the frame crops the page (one undo step per drag)', () => {
     const store = openPreview();
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    openGroup(strings.groupHide);
     fireEvent.click(screen.getByRole('button', { name: strings.pageCrop }));
     const se = document.querySelector('.crop-frame [data-handle="se"]') as HTMLElement;
     fireEvent.pointerDown(se, { clientX: 500, clientY: 700, pointerId: 1 });
@@ -111,6 +118,7 @@ describe('Edytuj', () => {
   it('"Dla wszystkich stron" gives every page the same crop; "Bez kadrowania" takes it off this page', () => {
     const store = openPreview(setCrop(docWithFlags(3), ['p1'], { x: 0.1, y: 0.1, w: 0.8, h: 0.8 }));
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    openGroup(strings.groupHide);
     fireEvent.click(screen.getByRole('button', { name: strings.pageCrop }));
     fireEvent.click(screen.getByRole('button', { name: strings.pageCropAll }));
     expect(store.getState().doc.pages.map((p) => p.crop?.w)).toEqual([0.8, 0.8, 0.8]);
@@ -147,10 +155,13 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     fireEvent.pointerUp(el, { clientX: x, clientY: y, pointerId: 1 });
   };
   const layer = () => document.querySelector('.mark-layer') as HTMLElement;
+  const DRAW = [strings.toolPen, strings.toolHighlight, strings.toolArrow, strings.toolRect, strings.toolEllipse];
   const startTool = (name: string) => {
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    if (DRAW.includes(name)) openGroup(strings.groupDraw);
     fireEvent.click(screen.getByRole('button', { name }));
   };
+  const bubble = () => screen.getByRole('group', { name: strings.selectedItem });
 
   it('Wpisz: tap the page, type, Wstaw → the text sits where you tapped', () => {
     const store = openPreview();
@@ -177,6 +188,16 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     expect(m.x + m.w / 2).toBeCloseTo(0.5);
   });
 
+  it('more inks: a green cross, a purple text colour is remembered', () => {
+    const store = openPreview();
+    startTool(strings.toolCross);
+    fireEvent.click(screen.getByRole('button', { name: strings.inkGreen }));
+    tap(layer(), 250, 350);
+    expect(marks(store)[0]).toMatchObject({ kind: 'cross', color: 'green' });
+    fireEvent.click(screen.getByRole('button', { name: strings.inkPurple }));
+    expect(JSON.parse(localStorage.getItem(Object.keys(localStorage).find((k) => k.includes('edit-style'))!)!).ink).toBe('purple');
+  });
+
   it('Krzyżyk puts a cross', () => {
     const store = openPreview();
     startTool(strings.toolCross);
@@ -194,6 +215,48 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     fireEvent.click(screen.getByRole('button', { name: strings.toolTick })); // tool off
     tap(layer(), 50, 600);
     expect(document.querySelector('.mark-item.selected')).toBeNull();
+  });
+
+  it('the bubble over a selected item: colour, size, duplicate, remove', () => {
+    const doc = addMark(docWithFlags(1), 'p1', { id: 'k1', kind: 'check', color: 'black', x: 0.1, y: 0.1, w: 0.05, h: 0.04 });
+    const store = openPreview(doc);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    expect(screen.queryByRole('group', { name: strings.selectedItem })).toBeNull();
+    tap(document.querySelector('[data-mark="k1"]')!, 60, 80);
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.inkGreen }));
+    expect(marks(store)[0]).toMatchObject({ color: 'green' });
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.sizeLarge }));
+    expect((marks(store)[0] as { w: number }).w).toBeCloseTo(0.07);
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.duplicate }));
+    expect(marks(store)).toHaveLength(2);
+    const [a, b] = marks(store) as Array<{ id: string; x: number; color: string }>;
+    expect(b.id).not.toBe(a.id);
+    expect(b.x).toBeCloseTo(a.x + 0.03);
+    expect(b.color).toBe('green');
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.removeMark }));
+    expect(marks(store)).toHaveLength(1);
+    expect(screen.queryByRole('group', { name: strings.selectedItem })).toBeNull();
+  });
+
+  it('a cover in the bubble offers black and white only', () => {
+    const doc = addMark(docWithFlags(1), 'p1', { id: 'c1', kind: 'cover', color: 'black', x: 0.1, y: 0.1, w: 0.3, h: 0.1 });
+    const store = openPreview(doc);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    tap(document.querySelector('[data-mark="c1"]')!, 60, 80);
+    expect(within(bubble()).queryByRole('button', { name: strings.inkRed })).toBeNull();
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.coverWhite }));
+    expect(marks(store)[0]).toMatchObject({ color: 'white' });
+  });
+
+  it('the tool panel folds away and comes back; the tool stays on', () => {
+    const store = openPreview();
+    startTool(strings.toolTick);
+    fireEvent.click(screen.getByRole('button', { name: strings.toolsHide }));
+    expect(screen.queryByRole('button', { name: strings.toolTick })).toBeNull();
+    tap(layer(), 250, 350);
+    expect(marks(store)[0]).toMatchObject({ kind: 'check' });
+    fireEvent.click(screen.getByRole('button', { name: strings.toolsShow }));
+    expect(screen.getByRole('button', { name: strings.toolTick }).getAttribute('aria-pressed')).toBe('true');
   });
 
   it('Data writes today\'s date with one tap', () => {
@@ -224,7 +287,7 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     const store = openPreview(doc);
     startTool(strings.toolTick);
     tap(document.querySelector('[data-mark="k1"]')!, 60, 80);
-    fireEvent.click(screen.getByRole('button', { name: strings.inkBlue }));
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.inkBlue }));
     expect(marks(store)[0]).toMatchObject({ color: 'blue' });
   });
 

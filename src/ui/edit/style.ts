@@ -1,5 +1,5 @@
 import { storageKey } from '../../config';
-import type { HighlightColor, InkColor } from '../../model/document';
+import { HIGHLIGHT_COLORS, INK_COLORS, type HighlightColor, type InkColor } from '../../model/document';
 import type { MarkSize } from '../../edit/text';
 
 export interface EditStyle {
@@ -16,9 +16,9 @@ export function loadEditStyle(): EditStyle {
   try {
     const v = JSON.parse(localStorage.getItem(KEY) ?? 'null') as Partial<EditStyle> | null;
     return {
-      ink: v?.ink === 'blue' || v?.ink === 'red' ? v.ink : 'black',
+      ink: INK_COLORS.includes(v?.ink as InkColor) ? (v!.ink as InkColor) : 'black',
       size: v?.size === 1 || v?.size === 3 ? v.size : 2,
-      highlight: v?.highlight === 'green' || v?.highlight === 'pink' ? v.highlight : 'yellow',
+      highlight: HIGHLIGHT_COLORS.includes(v?.highlight as HighlightColor) ? (v!.highlight as HighlightColor) : 'yellow',
     };
   } catch {
     return DEFAULT;

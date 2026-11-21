@@ -34,8 +34,10 @@ export interface Box {
   h: number;
 }
 
-export type InkColor = 'black' | 'blue' | 'red';
-export type HighlightColor = 'yellow' | 'green' | 'pink';
+export const INK_COLORS = ['black', 'blue', 'red', 'green', 'orange', 'purple', 'white'] as const;
+export type InkColor = (typeof INK_COLORS)[number];
+export const HIGHLIGHT_COLORS = ['yellow', 'green', 'pink', 'blue', 'orange'] as const;
+export type HighlightColor = (typeof HIGHLIGHT_COLORS)[number];
 
 /** An item on the page in "Edytuj"; same frame as signatures. */
 export type Mark =
