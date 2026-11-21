@@ -285,6 +285,6 @@ describe('home', () => {
       fireEvent.change(input, { target: { files: [new File(['x'], 'a.pdf')] } });
     });
     expect(await screen.findByText(strings.errors.encrypted)).toBeTruthy();
-    expect(screen.getByRole('button', { name: strings.open })).toBeTruthy();
+    expect(screen.getByRole('button', { name: strings.homeOpen })).toBeTruthy();
   });
 });

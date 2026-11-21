@@ -34,7 +34,7 @@ describe('camera scan', () => {
   it('Home offers "Zrób zdjęcie" that opens the rear camera', () => {
     render(<App store={createAppStore(fakeDeps())} />);
     const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
-    fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
+    fireEvent.click(screen.getByRole('button', { name: strings.homeScan }));
     expect(click).toHaveBeenCalled();
     expect(cameraInput().getAttribute('capture')).toBe('environment');
     expect(cameraInput().getAttribute('accept')).toBe('image/*');
@@ -176,7 +176,7 @@ describe('built-in camera', () => {
   it('"Zrób zdjęcie" opens the camera inside the app (the page is not left); ✕ turns it off', async () => {
     render(<App store={createAppStore(fakeDeps())} />);
     const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
-    fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
+    fireEvent.click(screen.getByRole('button', { name: strings.homeScan }));
     expect(click).not.toHaveBeenCalled();
     const cam = await screen.findByRole('dialog', { name: strings.cameraTitle });
     await waitFor(() => expect((screen.getByRole('button', { name: strings.cameraShoot }) as HTMLButtonElement).disabled).toBe(false));
@@ -190,7 +190,7 @@ describe('built-in camera', () => {
 
   it('the shutter takes the picture and goes on to the crop screen', async () => {
     render(<App store={createAppStore(fakeDeps())} />);
-    fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
+    fireEvent.click(screen.getByRole('button', { name: strings.homeScan }));
     await screen.findByRole('dialog', { name: strings.cameraTitle });
     const video = document.querySelector('video') as HTMLVideoElement;
     Object.defineProperty(video, 'videoWidth', { value: 1600 });
@@ -208,7 +208,7 @@ describe('built-in camera', () => {
   it('when the camera cannot start (no permission), the phone camera is offered', async () => {
     (navigator.mediaDevices.getUserMedia as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('NotAllowedError'));
     render(<App store={createAppStore(fakeDeps())} />);
-    fireEvent.click(screen.getByRole('button', { name: strings.takePhoto }));
+    fireEvent.click(screen.getByRole('button', { name: strings.homeScan }));
     expect(await screen.findByText(strings.cameraFailed)).toBeTruthy();
     const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});
     fireEvent.click(screen.getAllByRole('button', { name: strings.cameraPhone })[0]);

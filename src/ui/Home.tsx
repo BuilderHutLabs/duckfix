@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { DuckLogo } from './DuckLogo';
 import { SPLASH_TOTAL_MS, isStandaloneLaunch } from './Splash';
 import { useAppStore } from './store';
@@ -12,6 +12,82 @@ import { IconCamera } from './icons';
 export const FILE_ACCEPT = 'application/pdf,image/*';
 
 let introPlayed = false;
+/** The panel comes up when the "Kwa kwa!" bubble is out (the quack starts the bubble at ~0.4 s). */
+const PANEL_AFTER_QUACK_MS = 1300;
+
+const IconFolder = () => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+  </svg>
+);
+const IconHistory = () => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+    <path d="M3 3v5h5" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+);
+
+/** One big row of the home panel: icon, name, a short hint under it, an arrow. */
+function HomeAction({
+  id,
+  icon,
+  label,
+  hint,
+  primary = false,
+  disabled = false,
+  onClick,
+}: {
+  id: string;
+  icon: ReactNode;
+  label: string;
+  hint: string;
+  primary?: boolean;
+  disabled?: boolean;
+  onClick(): void;
+}) {
+  return (
+    <button
+      type="button"
+      className={primary ? 'home-action primary' : 'home-action'}
+      aria-label={label}
+      aria-describedby={`home-${id}-hint`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="home-action-icon">{icon}</span>
+      <span className="home-action-text">
+        <span className="home-action-label">{label}</span>
+        <span className="home-action-hint" id={`home-${id}-hint`}>
+          {hint}
+        </span>
+      </span>
+      <span className="home-action-arrow" aria-hidden="true">
+        ›
+      </span>
+    </button>
+  );
+}
 
 export function Home() {
   const { open, setScanPhoto, busy, restorable, restore, discardStored, openDiagnostics } = useAppStore();
@@ -23,6 +99,10 @@ export function Home() {
   useEffect(() => {
     introPlayed = true;
   }, []);
+
+  // the panel slides up from the bottom once the duck has said "Kwa kwa!" (first start), else at once
+  const panelDelay = intro ? (isStandaloneLaunch() ? SPLASH_TOTAL_MS : 0) + PANEL_AFTER_QUACK_MS : 80;
+  const pickFiles = () => input.current?.click();
 
   return (
     <main className="home">
@@ -36,43 +116,53 @@ export function Home() {
       <div className="home-top">
         <Settings />
       </div>
-      {/* 5 taps on the title open the diagnostics screen */}
-      <DuckLogo autoplay={intro} delayMs={isStandaloneLaunch() ? SPLASH_TOTAL_MS : 0} />
-      <h1 className="home-title" onClick={onTitleTap}>
-        {strings.appName}
-      </h1>
-      <p className="home-subtitle">{strings.appDescription}</p>
-      <p className="home-privacy">
-        <span aria-hidden="true">🔒</span>
-        {strings.privacyNote}
-      </p>
-      {restorable ? (
-        <div className="home-restore">
-          <button type="button" className="btn btn-primary btn-huge" onClick={restore}>
-            {strings.restoreSession}
-          </button>
-          <button type="button" className="btn btn-plain" onClick={discardStored}>
-            {strings.startOver}
-          </button>
-        </div>
-      ) : (
-        <button type="button" className="btn btn-primary btn-huge" disabled={busy === 'opening'} onClick={() => input.current?.click()}>
-          {busy === 'opening' ? strings.opening : strings.open}
-        </button>
-      )}
-      {!restorable && <p className="home-hint">{strings.mergeHint}</p>}
-      {!restorable && (
-        <button type="button" className="btn btn-camera" disabled={busy === 'opening'} onClick={openCamera}>
-          <IconCamera size={20} />
-          {strings.takePhoto}
-        </button>
-      )}
+      <div className="home-hero">
+        {/* 5 taps on the title open the diagnostics screen */}
+        <DuckLogo autoplay={intro} delayMs={isStandaloneLaunch() ? SPLASH_TOTAL_MS : 0} />
+        <h1 className="home-title" onClick={onTitleTap}>
+          {strings.appName}
+        </h1>
+        <p className="home-subtitle">{strings.homeTagline}</p>
+      </div>
+      <section className="home-panel" style={{ animationDelay: `${panelDelay}ms` }}>
+        <span className="home-panel-grip" aria-hidden="true" />
+        <HomeAction
+          id="scan"
+          primary
+          icon={<IconCamera size={22} />}
+          label={strings.homeScan}
+          hint={strings.homeScanHint}
+          disabled={busy === 'opening'}
+          onClick={openCamera}
+        />
+        <HomeAction
+          id="open"
+          icon={<IconFolder />}
+          label={busy === 'opening' ? strings.opening : strings.homeOpen}
+          hint={strings.mergeHint}
+          disabled={busy === 'opening'}
+          onClick={pickFiles}
+        />
+        {restorable && (
+          <>
+            <HomeAction
+              id="restore"
+              icon={<IconHistory />}
+              label={strings.restoreSession}
+              hint={strings.homeRestoreHint}
+              onClick={restore}
+            />
+            <button type="button" className="btn btn-plain home-start-over" onClick={discardStored}>
+              {strings.startOver}
+            </button>
+          </>
+        )}
+        <p className="home-privacy">
+          <span aria-hidden="true">🔒</span>
+          {strings.privacyNote}
+        </p>
+      </section>
       <DuckTour delayed={isStandaloneLaunch()} />
-      <ul className="home-steps">
-        {strings.steps.map((step) => (
-          <li key={step}>{step}</li>
-        ))}
-      </ul>
       <input
         ref={input}
         className="visually-hidden"

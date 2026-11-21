@@ -76,7 +76,8 @@ describe('persistent session', () => {
 
     const back = await screen.findByRole('button', { name: strings.restoreSession });
     expect(screen.getByRole('button', { name: strings.startOver })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: strings.open })).toBeNull();
+    // scanning or opening something new stays at hand
+    expect(screen.getByRole('button', { name: strings.homeOpen })).toBeTruthy();
 
     fireEvent.click(back);
     await waitFor(() => expect(deps.analyzePages).toHaveBeenCalledTimes(1));
@@ -85,11 +86,11 @@ describe('persistent session', () => {
     expect(screen.getByRole('button', { name: strings.save })).toBeTruthy(); // review toolbar
   });
 
-  it('"Zacznij od nowa" clears the stored session and shows the open button', async () => {
+  it('"Zacznij od nowa" clears the stored session and hides "Wróć"', async () => {
     const { box, session } = memorySession(stored);
     render(<App store={createAppStore(fakeDeps({ session }))} />);
     fireEvent.click(await screen.findByRole('button', { name: strings.startOver }));
-    expect(screen.getByRole('button', { name: strings.open })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: strings.restoreSession })).toBeNull();
     expect(session.clear).toHaveBeenCalled();
     await waitFor(() => expect(box.stored).toBeNull());
   });
