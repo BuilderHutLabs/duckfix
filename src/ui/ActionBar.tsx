@@ -8,12 +8,21 @@ export function ActionBar() {
   if (s.selecting) {
     const n = s.selection.size;
     return (
-      <footer className="action-bar">
+      <footer className="action-bar action-bar-select">
         <button type="button" className="btn" disabled={n === 0} onClick={() => s.rotate(s.selection, 90)}>
           {strings.rotate}
         </button>
         <button type="button" className="btn" disabled={n === 0} onClick={() => s.openFilterSheet(s.selection)}>
           {strings.pageLook}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          aria-label={strings.saveSelected}
+          disabled={n === 0}
+          onClick={() => s.openSaveSheet(s.selection)}
+        >
+          {strings.saveShort}
         </button>
         <button type="button" className="btn btn-danger" disabled={n === 0} onClick={() => s.remove(s.selection)}>
           {strings.remove}

@@ -20,18 +20,19 @@ export function pdfFile(bytes: Uint8Array, name: string): File {
  * Opens the share sheet, or downloads when file sharing is unsupported. Call it straight from a
  * tap: navigator.share needs a fresh user activation (it expires during a long export).
  */
-export async function shareOrDownload(file: File): Promise<ShareResult> {
+export async function shareOrDownload(fileOrFiles: File | File[]): Promise<ShareResult> {
+  const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
   const nav = typeof navigator === 'undefined' ? undefined : navigator;
-  if (nav?.canShare?.({ files: [file] }) && nav.share) {
+  if (nav?.canShare?.({ files }) && nav.share) {
     try {
-      await nav.share({ files: [file], title: file.name });
+      await nav.share({ files, title: files[0].name });
       return 'shared';
     } catch (e) {
       if ((e as { name?: string })?.name === 'AbortError') return 'cancelled';
       // any other failure: fall back to download
     }
   }
-  downloadFile(file);
+  files.forEach(downloadFile);
   return 'downloaded';
 }
 

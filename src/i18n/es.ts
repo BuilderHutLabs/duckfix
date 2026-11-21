@@ -46,6 +46,10 @@ export const es: Strings = {
   smallerFileHint: 'Las páginas se guardan como imágenes más ligeras. Ideal para correo y trámites.',
   searchableText: 'Texto con búsqueda',
   searchableTextHint: 'Reconoce el texto para que puedas buscarlo y copiarlo. Tarda más.',
+  fileName: 'Nombre del archivo',
+  saveSelected: 'Guardar seleccionadas',
+  saveShort: 'Guardar',
+  format: 'Formato',
   saveConfirm: 'Guardar',
   cancel: 'Cancelar',
 

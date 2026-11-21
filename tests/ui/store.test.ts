@@ -200,7 +200,7 @@ describe('app store', () => {
     // the share sheet needs a fresh user activation: nothing is shared until the user taps again
     expect(deps.share).not.toHaveBeenCalled();
     expect(store.getState()).toMatchObject({ busy: null, exportProgress: null });
-    const file = store.getState().exportReady!;
+    const file = store.getState().exportReady as File;
     expect(file.name).toBe('skan (poprawiony).pdf');
     expect(file.type).toBe('application/pdf');
 

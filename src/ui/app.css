@@ -1563,3 +1563,36 @@ body.splashing .home .duck {
 .preview .sheet .btn-camera {
   color: var(--accent);
 }
+.sheet-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+.sheet-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: var(--fill);
+}
+.sheet-name input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 16px;
+  outline: none;
+}
+.sheet-ext {
+  color: var(--text-2);
+}
+.sheet-format {
+  margin-bottom: 4px;
+}
+.action-bar-select .btn {
+  font-size: 15px;
+}

@@ -101,7 +101,7 @@ describe('searchable text', () => {
 
   it('when OCR cannot start (offline, first German use) the file is still saved and the user is told', async () => {
     const { store, deps } = setup({ createOcr: vi.fn(async () => { throw new Error('offline'); }) });
-    await act(() => store.export({ compress: false, ocr: true }));
+    await act(() => store.export({ compress: false, ocr: true, format: 'pdf' }));
     expect(deps.download).toHaveBeenCalledTimes(1);
     expect(vi.mocked(deps.exportPdf).mock.calls[0][3]).toMatchObject({ ocr: null });
     expect(store.getState().notice).toContain(strings.ocrUnavailable);
@@ -113,5 +113,45 @@ describe('formatSize', () => {
     expect(formatSize(1_200_000, 'pl')).toBe('1,2 MB');
     expect(formatSize(1_200_000, 'en')).toBe('1.2 MB');
     expect(formatSize(420_000, 'pl')).toBe('420 kB');
+  });
+});
+
+describe('save sheet: name, chosen pages, JPG', () => {
+  it('the file name can be changed before saving', async () => {
+    const { deps } = setup();
+    fireEvent.click(saveButton());
+    const name = screen.getByRole('textbox', { name: strings.fileName }) as HTMLInputElement;
+    expect(name.value).toBe('skan (poprawiony)');
+    fireEvent.change(name, { target: { value: 'Umowa najmu' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm }));
+    await waitFor(() => expect(deps.download).toHaveBeenCalled());
+    expect(vi.mocked(deps.download).mock.calls[0][0].name).toBe('Umowa najmu.pdf');
+  });
+
+  it('select mode: "Zapisz zaznaczone" saves only the chosen pages as their own file', async () => {
+    const { deps, store } = setup();
+    act(() => {
+      store.toggleSelecting();
+      store.toggleSelected('p2');
+    });
+    fireEvent.click(screen.getByRole('button', { name: strings.saveSelected }));
+    expect(screen.getByText(strings.pageLookCount(1))).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm }));
+    await waitFor(() => expect(deps.exportPdf).toHaveBeenCalled());
+    const doc = vi.mocked(deps.exportPdf).mock.calls[0][0];
+    expect(doc.pages.map((p) => p.id)).toEqual(['p2']);
+  });
+
+  it('JPG: every page becomes a picture, named after the file', async () => {
+    const exportImages = vi.fn(async () => [new Blob(['a']), new Blob(['b'])]);
+    const { deps } = setup({ exportImages });
+    fireEvent.click(saveButton());
+    fireEvent.click(screen.getByRole('button', { name: 'JPG' }));
+    fireEvent.change(screen.getByRole('textbox', { name: strings.fileName }), { target: { value: 'Faktura' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm }));
+    await waitFor(() => expect(deps.download).toHaveBeenCalledTimes(2));
+    expect(deps.exportPdf).not.toHaveBeenCalled();
+    expect(vi.mocked(deps.download).mock.calls.map(([f]) => f.name)).toEqual(['Faktura 1.jpg', 'Faktura 2.jpg']);
+    expect(vi.mocked(deps.download).mock.calls[0][0].type).toBe('image/jpeg');
   });
 });

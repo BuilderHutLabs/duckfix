@@ -46,6 +46,10 @@ export const en: Strings = {
   smallerFileHint: 'Pages are saved as lighter images. Good for email and forms.',
   searchableText: 'Searchable text',
   searchableTextHint: 'Recognizes the text so you can search and copy it. Takes longer.',
+  fileName: 'File name',
+  saveSelected: 'Save selected',
+  saveShort: 'Save',
+  format: 'Format',
   saveConfirm: 'Save',
   cancel: 'Cancel',
 

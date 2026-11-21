@@ -53,6 +53,10 @@ export const pl = {
   smallerFileHint: 'Strony zapisują się jako lżejsze zdjęcia. Dobre do maila i urzędu.',
   searchableText: 'Tekst do wyszukiwania',
   searchableTextHint: 'Rozpoznaje tekst, żeby dało się go szukać i kopiować. Trwa dłużej.',
+  fileName: 'Nazwa pliku',
+  saveSelected: 'Zapisz zaznaczone',
+  saveShort: 'Zapisz',
+  format: 'Format',
   saveConfirm: 'Zapisz',
   cancel: 'Anuluj',
 

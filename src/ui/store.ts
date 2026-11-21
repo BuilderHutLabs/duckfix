@@ -2,6 +2,7 @@ import type { ScanFilter } from '../scan/enhance';
 import { storageKey } from '../config';
 import { currentLanguage, formatSize, type Lang } from '../i18n';
 import { createOcrEngine, type OcrEngine } from '../export/ocr';
+import { exportImages } from '../export/images';
 import { loadExportOptions, saveExportOptions, type ExportOptions } from '../export/options';
 import { createContext, createElement, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import {
@@ -51,9 +52,11 @@ export interface AppState {
   /** Pages written so far while exporting. */
   exportProgress: { done: number; total: number; ocr: boolean } | null;
   /** Exported PDF waiting for the user's tap on "Udostępnij / Zapisz". */
-  exportReady: File | null;
+  exportReady: File | File[] | null;
   /** "Zapisz PDF" opened the save options sheet. */
   saveSheetOpen: boolean;
+  /** Pages the save sheet saves (select mode); null = the whole document. */
+  saveSheetIds: string[] | null;
   /** Camera photo waiting on the crop screen. */
   scanPhoto: File | null;
   /** Pages the "Wygląd stron" sheet applies to (open while set). */
@@ -83,6 +86,13 @@ export interface StoreDeps {
     onProgress: (done: number, total: number) => void,
     opts: { compress: boolean; ocr: OcrEngine | null; signal: AbortSignal },
   ): Promise<Uint8Array>;
+  /** "JPG": every page as a JPEG picture. */
+  exportImages(
+    doc: Doc,
+    sources: Map<string, SourceFile>,
+    onProgress: (done: number, total: number) => void,
+    opts: { compress: boolean; signal: AbortSignal },
+  ): Promise<Blob[]>;
   /** OCR engine for "Tekst do wyszukiwania" in the given language (may download deu/spa data). */
   createOcr(lang: Lang): Promise<OcrEngine>;
   share: typeof shareOrDownload;
@@ -114,6 +124,7 @@ function browserDeps(): StoreDeps {
         ocr: opts.ocr ?? undefined,
         signal: opts.signal,
       }),
+    exportImages: (doc, sources, onProgress, opts) => exportImages(doc, sources, browserRasterizer, onProgress, opts),
     createOcr: (lang) => createOcrEngine(lang, tesseractPaths(import.meta.env.BASE_URL)),
     share: shareOrDownload,
     download: downloadFile,
@@ -227,6 +238,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     exportProgress: null,
     exportReady: null,
     saveSheetOpen: false,
+    saveSheetIds: null,
     scanPhoto: null,
     filterSheetIds: null,
     scanIndex: null,
@@ -536,13 +548,22 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       set({});
     },
 
-    openSaveSheet() {
+    /** Opens the save sheet for the whole document, or for the given pages only. */
+    openSaveSheet(ids?: Iterable<string>) {
       if (state.busy || history.present.pages.length === 0) return;
-      set({ saveSheetOpen: true });
+      const only = ids ? existing(ids) : null;
+      if (only && only.length === 0) return;
+      set({ saveSheetOpen: true, saveSheetIds: only });
     },
 
     closeSaveSheet() {
-      set({ saveSheetOpen: false });
+      set({ saveSheetOpen: false, saveSheetIds: null });
+    },
+
+    /** Suggested file name (without extension): first file's name + " (poprawiony)". */
+    defaultFileName(): string {
+      const first = state.sources.values().next().value as SourceFile | undefined;
+      return exportFileName(first?.name ?? strings.defaultDocName).replace(/\.pdf$/, '');
     },
 
     /** Stops a running export; nothing is saved and no error is shown. */
@@ -551,11 +572,14 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     },
 
     /** Builds the PDF; sharing is a separate tap (shareExport) with a fresh user activation. */
-    async export(opts: ExportOptions = state.exportOptions) {
+    async export(opts: ExportOptions = state.exportOptions, extra: { name?: string; ids?: string[] | null } = {}) {
       if (state.busy || history.present.pages.length === 0) return;
       saveExportOptions(deps.storage, opts);
       const own = session;
-      const doc = history.present;
+      const only = extra.ids ? new Set(extra.ids) : null;
+      const doc = only ? { pages: history.present.pages.filter((p) => only.has(p.id)) } : history.present;
+      if (doc.pages.length === 0) return;
+      const base = (extra.name ?? '').trim().replace(/[\\/:*?"<>|]+/g, '-') || actions.defaultFileName();
       const ctrl = new AbortController();
       exportCtrl = ctrl;
       set({
@@ -565,9 +589,33 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         error: null,
         notice: null,
         saveSheetOpen: false,
+        saveSheetIds: null,
         exportOptions: opts,
       });
       try {
+        if (opts.format === 'jpg') {
+          const blobs = await deps.exportImages(
+            doc,
+            state.sources,
+            (done, total) => {
+              if (own === session) set({ exportProgress: { done, total, ocr: false } });
+            },
+            { compress: opts.compress, signal: ctrl.signal },
+          );
+          if (own !== session) return;
+          const files = blobs.map(
+            (b, i) => new File([b], blobs.length === 1 ? `${base}.jpg` : `${base} ${i + 1}.jpg`, { type: 'image/jpeg' }),
+          );
+          if (deps.shareFirst) {
+            exportedDoc = history.present;
+            set({ busy: null, exportProgress: null, exportReady: files });
+          } else {
+            files.forEach((f) => deps.download(f));
+            const size = formatSize(files.reduce((s, f) => s + f.size, 0));
+            set({ busy: null, exportProgress: null, notice: strings.savedNotice(files.length === 1 ? files[0].name : `${base} (${files.length})`, size) });
+          }
+          return;
+        }
         let engine: OcrEngine | null = null;
         let ocrFailed = false;
         if (opts.ocr) {
@@ -586,10 +634,9 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
           { compress: opts.compress, ocr: engine, signal: ctrl.signal },
         );
         if (own !== session) return;
-        const first = state.sources.values().next().value as SourceFile | undefined;
-        const file = pdfFile(bytes, exportFileName(first?.name ?? strings.defaultDocName));
+        const file = pdfFile(bytes, `${base}.pdf`);
         if (deps.shareFirst) {
-          exportedDoc = doc;
+          exportedDoc = history.present;
           set({ busy: null, exportProgress: null, exportReady: file, notice: ocrFailed ? strings.ocrUnavailable : null });
         } else {
           deps.download(file);

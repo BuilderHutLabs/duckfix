@@ -46,6 +46,10 @@ export const de: Strings = {
   smallerFileHint: 'Seiten werden als leichtere Bilder gespeichert. Gut für E-Mail und Ämter.',
   searchableText: 'Durchsuchbarer Text',
   searchableTextHint: 'Erkennt den Text, damit du ihn suchen und kopieren kannst. Dauert länger.',
+  fileName: 'Dateiname',
+  saveSelected: 'Auswahl speichern',
+  saveShort: 'Speichern',
+  format: 'Format',
   saveConfirm: 'Speichern',
   cancel: 'Abbrechen',
 
