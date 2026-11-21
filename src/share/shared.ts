@@ -28,7 +28,7 @@ export async function takeSharedFiles(caches: CacheStorage, scope: string): Prom
     const res = await cache.match(key);
     if (!res) continue;
     const name = decodeURIComponent(res.headers.get('x-file-name') ?? 'plik');
-    files.push(new File([await res.blob()], name, { type: res.headers.get('content-type') ?? '' }));
+    files.push(new File([await res.arrayBuffer()], name, { type: res.headers.get('content-type') ?? '' }));
   }
   await caches.delete(cacheName(scope));
   return files;
