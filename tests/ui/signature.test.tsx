@@ -91,4 +91,16 @@ describe('signature', () => {
     fireEvent.click(black);
     expect(black.getAttribute('aria-pressed')).toBe('true');
   });
+
+  it('"Mój podpis" from the ⋯ menu opens over the whole screen, not inside the blurred top bar', () => {
+    const store = createAppStore(fakeDeps());
+    store.load(docWithFlags(1), [source]);
+    const { container } = render(<App store={store} />);
+    fireEvent.click(screen.getByRole('button', { name: strings.more }));
+    fireEvent.click(screen.getByRole('button', { name: strings.mySignature }));
+    const sheet = screen.getByRole('dialog', { name: strings.signatureTitle });
+    expect(sheet.closest('.toolbar')).toBeNull();
+    expect(container.contains(sheet)).toBe(false);
+    expect(sheet.parentElement?.parentElement).toBe(document.body);
+  });
 });

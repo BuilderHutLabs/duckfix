@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { IconMore } from './icons';
 import { useAppStore } from './store';
 import { strings } from './strings';
@@ -71,7 +72,9 @@ export function MoreMenu() {
           </button>
         </div>
       )}
-      {signatureOpen && <SignatureSheet onClose={() => setSignatureOpen(false)} onSaved={() => setSignatureOpen(false)} />}
+      {/* on <body>: the top bar's backdrop-filter would otherwise pin the fixed sheet to the bar */}
+      {signatureOpen &&
+        createPortal(<SignatureSheet onClose={() => setSignatureOpen(false)} onSaved={() => setSignatureOpen(false)} />, document.body)}
     </div>
   );
 }
