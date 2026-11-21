@@ -10,6 +10,7 @@ import { SaveSheet } from './SaveSheet';
 import { FilterSheet } from './FilterSheet';
 import { ScanCrop } from './ScanCrop';
 import { CameraInput } from './camera';
+import { useIncomingFiles } from '../share/incoming';
 import { Progress } from './Progress';
 import { ReviewGrid } from './ReviewGrid';
 import { Diagnostics, DIAG_HASH } from './Diagnostics';
@@ -29,6 +30,7 @@ export function App({ store }: { store?: AppStore }) {
     }
   }, []);
 
+  useIncomingFiles(s);
   const [splash, setSplash] = useState(isStandaloneLaunch);
   const [lang] = useLanguage();
 

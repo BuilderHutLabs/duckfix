@@ -39,6 +39,10 @@ export default defineConfig({
     namespaceInlineScript(),
     VitePWA({
       registerType: 'prompt',
+      // own service worker (src/sw.ts): it also receives files shared from other apps
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.ts',
       includeAssets: ['icons/*.png'],
       manifest: {
         name: APP_NAME,
@@ -50,24 +54,30 @@ export default defineConfig({
         display: 'standalone',
         theme_color: THEME_COLOR,
         background_color: THEME_COLOR,
+        // "Udostępnij do DuckFix" from other apps (Android) and "Otwórz za pomocą" (installed app)
+        share_target: {
+          action: `${BASE}share-target`,
+          method: 'POST',
+          enctype: 'multipart/form-data',
+          params: { files: [{ name: 'files', accept: ['application/pdf', '.pdf', 'image/*'] }] },
+        },
+        file_handlers: [
+          {
+            action: BASE,
+            accept: { 'application/pdf': ['.pdf'], 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'] },
+          },
+        ],
         icons: [
           { src: 'icons/icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icons/icon-512.png', sizes: '512x512', type: 'image/png' },
           { src: 'icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: {
+      injectManifest: {
         // pdf.js worker is a .mjs; tesseract core loaders are *.wasm.js; traineddata must be cached for offline OSD
         globPatterns: ['**/*.{js,mjs,css,html,png,svg,wasm,traineddata}'],
-        // deu/spa (searchable text in German/Spanish) are cached on first use, not at install
+        // deu/spa (searchable text in German/Spanish) are cached on first use, not at install (see src/sw.ts)
         globIgnores: ['calibrate.html', 'tessdata/deu.traineddata', 'tessdata/spa.traineddata'],
-        runtimeCaching: [
-          {
-            urlPattern: /\/tessdata\/(deu|spa)\.traineddata$/,
-            handler: 'CacheFirst',
-            options: { cacheName: 'duckfix-ocr-langs', expiration: { maxEntries: 4 } },
-          },
-        ],
         maximumFileSizeToCacheInBytes: 40 * 1024 * 1024,
       },
     }),
