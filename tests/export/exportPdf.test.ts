@@ -175,6 +175,17 @@ describe('exportPdf', () => {
     expect(r.mock.calls[0][0].filter).toBe('whiten');
   });
 
+  it('a signature is drawn onto its page at the chosen place (page is rasterized)', async () => {
+    const src = await makePdf([[100, 100]]);
+    const r = fakeRaster();
+    const sig = { id: 's1', src: `data:image/png;base64,${btoa(String.fromCharCode(...PNG))}`, x: 0.5, y: 0.75, w: 0.4, h: 0.1 };
+    const doc: Doc = { pages: [pdfPage(0, { stamps: [sig] })] };
+    const out = await load(await exportPdf(doc, new Map([['f1', src]]), r));
+    expect(r).toHaveBeenCalledTimes(1);
+    const plain = await load(await exportPdf({ pages: [pdfPage(0, { skewDeg: 1 })] }, new Map([['f1', src]]), fakeRaster()));
+    expect(imageCount(out)).toBeGreaterThan(imageCount(plain));
+  });
+
   it('always rasterizes image pages', async () => {
     const img: SourceFile = { id: 'i1', name: 'foto.jpg', type: 'image', blob: new Blob([PNG as BlobPart]) };
     const r = fakeRaster();

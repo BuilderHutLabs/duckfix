@@ -3,11 +3,13 @@ import { IconMore } from './icons';
 import { useAppStore } from './store';
 import { strings } from './strings';
 import { ThemePicker } from './ThemePicker';
+import { SignatureSheet } from './SignatureSheet';
 
 /** The ⋯ popover of the review top bar: select mode, deskew switch, diagnostics. */
 export function MoreMenu() {
   const { deskew, setDeskew, toggleSelecting, openDiagnostics, openFilterSheet, doc } = useAppStore();
   const [open, setOpen] = useState(false);
+  const [signatureOpen, setSignatureOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,6 +54,9 @@ export function MoreMenu() {
           <button type="button" className="menu-item" onClick={choose(() => openFilterSheet(doc.pages.map((p) => p.id)))}>
             {strings.pageLook}
           </button>
+          <button type="button" className="menu-item" onClick={choose(() => setSignatureOpen(true))}>
+            {strings.mySignature}
+          </button>
           <div className="menu-sep" />
           <label className="switch-row">
             <input type="checkbox" checked={deskew} onChange={(e) => setDeskew(e.target.checked)} />
@@ -66,6 +71,7 @@ export function MoreMenu() {
           </button>
         </div>
       )}
+      {signatureOpen && <SignatureSheet onClose={() => setSignatureOpen(false)} onSaved={() => setSignatureOpen(false)} />}
     </div>
   );
 }

@@ -11,6 +11,10 @@ import {
   movePage,
   rotatePages,
   setPageFilter,
+  addStamp as addStampTo,
+  moveStamp as moveStampOn,
+  removeStamp as removeStampFrom,
+  type Stamp,
   type Doc,
   type Page,
 } from '../model/document';
@@ -476,6 +480,19 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       const valid = existing(ids);
       set({ filterSheetIds: null });
       if (valid.length) commit(setPageFilter(history.present, valid, filter));
+    },
+
+    /** Places a signature on a page (fractions of the page, origin top-left). */
+    addStamp(pageId: string, stamp: Stamp) {
+      if (existing([pageId]).length) commit(addStampTo(history.present, pageId, stamp));
+    },
+
+    moveStamp(pageId: string, stampId: string, box: Pick<Stamp, 'x' | 'y' | 'w' | 'h'>) {
+      commit(moveStampOn(history.present, pageId, stampId, box));
+    },
+
+    removeStamp(pageId: string, stampId: string) {
+      commit(removeStampFrom(history.present, pageId, stampId));
     },
 
     showError(message: string) {

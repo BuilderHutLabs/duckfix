@@ -17,6 +17,21 @@ export interface Page {
   analyzed: boolean;
   /** Look of the page ("Wygląd strony"); missing = as scanned. */
   filter?: ScanFilter;
+  /** Signatures placed on the page. */
+  stamps?: Stamp[];
+}
+
+/**
+ * An image (signature) on a page: position and size as fractions of the page as it is saved
+ * (after rotation and straightening), origin top-left.
+ */
+export interface Stamp {
+  id: string;
+  src: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 export interface Doc {
@@ -53,6 +68,21 @@ export function movePage(doc: Doc, fromIndex: number, toIndex: number): Doc {
 /** Sets the look (Kolor / Wybielony / Czarno-biały) of the given pages. */
 export function setPageFilter(doc: Doc, ids: string[], filter: ScanFilter): Doc {
   return mapPages(doc, ids, (p) => ({ ...p, filter }));
+}
+
+export function addStamp(doc: Doc, pageId: string, stamp: Stamp): Doc {
+  return mapPages(doc, [pageId], (p) => ({ ...p, stamps: [...(p.stamps ?? []), stamp] }));
+}
+
+export function moveStamp(doc: Doc, pageId: string, stampId: string, box: Pick<Stamp, 'x' | 'y' | 'w' | 'h'>): Doc {
+  return mapPages(doc, [pageId], (p) => ({
+    ...p,
+    stamps: (p.stamps ?? []).map((s) => (s.id === stampId ? { ...s, ...box } : s)),
+  }));
+}
+
+export function removeStamp(doc: Doc, pageId: string, stampId: string): Doc {
+  return mapPages(doc, [pageId], (p) => ({ ...p, stamps: (p.stamps ?? []).filter((s) => s.id !== stampId) }));
 }
 
 export function deletePages(doc: Doc, ids: string[]): Doc {

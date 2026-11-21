@@ -21,7 +21,17 @@ export function exportFileName(original: string, suffix: string = strings.export
 }
 
 function needsRaster(page: Page): boolean {
-  return page.source.kind === 'image' || page.skewDeg !== 0 || (page.filter !== undefined && page.filter !== 'color');
+  return (
+    page.source.kind === 'image' ||
+    page.skewDeg !== 0 ||
+    (page.filter !== undefined && page.filter !== 'color') ||
+    (page.stamps?.length ?? 0) > 0
+  );
+}
+
+function dataUrlBytes(url: string): Uint8Array {
+  const b64 = url.slice(url.indexOf(',') + 1);
+  return Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
 }
 
 /** A PDF page copied as is keeps its own text; anything else has none until OCR adds it. */
@@ -63,6 +73,16 @@ export async function exportPdf(
       const image = r.format === 'png' ? await out.embedPng(r.bytes) : await out.embedJpg(r.bytes);
       const outPage = out.addPage([r.widthPt, r.heightPt]);
       outPage.drawImage(image, { x: 0, y: 0, width: r.widthPt, height: r.heightPt });
+      for (const s of page.stamps ?? []) {
+        // fractions of the saved page, origin top-left; PDF origin is bottom-left
+        const sig = await out.embedPng(dataUrlBytes(s.src));
+        outPage.drawImage(sig, {
+          x: s.x * r.widthPt,
+          y: (1 - s.y - s.h) * r.heightPt,
+          width: s.w * r.widthPt,
+          height: s.h * r.heightPt,
+        });
+      }
       if (ocrThis && opts.ocr) {
         // a page that originally had text and is now an image (compress/skew) also gets recognized
         const layer = await opts.ocr.textLayer(new Blob([r.bytes as BlobPart], { type: `image/${r.format === 'png' ? 'png' : 'jpeg'}` }));

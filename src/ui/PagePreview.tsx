@@ -6,6 +6,9 @@ import type { ThumbnailCache } from './thumbnails';
 import { useAppStore } from './store';
 import { strings } from './strings';
 import { IconChevronLeft, IconChevronRight, IconClose } from './icons';
+import { StampLayer } from './StampLayer';
+import { SignatureSheet } from './SignatureSheet';
+import { loadSignature, type SavedSignature } from '../signature/storage';
 
 interface Props {
   /** Visible pages in grid order; the arrows walk this list. */
@@ -34,7 +37,10 @@ function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
 
 /** Full-screen view of one page, rotated the way it will be saved. */
 export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
-  const { previewId, doc, sources, rotate, closePreview, openPreview } = useAppStore();
+  const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp } = useAppStore();
+  const [signing, setSigning] = useState(false);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const stageRef = useRef<HTMLDivElement>(null);
   const page = previewId === null ? undefined : doc.pages.find((p) => p.id === previewId);
   const index = previewId === null ? -1 : pageIds.indexOf(previewId);
   const open = page !== undefined && index >= 0;
@@ -112,6 +118,20 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
 
   if (!open) return null;
 
+  /** Puts the signature in the lower right part of the page, 35 % of its width. */
+  const place = (sig: SavedSignature) => {
+    const box = imgRef.current?.getBoundingClientRect();
+    const pageAspect = box && box.height ? box.width / box.height : 0.707;
+    const w = 0.35;
+    const h = Math.min(0.5, (w * pageAspect) / sig.aspect);
+    addStamp(page.id, { id: crypto.randomUUID(), src: sig.src, x: 0.55, y: Math.max(0, 0.82 - h), w, h });
+  };
+  const sign = () => {
+    const saved = loadSignature();
+    if (saved) place(saved);
+    else setSigning(true);
+  };
+
   const angle = effectiveRotation(page) + page.skewDeg;
   const sideways = Math.round(angle / 90) % 2 !== 0;
   const src = full?.id === page.id ? full.url : thumb?.status === 'ready' ? thumb.url : null;
@@ -133,13 +153,17 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
         <span className="preview-title" aria-hidden="true">
           {strings.page(number)}
         </span>
+        <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(sign)}>
+          {strings.sign}
+        </button>
         <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => rotate([page.id], 90))}>
           {strings.rotate}
         </button>
       </div>
-      <div className="preview-stage">
+      <div className="preview-stage" ref={stageRef}>
         {src && (
           <img
+            ref={imgRef}
             className={sideways ? 'preview-img sideways' : 'preview-img'}
             src={src}
             alt=""
@@ -147,7 +171,17 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             style={{ transform: `translate(-50%, -50%) rotate(${angle}deg)` }}
           />
         )}
+        <StampLayer page={page} img={imgRef} stage={stageRef} />
       </div>
+      {signing && (
+        <SignatureSheet
+          onClose={() => setSigning(false)}
+          onSaved={(sig) => {
+            setSigning(false);
+            place(sig);
+          }}
+        />
+      )}
       <button
         type="button"
         className="btn btn-icon preview-nav preview-prev"
