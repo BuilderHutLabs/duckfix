@@ -12,11 +12,13 @@ export function MoreMenu() {
   const [open, setOpen] = useState(false);
   const [signatureOpen, setSignatureOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const [place, setPlace] = useState({ top: 0, right: 12 });
 
   useEffect(() => {
     if (!open) return;
     const onPointerDown = (e: Event) => {
-      if (!root.current?.contains(e.target as Node)) setOpen(false);
+      if (!root.current?.contains(e.target as Node) && !panel.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false);
@@ -43,35 +45,53 @@ export function MoreMenu() {
         title={strings.more}
         aria-expanded={open}
         aria-haspopup="dialog"
-        onClick={() => setOpen(!open)}
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect();
+          setPlace({
+            top: r.bottom + 6,
+            right: Math.max(12, window.innerWidth - r.right),
+          });
+          setOpen(!open);
+        }}
       >
         <IconMore />
       </button>
-      {open && (
-        <div className="menu-panel">
-          <button type="button" className="menu-item" onClick={choose(toggleSelecting)}>
-            {strings.select}
-          </button>
-          <button type="button" className="menu-item" onClick={choose(() => openFilterSheet(doc.pages.map((p) => p.id)))}>
-            {strings.pageLook}
-          </button>
-          <button type="button" className="menu-item" onClick={choose(() => setSignatureOpen(true))}>
-            {strings.mySignature}
-          </button>
-          <div className="menu-sep" />
-          <label className="switch-row">
-            <input type="checkbox" checked={deskew} onChange={(e) => setDeskew(e.target.checked)} />
-            <span>{strings.deskew}</span>
-          </label>
-          <p className="settings-hint">{strings.deskewHint}</p>
-          <div className="menu-sep" />
-          <ThemePicker />
-          <div className="menu-sep" />
-          <button type="button" className="menu-item" onClick={choose(openDiagnostics)}>
-            {strings.diagnostics}
-          </button>
-        </div>
-      )}
+      {/* on <body>, fixed under the button: inside the top bar it was clipped and covered by the progress bar */}
+      {open &&
+        createPortal(
+          <div
+            className="menu-panel menu-floating"
+            ref={panel}
+            style={{
+              top: place.top,
+              right: place.right,
+              maxHeight: `calc(100dvh - ${place.top + 12}px)`,
+            }}
+          >
+            <button type="button" className="menu-item" onClick={choose(toggleSelecting)}>
+              {strings.select}
+            </button>
+            <button type="button" className="menu-item" onClick={choose(() => openFilterSheet(doc.pages.map((p) => p.id)))}>
+              {strings.pageLook}
+            </button>
+            <button type="button" className="menu-item" onClick={choose(() => setSignatureOpen(true))}>
+              {strings.mySignature}
+            </button>
+            <div className="menu-sep" />
+            <label className="switch-row">
+              <input type="checkbox" checked={deskew} onChange={(e) => setDeskew(e.target.checked)} />
+              <span>{strings.deskew}</span>
+            </label>
+            <p className="settings-hint">{strings.deskewHint}</p>
+            <div className="menu-sep" />
+            <ThemePicker />
+            <div className="menu-sep" />
+            <button type="button" className="menu-item" onClick={choose(openDiagnostics)}>
+              {strings.diagnostics}
+            </button>
+          </div>,
+          document.body,
+        )}
       {/* on <body>: the top bar's backdrop-filter would otherwise pin the fixed sheet to the bar */}
       {signatureOpen &&
         createPortal(<SignatureSheet onClose={() => setSignatureOpen(false)} onSaved={() => setSignatureOpen(false)} />, document.body)}

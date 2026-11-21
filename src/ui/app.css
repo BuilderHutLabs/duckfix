@@ -432,6 +432,12 @@ button.capsule.on {
 .menu-panel {
   padding: 4px 16px;
 }
+.menu-panel.menu-floating {
+  position: fixed;
+  z-index: 60;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 .menu-item {
   display: block;
   width: 100%;
