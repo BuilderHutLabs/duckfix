@@ -6,6 +6,7 @@ import { strings } from './strings';
 import { Settings } from './Toolbar';
 import { useSecretTaps } from './Diagnostics';
 import { isSinglePhoto, openCamera } from './camera';
+import { DuckTour } from './DuckTour';
 import { IconCamera } from './icons';
 
 export const FILE_ACCEPT = 'application/pdf,image/*';
@@ -67,6 +68,7 @@ export function Home() {
           {strings.takePhoto}
         </button>
       )}
+      <DuckTour delayed={isStandaloneLaunch()} />
       <ul className="home-steps">
         {strings.steps.map((step) => (
           <li key={step}>{step}</li>

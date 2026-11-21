@@ -96,6 +96,15 @@ export const de: Strings = {
   noText: 'Auf dieser Seite ist kein Text.',
   inkBlue: 'Blaue Tinte',
   inkBlack: 'Schwarze Tinte',
+  tourTitle: 'Enten-Helfer',
+  tourNext: 'Weiter',
+  tourSkip: 'Überspringen',
+  tourDone: 'Los geht’s!',
+  tourSteps: [
+    'Quak! Wähle PDFs oder Fotos oder fotografiere eine Seite. Ich schneide sie zu und begradige sie.',
+    'Tippe auf eine Seite, um sie zu drehen. Halte sie gedrückt für die große Vorschau, zum Unterschreiben oder Text kopieren.',
+    'Zum Schluss „Speichern“: Name, kleinere Datei, durchsuchbarer Text oder JPG. Fertig!',
+  ],
   insertHere: 'Seiten hier einfügen',
   addAtEnd: 'Dateien hinzufügen',
 

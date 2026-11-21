@@ -103,6 +103,15 @@ export const pl = {
   noText: 'Na tej stronie nie ma tekstu.',
   inkBlue: 'Niebieski tusz',
   inkBlack: 'Czarny tusz',
+  tourTitle: 'Kaczka pomocnik',
+  tourNext: 'Dalej',
+  tourSkip: 'Pomiń',
+  tourDone: 'Zaczynamy!',
+  tourSteps: [
+    'Kwa! Wybierz PDF-y lub zdjęcia, albo zrób zdjęcie kartki. Ja ją przytnę i wyprostuję.',
+    'Dotknij strony, żeby ją obrócić. Przytrzymaj, żeby zobaczyć ją w dużym podglądzie, podpisać albo skopiować tekst.',
+    'Na koniec „Zapisz”: wybierz nazwę, mniejszy plik, tekst do wyszukiwania albo JPG. Gotowe!',
+  ] as string[],
   insertHere: 'Wstaw strony tutaj',
   addAtEnd: 'Dodaj pliki',
 

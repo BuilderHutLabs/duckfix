@@ -96,6 +96,15 @@ export const es: Strings = {
   noText: 'No hay texto en esta página.',
   inkBlue: 'Tinta azul',
   inkBlack: 'Tinta negra',
+  tourTitle: 'Pato ayudante',
+  tourNext: 'Siguiente',
+  tourSkip: 'Omitir',
+  tourDone: '¡Vamos!',
+  tourSteps: [
+    '¡Cuac! Elige PDF o fotos, o haz una foto de una página. Yo la recorto y la enderezo.',
+    'Toca una página para girarla. Mantenla pulsada para verla en grande, firmarla o copiar su texto.',
+    'Al final «Guardar»: elige el nombre, un archivo más pequeño, texto con búsqueda o JPG. ¡Listo!',
+  ],
   insertHere: 'Insertar páginas aquí',
   addAtEnd: 'Añadir archivos',
 

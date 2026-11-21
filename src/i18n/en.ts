@@ -96,6 +96,15 @@ export const en: Strings = {
   noText: 'There is no text on this page.',
   inkBlue: 'Blue ink',
   inkBlack: 'Black ink',
+  tourTitle: 'Duck helper',
+  tourNext: 'Next',
+  tourSkip: 'Skip',
+  tourDone: 'Let’s go!',
+  tourSteps: [
+    'Quack! Choose PDFs or photos, or take a photo of a page. I will crop and straighten it.',
+    'Tap a page to rotate it. Hold it to see it big, sign it or copy its text.',
+    'Finally “Save”: pick a name, a smaller file, searchable text or JPG. Done!',
+  ],
   insertHere: 'Insert pages here',
   addAtEnd: 'Add files',
 
