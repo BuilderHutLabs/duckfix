@@ -32,6 +32,8 @@ export interface Stamp {
   y: number;
   w: number;
   h: number;
+  /** Clockwise turn in degrees around the box centre. */
+  rot?: number;
 }
 
 export interface Doc {
@@ -74,7 +76,7 @@ export function addStamp(doc: Doc, pageId: string, stamp: Stamp): Doc {
   return mapPages(doc, [pageId], (p) => ({ ...p, stamps: [...(p.stamps ?? []), stamp] }));
 }
 
-export function moveStamp(doc: Doc, pageId: string, stampId: string, box: Pick<Stamp, 'x' | 'y' | 'w' | 'h'>): Doc {
+export function moveStamp(doc: Doc, pageId: string, stampId: string, box: Partial<Pick<Stamp, 'x' | 'y' | 'w' | 'h' | 'rot'>>): Doc {
   return mapPages(doc, [pageId], (p) => ({
     ...p,
     stamps: (p.stamps ?? []).map((s) => (s.id === stampId ? { ...s, ...box } : s)),

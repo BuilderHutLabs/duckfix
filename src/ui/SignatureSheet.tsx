@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { extractInk, trimToInk } from '../signature/extract';
+import { cropRgba, inkBox, type PxRect } from '../signature/geometry';
+import { SignatureCrop } from './SignatureCrop';
 import { saveSignature, type SavedSignature } from '../signature/storage';
 import { loadPhoto } from '../scan/warp';
 import { releaseCanvas } from '../imaging/render';
@@ -31,6 +33,12 @@ export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature
   const [ink, setInk] = useState<keyof typeof INKS>('blue');
   const [scanned, setScanned] = useState<SavedSignature | null>(null);
   const [failed, setFailed] = useState(false);
+  /** The photo with its ink picked out, waiting for the crop frame. */
+  const [photo, setPhoto] = useState<{ url: string; w: number; h: number } | null>(null);
+  const [frame, setFrame] = useState<PxRect | null>(null);
+  const inkData = useRef<Uint8ClampedArray | null>(null);
+  const lastPhoto = useRef<{ url: string; w: number; h: number } | null>(null);
+  if (photo) lastPhoto.current = photo;
   const pad = useRef<HTMLCanvasElement>(null);
   const photoInput = useRef<HTMLInputElement>(null);
   const last = useRef<{ x: number; y: number } | null>(null);
@@ -74,28 +82,56 @@ export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature
 
   const onPhoto = async (file: File) => {
     setFailed(false);
+    setScanned(null);
     try {
-      const photo = await loadPhoto(file);
+      const loaded = await loadPhoto(file);
       try {
-        const c = Object.assign(document.createElement('canvas'), { width: photo.width, height: photo.height });
+        const w = loaded.width;
+        const h = loaded.height;
+        const c = Object.assign(document.createElement('canvas'), { width: w, height: h });
         try {
           const ctx = c.getContext('2d', { willReadFrequently: true })!;
-          ctx.drawImage(photo.bitmap, 0, 0);
-          const img = ctx.getImageData(0, 0, c.width, c.height);
-          const sig = toSignature(extractInk(img.data, c.width, c.height), c.width, c.height);
-          if (sig) setScanned(sig);
-          else setFailed(true);
+          ctx.drawImage(loaded.bitmap, 0, 0);
+          const ink = extractInk(ctx.getImageData(0, 0, w, h).data, w, h);
+          inkData.current = ink;
+          // small copy of the photo to crop on (the frame is in full-photo pixels)
+          const k = Math.min(1, 1000 / Math.max(w, h));
+          const small = Object.assign(document.createElement('canvas'), { width: Math.round(w * k), height: Math.round(h * k) });
+          try {
+            small.getContext('2d')!.drawImage(loaded.bitmap, 0, 0, small.width, small.height);
+            setPhoto({ url: small.toDataURL('image/jpeg', 0.8), w, h });
+          } finally {
+            releaseCanvas(small);
+          }
+          setFrame(inkBox(ink, w, h, 0.03) ?? { x: 0, y: 0, w, h });
         } finally {
           releaseCanvas(c);
         }
       } finally {
-        photo.close();
+        loaded.close();
       }
     } catch {
       setFailed(true);
     }
   };
 
+  /** "Przytnij": only the ink inside the frame becomes the signature. */
+  const applyCrop = () => {
+    if (!photo || !frame || !inkData.current) return;
+    const part = cropRgba(inkData.current, photo.w, photo.h, frame);
+    const sig = toSignature(part.data, part.width, part.height);
+    setFailed(!sig);
+    if (sig) {
+      setScanned(sig);
+      setPhoto(null);
+    }
+  };
+  const recrop = () => {
+    // back to the frame on the same photo
+    if (!inkData.current || !lastPhoto.current) return;
+    setPhoto(lastPhoto.current);
+    setScanned(null);
+  };
   const save = () => {
     let sig: SavedSignature | null = null;
     if (mode === 'scan') sig = scanned;
@@ -150,14 +186,26 @@ export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature
           </>
         ) : (
           <div className="signature-scan">
-            {scanned ? (
+            {photo && frame ? (
+              <>
+                <p className="sheet-option-hint">{failed ? strings.signatureNotFound : strings.signatureCropHint}</p>
+                <SignatureCrop src={photo.url} width={photo.w} height={photo.h} frame={frame} onChange={setFrame} />
+              </>
+            ) : scanned ? (
               <img className="signature-result" src={scanned.src} alt={strings.signature} />
             ) : (
               <p className="sheet-option-hint">{failed ? strings.signatureNotFound : strings.signatureScanHint}</p>
             )}
-            <button type="button" className="btn btn-camera" onClick={() => photoInput.current?.click()}>
-              {scanned ? strings.cropRetake : strings.takePhoto}
-            </button>
+            <div className="signature-scan-actions">
+              {scanned && (
+                <button type="button" className="btn" onClick={recrop}>
+                  {strings.signatureRecrop}
+                </button>
+              )}
+              <button type="button" className="btn btn-camera" onClick={() => photoInput.current?.click()}>
+                {scanned || photo ? strings.cropRetake : strings.takePhoto}
+              </button>
+            </div>
             <input
               ref={photoInput}
               className="visually-hidden"
@@ -184,14 +232,20 @@ export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature
               {strings.cancel}
             </button>
           )}
-          <button
-            type="button"
-            className="btn btn-primary"
-            disabled={mode === 'draw' ? !drawn : !scanned}
-            onClick={save}
-          >
-            {strings.signatureSave}
-          </button>
+          {mode === 'scan' && photo ? (
+            <button type="button" className="btn btn-primary" onClick={applyCrop}>
+              {strings.signatureCrop}
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={mode === 'draw' ? !drawn : !scanned}
+              onClick={save}
+            >
+              {strings.signatureSave}
+            </button>
+          )}
         </div>
       </div>
     </div>

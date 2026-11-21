@@ -39,7 +39,13 @@ async function toJpeg(bytes: Uint8Array, format: 'png' | 'jpg', page: Page, comp
       const img = new Image();
       img.src = s.src;
       await img.decode();
-      ctx.drawImage(img, s.x * c.width, s.y * c.height, s.w * c.width, s.h * c.height);
+      const w = s.w * c.width;
+      const h = s.h * c.height;
+      ctx.save();
+      ctx.translate(s.x * c.width + w / 2, s.y * c.height + h / 2);
+      ctx.rotate(((s.rot ?? 0) * Math.PI) / 180);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
     }
     return await new Promise<Blob>((resolve, reject) =>
       c.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', compress ? 0.7 : 0.9),

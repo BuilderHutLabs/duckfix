@@ -1,4 +1,5 @@
 import { PDFDocument, degrees } from 'pdf-lib';
+import { stampPdfPlacement } from '../signature/geometry';
 import { effectiveRotation, type Doc, type Page } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
 import { DICTS, strings } from '../i18n';
@@ -76,12 +77,8 @@ export async function exportPdf(
       for (const s of page.stamps ?? []) {
         // fractions of the saved page, origin top-left; PDF origin is bottom-left
         const sig = await out.embedPng(dataUrlBytes(s.src));
-        outPage.drawImage(sig, {
-          x: s.x * r.widthPt,
-          y: (1 - s.y - s.h) * r.heightPt,
-          width: s.w * r.widthPt,
-          height: s.h * r.heightPt,
-        });
+        const at = stampPdfPlacement(s, r.widthPt, r.heightPt);
+        outPage.drawImage(sig, { ...at, rotate: degrees(at.rotate) });
       }
       if (ocrThis && opts.ocr) {
         // a page that originally had text and is now an image (compress/skew) also gets recognized

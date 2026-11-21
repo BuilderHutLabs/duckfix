@@ -103,4 +103,21 @@ describe('signature', () => {
     expect(container.contains(sheet)).toBe(false);
     expect(sheet.parentElement?.parentElement).toBe(document.body);
   });
+
+  it('a rotated signature is shown turned; tapping the turn handle turns it 90° (undoable)', () => {
+    const store = createAppStore(fakeDeps());
+    store.load(addStamp(docWithFlags(1), 'p1', { id: 's1', src: SIG.src, x: 0.1, y: 0.1, w: 0.3, h: 0.1, rot: 45 }), [source]);
+    render(<App store={store} />);
+    act(() => store.openPreview('p1'));
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000);
+    const preview = screen.getByRole('dialog', { name: strings.preview(1) });
+    const stamp = within(preview).getByRole('img', { name: strings.signature }).parentElement!;
+    expect(stamp.style.transform).toBe('rotate(45deg)');
+    const handle = within(preview).getByRole('button', { name: strings.rotateSignature });
+    fireEvent.pointerDown(handle, { clientX: 0, clientY: 0, pointerId: 1 });
+    fireEvent.pointerUp(handle, { clientX: 0, clientY: 0, pointerId: 1 });
+    expect(store.getState().doc.pages[0].stamps![0].rot).toBe(90);
+    act(() => store.undo());
+    expect(store.getState().doc.pages[0].stamps![0].rot).toBe(45);
+  });
 });
