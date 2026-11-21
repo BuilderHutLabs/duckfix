@@ -1,0 +1,94 @@
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { App } from '../../src/ui/App';
+import { createAppStore } from '../../src/ui/store';
+import { strings } from '../../src/ui/strings';
+import { addMark } from '../../src/model/document';
+import { docWithFlags, fakeDeps, source } from './fixtures';
+
+vi.mock('../../src/imaging/render', () => ({
+  renderPage: vi.fn(() => new Promise(() => {})),
+  releaseCanvas: vi.fn(),
+  getPdf: vi.fn(),
+  forgetPdf: vi.fn(async () => {}),
+}));
+
+/** jsdom has no layout: every element is 500×700 at the origin, so the page box is the whole stage. */
+function fakeLayout() {
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+    left: 0, top: 0, width: 500, height: 700, right: 500, bottom: 700, x: 0, y: 0, toJSON() {},
+  } as DOMRect);
+}
+
+function openPreview(doc = docWithFlags(1)) {
+  fakeLayout();
+  const store = createAppStore(fakeDeps());
+  store.load(doc, [source]);
+  render(<App store={store} />);
+  act(() => store.openPreview('p1'));
+  vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000); // past the preview's ghost-tap guard
+  return store;
+}
+
+const marks = (store: ReturnType<typeof createAppStore>) => store.getState().doc.pages[0].marks ?? [];
+
+describe('Edytuj', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('the top bar has Tekst, Edytuj, Obróć; Edytuj shows the tools and Gotowe', () => {
+    openPreview();
+    const preview = screen.getByRole('dialog', { name: strings.preview(1) });
+    expect(within(preview).queryByRole('button', { name: strings.sign })).toBeNull(); // moved into the tools
+    fireEvent.click(within(preview).getByRole('button', { name: strings.edit }));
+    expect(within(preview).getByRole('button', { name: strings.cover })).toBeTruthy();
+    expect(within(preview).getByRole('button', { name: strings.sign })).toBeTruthy();
+    fireEvent.click(within(preview).getByRole('button', { name: strings.editDone }));
+    expect(within(preview).queryByRole('button', { name: strings.cover })).toBeNull();
+  });
+
+  it('Zasłoń: dragging over the page adds a black cover there (one undo step)', () => {
+    const store = openPreview();
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    fireEvent.click(screen.getByRole('button', { name: strings.cover }));
+    const layer = document.querySelector('.mark-layer') as HTMLElement;
+    fireEvent.pointerDown(layer, { clientX: 50, clientY: 70, pointerId: 1 });
+    fireEvent.pointerMove(layer, { clientX: 300, clientY: 140, pointerId: 1 });
+    fireEvent.pointerUp(layer, { clientX: 300, clientY: 140, pointerId: 1 });
+    expect(marks(store)).toHaveLength(1);
+    expect(marks(store)[0]).toMatchObject({ kind: 'cover', color: 'black' });
+    const m = marks(store)[0] as { x: number; y: number; w: number; h: number };
+    expect(m.x).toBeCloseTo(0.1);
+    expect(m.y).toBeCloseTo(0.1);
+    expect(m.w).toBeCloseTo(0.5);
+    expect(m.h).toBeCloseTo(0.1);
+    act(() => store.undo());
+    expect(marks(store)).toHaveLength(0);
+  });
+
+  it('white cover: choose Biały first', () => {
+    const store = openPreview();
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    fireEvent.click(screen.getByRole('button', { name: strings.cover }));
+    fireEvent.click(screen.getByRole('button', { name: strings.coverWhite }));
+    const layer = document.querySelector('.mark-layer') as HTMLElement;
+    fireEvent.pointerDown(layer, { clientX: 100, clientY: 100, pointerId: 1 });
+    fireEvent.pointerUp(layer, { clientX: 100, clientY: 100, pointerId: 1 }); // a tap: default size
+    expect(marks(store)[0]).toMatchObject({ kind: 'cover', color: 'white' });
+  });
+
+  it('a cover can be selected and removed with ×', () => {
+    const doc = addMark(docWithFlags(1), 'p1', { id: 'c1', kind: 'cover', color: 'black', x: 0.1, y: 0.1, w: 0.3, h: 0.1 });
+    const store = openPreview(doc);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    const item = document.querySelector('[data-mark="c1"]') as HTMLElement;
+    fireEvent.pointerDown(item, { clientX: 60, clientY: 80, pointerId: 1 });
+    fireEvent.pointerUp(item, { clientX: 60, clientY: 80, pointerId: 1 });
+    fireEvent.click(screen.getByRole('button', { name: strings.removeMark }));
+    expect(marks(store)).toHaveLength(0);
+  });
+
+  it('covers are shown on the page also outside Edytuj', () => {
+    const doc = addMark(docWithFlags(1), 'p1', { id: 'c1', kind: 'cover', color: 'black', x: 0.1, y: 0.1, w: 0.3, h: 0.1 });
+    openPreview(doc);
+    expect(document.querySelector('.mark-layer rect[data-kind="cover"]')).toBeTruthy();
+  });
+});

@@ -16,7 +16,14 @@ import {
   addStamp as addStampTo,
   moveStamp as moveStampOn,
   removeStamp as removeStampFrom,
+  addMark as addMarkTo,
+  updateMark as updateMarkOn,
+  removeMark as removeMarkFrom,
+  setCrop as setCropOn,
   type Stamp,
+  type Mark,
+  type MarkPatch,
+  type Box,
   type Doc,
   type Page,
 } from '../model/document';
@@ -507,6 +514,24 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
 
     moveStamp(pageId: string, stampId: string, box: Partial<Pick<Stamp, 'x' | 'y' | 'w' | 'h' | 'rot'>>) {
       commit(moveStampOn(history.present, pageId, stampId, box));
+    },
+
+    addMark(pageId: string, mark: Mark) {
+      if (existing([pageId]).length) commit(addMarkTo(history.present, pageId, mark));
+    },
+
+    updateMark(pageId: string, markId: string, patch: MarkPatch) {
+      commit(updateMarkOn(history.present, pageId, markId, patch));
+    },
+
+    removeMark(pageId: string, markId: string) {
+      commit(removeMarkFrom(history.present, pageId, markId));
+    },
+
+    /** "Kadruj" on the given pages (undefined = whole page). */
+    setCrop(ids: string[], crop: Box | undefined) {
+      const valid = existing(ids);
+      if (valid.length) commit(setCropOn(history.present, valid, crop));
     },
 
     removeStamp(pageId: string, stampId: string) {

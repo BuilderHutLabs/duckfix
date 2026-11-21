@@ -7,6 +7,9 @@ import { useAppStore } from './store';
 import { strings } from './strings';
 import { IconChevronLeft, IconChevronRight, IconClose } from './icons';
 import { StampLayer } from './StampLayer';
+import { usePageBox } from './edit/pageBox';
+import { MarkLayer, type CoverColor, type EditTool } from './edit/MarkLayer';
+import { EditTools } from './edit/EditTools';
 import { TextSheet } from './TextSheet';
 import { SignatureSheet } from './SignatureSheet';
 import { loadSignature, type SavedSignature } from '../signature/storage';
@@ -41,6 +44,10 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp } = useAppStore();
   const [signing, setSigning] = useState(false);
   const [reading, setReading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [tool, setTool] = useState<EditTool>(null);
+  const [coverColor, setCoverColor] = useState<CoverColor>('black');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const page = previewId === null ? undefined : doc.pages.find((p) => p.id === previewId);
@@ -52,6 +59,17 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   const pageId = open ? page.id : null;
 
   const [full, setFull] = useState<{ id: string; url: string } | null>(null);
+
+  // another page or a closed preview leaves "Edytuj" (nothing half-made is kept)
+  useEffect(() => {
+    setEditing(false);
+    setTool(null);
+    setSelectedId(null);
+  }, [pageId]);
+  const angleNow = page ? effectiveRotation(page) + page.skewDeg : 0;
+  // measured again when the picture changes (miniature → sharp) and when the tool strip takes room
+  const thumbStatus = cache && pageId !== null ? cache.get(pageId)?.status : undefined;
+  const rect = usePageBox(imgRef, stageRef, angleNow, `${pageId}:${full?.url ?? ''}:${thumbStatus}:${editing}`);
   const dialog = useRef<HTMLDivElement>(null);
 
   // Sharp render of the shown page. A result for a page the user already left is dropped, and the
@@ -134,7 +152,13 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     else setSigning(true);
   };
 
-  const angle = effectiveRotation(page) + page.skewDeg;
+  const leaveEdit = () => {
+    setEditing(false);
+    setTool(null);
+    setSelectedId(null);
+  };
+
+  const angle = angleNow;
   const sideways = Math.round(angle / 90) % 2 !== 0;
   const src = full?.id === page.id ? full.url : thumb?.status === 'ready' ? thumb.url : null;
   const number = doc.pages.indexOf(page) + 1;
@@ -142,7 +166,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   return (
     <div
       ref={dialog}
-      className="preview"
+      className={editing ? 'preview editing' : 'preview'}
       role="dialog"
       aria-modal="true"
       aria-label={strings.preview(number)}
@@ -155,15 +179,23 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
         <span className="preview-title" aria-hidden="true">
           {strings.page(number)}
         </span>
-        <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => setReading(true))}>
-          {strings.copyText}
-        </button>
-        <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(sign)}>
-          {strings.sign}
-        </button>
-        <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => rotate([page.id], 90))}>
-          {strings.rotate}
-        </button>
+        {editing ? (
+          <button type="button" className="btn btn-plain preview-rotate preview-done" onClick={leaveEdit}>
+            {strings.editDone}
+          </button>
+        ) : (
+          <>
+            <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => setReading(true))}>
+              {strings.copyText}
+            </button>
+            <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => setEditing(true))}>
+              {strings.edit}
+            </button>
+            <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => rotate([page.id], 90))}>
+              {strings.rotate}
+            </button>
+          </>
+        )}
       </div>
       <div className="preview-stage" ref={stageRef}>
         {src && (
@@ -176,8 +208,22 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             style={{ transform: `translate(-50%, -50%) rotate(${angle}deg)` }}
           />
         )}
-        <StampLayer page={page} img={imgRef} stage={stageRef} />
+        {rect && (
+          <MarkLayer
+            page={page}
+            rect={rect}
+            editing={editing}
+            tool={tool}
+            coverColor={coverColor}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
+        )}
+        <StampLayer page={page} rect={rect} />
       </div>
+      {editing && (
+        <EditTools tool={tool} onTool={setTool} coverColor={coverColor} onCoverColor={setCoverColor} onSign={sign} />
+      )}
       {reading && <TextSheet pageId={page.id} onClose={() => setReading(false)} />}
       {signing && (
         <SignatureSheet
@@ -188,6 +234,8 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           }}
         />
       )}
+      {!editing && (
+        <>
       <button
         type="button"
         className="btn btn-icon preview-nav preview-prev"
@@ -206,6 +254,8 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
       >
         <IconChevronRight />
       </button>
+        </>
+      )}
     </div>
   );
 }

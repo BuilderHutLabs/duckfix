@@ -1,43 +1,17 @@
-import { useEffect, useState, type PointerEvent as ReactPointerEvent, type RefObject } from 'react';
+import { useState, type PointerEvent as ReactPointerEvent } from 'react';
+import type { Rect } from './edit/pageBox';
 import type { Page, Stamp } from '../model/document';
 import { useAppStore } from './store';
 import { strings } from './strings';
 import { snapAngle } from '../signature/geometry';
 
-type Rect = { left: number; top: number; width: number; height: number };
 type Box = Pick<Stamp, 'x' | 'y' | 'w' | 'h' | 'rot'>;
-
-/** Where the (rotated) page image sits inside the stage: its bounding box = the saved page. */
-function usePageBox(img: RefObject<HTMLImageElement>, stage: RefObject<HTMLDivElement>, key: unknown): Rect | null {
-  const [rect, setRect] = useState<Rect | null>(null);
-  useEffect(() => {
-    const measure = () => {
-      if (!img.current || !stage.current) return;
-      const a = img.current.getBoundingClientRect();
-      const b = stage.current.getBoundingClientRect();
-      setRect({ left: a.left - b.left, top: a.top - b.top, width: a.width, height: a.height });
-    };
-    measure();
-    const el = img.current;
-    el?.addEventListener('load', measure);
-    window.addEventListener('resize', measure);
-    // the zoom-in animation of the preview changes the box for a moment
-    const t = setTimeout(measure, 400);
-    return () => {
-      el?.removeEventListener('load', measure);
-      window.removeEventListener('resize', measure);
-      clearTimeout(t);
-    };
-  }, [img, stage, key]);
-  return rect;
-}
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 /** Signatures on the page in the preview: drag to move, corner to resize, ↻ to turn, × to remove. */
-export function StampLayer({ page, img, stage }: { page: Page; img: RefObject<HTMLImageElement>; stage: RefObject<HTMLDivElement> }) {
+export function StampLayer({ page, rect }: { page: Page; rect: Rect | null }) {
   const { moveStamp, removeStamp } = useAppStore();
-  const rect = usePageBox(img, stage, `${page.id}:${page.rotation}:${page.skewDeg}`);
   const [live, setLive] = useState<{ id: string; box: Box } | null>(null);
 
   const startDrag = (s: Stamp, kind: 'move' | 'size') => (e: ReactPointerEvent<HTMLElement>) => {

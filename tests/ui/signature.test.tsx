@@ -36,7 +36,7 @@ describe('signature', () => {
     expect(doc.pages[0].stamps).toEqual([]);
   });
 
-  it('"Podpisz" in the page preview: no signature yet opens the signature sheet (draw or scan)', () => {
+  it('Edytuj → "Podpisz" in the page preview: no signature yet opens the signature sheet (draw or scan)', () => {
     const store = createAppStore(fakeDeps());
     store.load(docWithFlags(1), [source]);
     render(<App store={store} />);
@@ -44,6 +44,7 @@ describe('signature', () => {
     // the preview ignores taps in its first 0.4 s (ghost click of the hold that opened it)
     const later = Date.now() + 1000;
     vi.spyOn(Date, 'now').mockReturnValue(later);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit })); // Podpisz is one of the Edytuj tools
     fireEvent.click(screen.getByRole('button', { name: strings.sign }));
     expect(screen.getByRole('dialog', { name: strings.signatureTitle })).toBeTruthy();
     expect(screen.getByRole('button', { name: strings.signatureDraw })).toBeTruthy();
@@ -59,6 +60,7 @@ describe('signature', () => {
     // the preview ignores taps in its first 0.4 s (ghost click of the hold that opened it)
     const later = Date.now() + 1000;
     vi.spyOn(Date, 'now').mockReturnValue(later);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit })); // Podpisz is one of the Edytuj tools
     fireEvent.click(screen.getByRole('button', { name: strings.sign }));
     const stamps = () => store.getState().doc.pages[0].stamps ?? [];
     expect(stamps()).toHaveLength(1);
@@ -84,6 +86,7 @@ describe('signature', () => {
     render(<App store={store} />);
     act(() => store.openPreview('p1'));
     vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit })); // Podpisz is one of the Edytuj tools
     fireEvent.click(screen.getByRole('button', { name: strings.sign }));
     const blue = screen.getByRole('button', { name: strings.inkBlue });
     const black = screen.getByRole('button', { name: strings.inkBlack });
