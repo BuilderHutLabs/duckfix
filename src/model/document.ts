@@ -34,6 +34,7 @@ export interface Box {
 }
 
 export type InkColor = 'black' | 'blue' | 'red';
+export type HighlightColor = 'yellow' | 'green' | 'pink';
 
 /** An item on the page in "Edytuj"; same frame as signatures. */
 export type Mark =
@@ -43,7 +44,8 @@ export type Mark =
   /** arrow: from (x, y) to (x + w, y + h); w and h may be negative */
   | ({ id: string; kind: 'rect' | 'ellipse' | 'arrow'; color: InkColor } & Box)
   /** points: flat [x0, y0, x1, y1, …] */
-  | { id: string; kind: 'pen' | 'highlight'; color: string; points: number[] };
+  | { id: string; kind: 'pen'; color: InkColor; points: number[] }
+  | { id: string; kind: 'highlight'; color: HighlightColor; points: number[] };
 
 /** Patch for a mark: any of its fields (kind and id stay). */
 export type MarkPatch = Partial<{ x: number; y: number; w: number; h: number; color: string; text: string; size: 1 | 2 | 3; points: number[] }>;

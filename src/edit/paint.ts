@@ -1,5 +1,6 @@
 import type { Box, Mark, Stamp } from '../model/document';
 import { CROSS_PATH, INK, LINE_HEIGHT, TICK_PATH, fontFrac } from './text';
+import { HEAD_FRAC, HIGHLIGHT, HIGHLIGHT_ALPHA, HIGHLIGHT_FRAC, PEN_FRAC, arrowHead } from './draw';
 
 /** Pixel rectangle of a crop on a w×h canvas: whole pixels, inside the canvas, at least 1×1. */
 export function cropRect(crop: Box | undefined, w: number, h: number): { x: number; y: number; w: number; h: number } {
@@ -39,6 +40,47 @@ export function paintMarks(ctx: CanvasRenderingContext2D, marks: Mark[] | undefi
         ctx.beginPath();
         line.forEach(([px, py], i) => (i ? ctx.lineTo : ctx.moveTo).call(ctx, m.x * w + px * bw, m.y * h + py * bh));
         ctx.stroke();
+      }
+    } else if (m.kind === 'pen' || m.kind === 'highlight') {
+      const pen = m.kind === 'pen';
+      ctx.save();
+      ctx.strokeStyle = pen ? INK[m.color] : HIGHLIGHT[m.color];
+      ctx.lineWidth = (pen ? PEN_FRAC : HIGHLIGHT_FRAC) * w;
+      ctx.globalAlpha = pen ? 1 : HIGHLIGHT_ALPHA;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(m.points[0] * w, m.points[1] * h);
+      // a single tap is a dot
+      if (m.points.length === 2) ctx.lineTo(m.points[0] * w + 0.01, m.points[1] * h);
+      for (let i = 2; i < m.points.length; i += 2) ctx.lineTo(m.points[i] * w, m.points[i + 1] * h);
+      ctx.stroke();
+      ctx.restore();
+    } else if (m.kind === 'rect' || m.kind === 'ellipse' || m.kind === 'arrow') {
+      ctx.strokeStyle = INK[m.color];
+      ctx.fillStyle = INK[m.color];
+      ctx.lineWidth = PEN_FRAC * w;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      if (m.kind === 'rect') {
+        ctx.strokeRect(m.x * w, m.y * h, m.w * w, m.h * h);
+      } else if (m.kind === 'ellipse') {
+        ctx.beginPath();
+        ctx.ellipse((m.x + m.w / 2) * w, (m.y + m.h / 2) * h, Math.abs(m.w * w) / 2, Math.abs(m.h * h) / 2, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        const x0 = m.x * w, y0 = m.y * h, x1 = (m.x + m.w) * w, y1 = (m.y + m.h) * h;
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+        const [tip, a, b] = arrowHead(x0, y0, x1, y1, HEAD_FRAC * w);
+        ctx.beginPath();
+        ctx.moveTo(tip[0], tip[1]);
+        ctx.lineTo(a[0], a[1]);
+        ctx.lineTo(b[0], b[1]);
+        ctx.closePath();
+        ctx.fill();
       }
     }
   }
