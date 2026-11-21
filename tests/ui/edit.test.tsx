@@ -216,6 +216,91 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     expect(marks(store)[0]).toMatchObject({ color: 'blue' });
   });
 
+  const drag = (el: Element, pts: Array<[number, number]>) => {
+    fireEvent.pointerDown(el, { clientX: pts[0][0], clientY: pts[0][1], pointerId: 1 });
+    for (const [x, y] of pts.slice(1)) fireEvent.pointerMove(el, { clientX: x, clientY: y, pointerId: 1 });
+    const [x, y] = pts[pts.length - 1];
+    fireEvent.pointerUp(el, { clientX: x, clientY: y, pointerId: 1 });
+  };
+
+  it('Pióro: a finger line becomes one pen stroke in the chosen ink (one undo step)', () => {
+    const store = openPreview();
+    startTool(strings.toolPen);
+    fireEvent.click(screen.getByRole('button', { name: strings.inkBlue }));
+    drag(layer(), [[50, 70], [100, 140], [150, 70], [200, 140]]);
+    const m = marks(store)[0] as { kind: string; color: string; points: number[] };
+    expect(m).toMatchObject({ kind: 'pen', color: 'blue' });
+    expect(m.points.slice(0, 2)).toEqual([0.1, 0.1]);
+    expect(m.points.length).toBeGreaterThanOrEqual(6); // the zigzag keeps its bends
+    act(() => store.undo());
+    expect(marks(store)).toHaveLength(0);
+  });
+
+  it('Zakreślacz is yellow until another highlighter colour is chosen', () => {
+    const store = openPreview();
+    startTool(strings.toolHighlight);
+    drag(layer(), [[50, 70], [300, 70]]);
+    fireEvent.click(screen.getByRole('button', { name: strings.hlPink }));
+    drag(layer(), [[50, 140], [300, 140]]);
+    expect(marks(store).map((m) => [m.kind, m.color])).toEqual([['highlight', 'yellow'], ['highlight', 'pink']]);
+  });
+
+  it('Strzałka goes from where the finger started to where it ended (even up and to the left)', () => {
+    const store = openPreview();
+    startTool(strings.toolArrow);
+    drag(layer(), [[300, 420], [100, 140]]);
+    const m = marks(store)[0] as { kind: string; x: number; y: number; w: number; h: number };
+    expect(m.kind).toBe('arrow');
+    expect(m.x).toBeCloseTo(0.6);
+    expect(m.y).toBeCloseTo(0.6);
+    expect(m.w).toBeCloseTo(-0.4);
+    expect(m.h).toBeCloseTo(-0.4);
+  });
+
+  it('Prostokąt and Kółko are dragged corner to corner; a tap draws nothing', () => {
+    const store = openPreview();
+    startTool(strings.toolRect);
+    drag(layer(), [[300, 420], [100, 140]]);
+    tap(layer(), 50, 50);
+    fireEvent.click(screen.getByRole('button', { name: strings.toolEllipse }));
+    drag(layer(), [[50, 70], [250, 210]]);
+    const [r, e] = marks(store) as Array<{ kind: string; x: number; y: number; w: number; h: number }>;
+    expect(marks(store)).toHaveLength(2);
+    expect(r.kind).toBe('rect');
+    expect(r.x).toBeCloseTo(0.2);
+    expect(r.w).toBeCloseTo(0.4);
+    expect(e.kind).toBe('ellipse');
+    expect(e.h).toBeCloseTo(0.2);
+  });
+
+  it('a pen stroke can be selected and moved; all its points move', () => {
+    const doc = addMark(docWithFlags(1), 'p1', { id: 'k', kind: 'pen', color: 'black', points: [0.2, 0.2, 0.4, 0.3] });
+    const store = openPreview(doc);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    drag(document.querySelector('[data-mark="k"]')!, [[150, 175], [200, 245]]); // +0.1, +0.1
+    const m = marks(store)[0] as { points: number[] };
+    m.points.forEach((v, i) => expect(v).toBeCloseTo([0.3, 0.3, 0.5, 0.4][i]));
+  });
+
+  it('dragging the tip of a selected arrow changes where it points', () => {
+    const doc = addMark(docWithFlags(1), 'p1', { id: 'a', kind: 'arrow', color: 'black', x: 0.2, y: 0.2, w: 0.2, h: 0 });
+    const store = openPreview(doc);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    tap(document.querySelector('[data-mark="a"]')!, 150, 140);
+    drag(document.querySelector('[data-handle="end"]')!, [[200, 140], [200, 280]]); // tip down by 0.2
+    expect(marks(store)[0]).toMatchObject({ x: 0.2, y: 0.2, w: 0.2 });
+    expect((marks(store)[0] as { h: number }).h).toBeCloseTo(0.2);
+  });
+
+  it('miniatures show drawings', () => {
+    fakeLayout();
+    const doc = addMark(docWithFlags(1), 'p1', { id: 'k', kind: 'pen', color: 'black', points: [0.2, 0.2, 0.4, 0.3] });
+    const store = createAppStore(fakeDeps());
+    store.load(doc, [source]);
+    render(<App store={store} />);
+    expect(document.querySelector('.thumb-box polyline[data-kind="pen"]')).toBeTruthy();
+  });
+
   it('miniatures show written text', () => {
     fakeLayout();
     const doc = addMark(docWithFlags(1), 'p1', { id: 't1', kind: 'text', text: 'Zażółć', color: 'black', size: 2, x: 0.1, y: 0.1, w: 0.2, h: 0.03 });

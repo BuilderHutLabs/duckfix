@@ -2063,3 +2063,7 @@ body.splashing .home .duck {
   font-size: 17px;
   resize: vertical;
 }
+.mark-handle.end {
+  margin: -12px 0 0 -12px;
+  cursor: grab;
+}

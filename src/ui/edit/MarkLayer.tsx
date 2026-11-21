@@ -1,26 +1,54 @@
 import { useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { Box, Mark, Page } from '../../model/document';
+import type { Box, HighlightColor, InkColor, Mark, Page } from '../../model/document';
 import { dragCrop, type CropHandle } from '../../signature/geometry';
+import { simplify, strokeBox } from '../../edit/draw';
 import { useAppStore } from '../store';
 import { strings } from '../strings';
 import type { Rect } from './pageBox';
 import { Marks } from './MarksSvg';
 
-export type EditTool = 'cover' | 'crop' | PlaceTool | null;
 /** Tools that put something on the page with a tap. */
 export type PlaceTool = 'write' | 'tick' | 'cross' | 'date';
+/** Tools that draw with a finger drag. */
+export type DrawTool = 'pen' | 'highlight' | 'arrow' | 'rect' | 'ellipse';
+export type EditTool = 'cover' | 'crop' | PlaceTool | DrawTool | null;
 export const PLACE_TOOLS: readonly PlaceTool[] = ['write', 'tick', 'cross', 'date'];
+export const DRAW_TOOLS: readonly DrawTool[] = ['pen', 'highlight', 'arrow', 'rect', 'ellipse'];
 const isPlaceTool = (t: EditTool): t is PlaceTool => PLACE_TOOLS.includes(t as PlaceTool);
 export type CoverColor = 'black' | 'white';
 
-const COVER_FILL = { black: '#000', white: '#fff' } as const;
 /** A tap (no drag) with Zasłoń places a box of this size around the finger. */
 const TAP_BOX = { w: 0.3, h: 0.05 };
 const MIN = 0.02;
 const CORNERS: CropHandle[] = ['nw', 'ne', 'sw', 'se'];
+/** Room around a thin drawing so it can still be grabbed (fraction of the page). */
+const GRAB = 0.015;
+
+type Handle = CropHandle | 'start' | 'end';
+type BoxMark = Extract<Mark, Box>;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-const hasBox = (m: Mark): m is Extract<Mark, Box> => 'w' in m;
+const hasBox = (m: Mark): m is BoxMark => 'w' in m;
+
+/** The area that selects a mark: its box (an arrow's box made positive), or around a stroke. */
+function hitBox(m: Mark): Box {
+  if (!hasBox(m)) {
+    const b = strokeBox(m.points);
+    return { x: b.x - GRAB, y: b.y - GRAB, w: b.w + 2 * GRAB, h: b.h + 2 * GRAB };
+  }
+  if (m.kind === 'arrow') {
+    const b = { x: Math.min(m.x, m.x + m.w), y: Math.min(m.y, m.y + m.h), w: Math.abs(m.w), h: Math.abs(m.h) };
+    return { x: b.x - GRAB, y: b.y - GRAB, w: b.w + 2 * GRAB, h: b.h + 2 * GRAB };
+  }
+  return m;
+}
+
+/** A mark moved by (dx, dy) page fractions. */
+function moved(m: Mark, dx: number, dy: number): Mark {
+  if (!hasBox(m)) return { ...m, points: m.points.map((v, i) => clamp01(v + (i % 2 ? dy : dx))) };
+  if (m.kind === 'arrow') return { ...m, x: m.x + dx, y: m.y + dy };
+  return { ...m, ...dragCrop(m, 'move', dx, dy, 1, 1, MIN) };
+}
 
 /** Marks of the page drawn over the preview; in "Edytuj" they can be made, moved, resized, removed. */
 export function MarkLayer({
@@ -29,6 +57,8 @@ export function MarkLayer({
   editing,
   tool,
   coverColor,
+  ink,
+  highlight,
   selectedId,
   onSelect,
   onPlace,
@@ -39,6 +69,10 @@ export function MarkLayer({
   editing: boolean;
   tool: EditTool;
   coverColor: CoverColor;
+  /** Colour of new pen lines, arrows and shapes. */
+  ink: InkColor;
+  /** Colour of new highlighter strokes. */
+  highlight: HighlightColor;
   selectedId: string | null;
   onSelect(id: string | null): void;
   /** A tap on the page with Wpisz / ✓ / ✗ / Data, at page fractions. */
@@ -47,14 +81,16 @@ export function MarkLayer({
   onEditText(m: Extract<Mark, { kind: 'text' }>): void;
 }) {
   const { addMark, updateMark, removeMark } = useAppStore();
-  /** The box being dragged (new cover, or a mark being moved/resized), before it is committed. */
-  const [live, setLive] = useState<{ id: string; box: Box } | null>(null);
+  /** A mark being drawn or changed, shown before it is committed (one undo step per gesture). */
+  const [live, setLive] = useState<Mark | null>(null);
 
   /** Pointer position as fractions of the page. */
   const frac = (e: { clientX: number; clientY: number }, layer: HTMLElement) => {
     const b = layer.getBoundingClientRect();
     return { x: (e.clientX - b.left) / rect.width, y: (e.clientY - b.top) / rect.height };
   };
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
+    Math.hypot((b.x - a.x) * rect.width, (b.y - a.y) * rect.height);
 
   const follow = (el: HTMLElement, pointerId: number, move: (e: PointerEvent) => void, up: (e: PointerEvent) => void) => {
     try {
@@ -73,69 +109,91 @@ export function MarkLayer({
     el.addEventListener('pointercancel', end);
   };
 
-  /** Drawing a new cover on an empty part of the page. */
+  /** A finger on an empty part of the page: place, draw or cover, depending on the tool. */
   const onLayerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!editing || e.target !== e.currentTarget) return;
-    if (isPlaceTool(tool)) {
-      e.preventDefault();
-      const layer = e.currentTarget;
-      const a = frac(e, layer);
-      let moved = false;
-      follow(
-        layer,
-        e.pointerId,
-        (ev) => {
-          const b = frac(ev, layer);
-          if (Math.hypot((b.x - a.x) * rect.width, (b.y - a.y) * rect.height) > 10) moved = true;
-        },
-        () => {
-          if (!moved) onPlace(tool, a);
-        },
-      );
-      return;
-    }
-    if (tool !== 'cover') {
+    if (!tool || tool === 'crop') {
       onSelect(null);
       return;
     }
     e.preventDefault();
     const layer = e.currentTarget;
     const a = frac(e, layer);
-    let box: Box = { x: a.x, y: a.y, w: 0, h: 0 };
     const id = crypto.randomUUID();
+
+    if (isPlaceTool(tool)) {
+      let far = false;
+      follow(
+        layer,
+        e.pointerId,
+        (ev) => {
+          if (dist(a, frac(ev, layer)) > 10) far = true;
+        },
+        () => {
+          if (!far) onPlace(tool, a);
+        },
+      );
+      return;
+    }
+
+    if (tool === 'pen' || tool === 'highlight') {
+      const points = [clamp01(a.x), clamp01(a.y)];
+      const make = (): Mark =>
+        tool === 'pen' ? { id, kind: 'pen', color: ink, points: [...points] } : { id, kind: 'highlight', color: highlight, points: [...points] };
+      setLive(make());
+      follow(
+        layer,
+        e.pointerId,
+        (ev) => {
+          const b = frac(ev, layer);
+          points.push(clamp01(b.x), clamp01(b.y));
+          setLive(make());
+        },
+        () => {
+          setLive(null);
+          const m = make() as Extract<Mark, { points: number[] }>;
+          addMark(page.id, { ...m, points: simplify(m.points, 0.0015) });
+        },
+      );
+      return;
+    }
+
+    // Zasłoń, Strzałka, Prostokąt, Kółko: a drag from corner to corner (arrow: from start to tip)
+    let b = a;
+    const shape = (): Mark => {
+      if (tool === 'arrow') return { id, kind: 'arrow', color: ink, x: a.x, y: a.y, w: clamp01(b.x) - a.x, h: clamp01(b.y) - a.y };
+      const x = clamp01(Math.min(a.x, b.x));
+      const y = clamp01(Math.min(a.y, b.y));
+      const box = { x, y, w: clamp01(Math.max(a.x, b.x)) - x, h: clamp01(Math.max(a.y, b.y)) - y };
+      return tool === 'cover' ? { id, kind: 'cover', color: coverColor, ...box } : { id, kind: tool as 'rect' | 'ellipse', color: ink, ...box };
+    };
     follow(
       layer,
       e.pointerId,
       (ev) => {
-        const b = frac(ev, layer);
-        const x = clamp01(Math.min(a.x, b.x));
-        const y = clamp01(Math.min(a.y, b.y));
-        box = { x, y, w: clamp01(Math.max(a.x, b.x)) - x, h: clamp01(Math.max(a.y, b.y)) - y };
-        setLive({ id, box });
+        b = frac(ev, layer);
+        setLive(shape());
       },
       () => {
         setLive(null);
-        if (box.w < MIN && box.h < MIN) {
+        const small = dist(a, b) < 12;
+        if (tool === 'cover' && small) {
           // a tap: a ready-made box around the finger
-          box = {
-            x: clamp01(a.x - TAP_BOX.w / 2),
-            y: clamp01(a.y - TAP_BOX.h / 2),
-            w: TAP_BOX.w,
-            h: TAP_BOX.h,
-          };
-          box.x = Math.min(box.x, 1 - box.w);
-          box.y = Math.min(box.y, 1 - box.h);
+          const box = { x: clamp01(a.x - TAP_BOX.w / 2), y: clamp01(a.y - TAP_BOX.h / 2), w: TAP_BOX.w, h: TAP_BOX.h };
+          addMark(page.id, { id, kind: 'cover', color: coverColor, x: Math.min(box.x, 1 - box.w), y: Math.min(box.y, 1 - box.h), w: box.w, h: box.h });
+        } else if (small) {
+          return; // a tap with an arrow or a shape draws nothing
         } else {
-          box = { ...box, w: Math.max(box.w, MIN), h: Math.max(box.h, MIN) };
+          const m = shape();
+          addMark(page.id, tool === 'cover' && hasBox(m) ? { ...m, w: Math.max(m.w, MIN), h: Math.max(m.h, MIN) } : m);
         }
-        addMark(page.id, { id, kind: 'cover', color: coverColor, ...box });
         onSelect(id);
       },
     );
   };
 
-  /** Moving (middle) or resizing (corner) a mark: one undo step per drag. */
-  const onItemDown = (m: Extract<Mark, Box>, handle: CropHandle) => (e: ReactPointerEvent<HTMLElement>) => {
+  /** Moving (middle), resizing (corner) or bending an arrow (its ends): one undo step per drag. */
+  const onItemDown = (m: Mark, handle: Handle) => (e: ReactPointerEvent<HTMLElement>) => {
     if (!editing) return;
     e.preventDefault();
     e.stopPropagation();
@@ -143,54 +201,60 @@ export function MarkLayer({
     onSelect(m.id);
     const layer = e.currentTarget.closest('.mark-layer') as HTMLElement;
     const a = frac(e, layer);
-    const from: Box = { x: m.x, y: m.y, w: m.w, h: m.h };
     // text and ticks keep their shape when resized (the text grows with the box height)
-    const keepShape = m.kind !== 'cover' && handle !== 'move';
-    let box = from;
-    let moved = false;
+    const keepShape = (m.kind === 'text' || m.kind === 'check' || m.kind === 'cross') && handle !== 'move';
+    let next: Mark = m;
+    let far = false;
     follow(
       e.currentTarget,
       e.pointerId,
       (ev) => {
         const b = frac(ev, layer);
-        if (Math.hypot((b.x - a.x) * rect.width, (b.y - a.y) * rect.height) > 6) moved = true;
-        if (!moved) return;
-        box = dragCrop(from, handle, b.x - a.x, b.y - a.y, 1, 1, MIN);
-        if (keepShape) {
-          const w = Math.min(1 - box.x, from.w * (box.h / from.h));
-          box = { ...box, w, x: handle === 'nw' || handle === 'sw' ? from.x + from.w - w : box.x };
+        if (dist(a, b) > 6) far = true;
+        if (!far) return;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        if (handle === 'move') next = moved(m, dx, dy);
+        else if (m.kind === 'arrow' && handle === 'start') next = { ...m, x: m.x + dx, y: m.y + dy, w: m.w - dx, h: m.h - dy };
+        else if (m.kind === 'arrow' && handle === 'end') next = { ...m, w: m.w + dx, h: m.h + dy };
+        else if (hasBox(m) && handle !== 'start' && handle !== 'end') {
+          let box = dragCrop(m, handle, dx, dy, 1, 1, MIN);
+          if (keepShape) {
+            const w = Math.min(1 - box.x, m.w * (box.h / m.h));
+            box = { ...box, w, x: handle === 'nw' || handle === 'sw' ? m.x + m.w - w : box.x };
+          }
+          next = { ...m, ...box } as Mark;
         }
-        setLive({ id: m.id, box });
+        setLive(next);
       },
       () => {
         setLive(null);
-        if (moved && box !== from) updateMark(page.id, m.id, box);
-        else if (!moved && wasSelected && handle === 'move' && m.kind === 'text') onEditText(m);
+        if (far && next !== m) {
+          const { id: _id, kind: _kind, ...patch } = next as Mark & Record<string, unknown>;
+          updateMark(page.id, m.id, patch);
+        } else if (!far && wasSelected && handle === 'move' && m.kind === 'text') onEditText(m);
       },
     );
   };
 
-  const items = (page.marks ?? []).filter(hasBox);
-  const boxOf = (m: Extract<Mark, Box>): Box => (live?.id === m.id ? live.box : m);
-  const drawing = live && !items.some((m) => m.id === live.id) ? live.box : null;
+  const marks = page.marks ?? [];
+  const shown = live ? (marks.some((m) => m.id === live.id) ? marks.map((m) => (m.id === live.id ? live : m)) : [...marks, live]) : marks;
   const pct = (v: number) => `${v * 100}%`;
+  const drawing = editing && tool !== null && tool !== 'crop';
 
   return (
     <div
-      className={editing && (tool === 'cover' || isPlaceTool(tool)) ? 'mark-layer drawing' : editing ? 'mark-layer editing' : 'mark-layer'}
+      className={drawing ? 'mark-layer drawing' : editing ? 'mark-layer editing' : 'mark-layer'}
       style={{ left: rect.left, top: rect.top, width: rect.width, height: rect.height }}
       onPointerDown={onLayerDown}
     >
-      <Marks marks={page.marks} pageW={rect.width} pageH={rect.height} boxOf={boxOf} />
-      {drawing && (
-        <svg className="marks-svg" viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
-          <rect x={drawing.x} y={drawing.y} width={drawing.w} height={drawing.h} fill={COVER_FILL[coverColor]} opacity={0.8} />
-        </svg>
-      )}
+      <Marks marks={shown} pageW={rect.width} pageH={rect.height} />
       {editing &&
-        items.map((m) => {
-          const b = boxOf(m);
+        shown.map((m) => {
+          const b = hitBox(m);
           const selected = m.id === selectedId;
+          const ends = m.kind === 'arrow';
+          const corners = hasBox(m) && !ends;
           return (
             <div
               key={m.id}
@@ -201,9 +265,25 @@ export function MarkLayer({
             >
               {selected && (
                 <>
-                  {CORNERS.map((c) => (
-                    <span key={c} className={`mark-handle ${c}`} aria-hidden="true" onPointerDown={onItemDown(m, c)} />
-                  ))}
+                  {corners &&
+                    CORNERS.map((c) => (
+                      <span key={c} className={`mark-handle ${c}`} aria-hidden="true" onPointerDown={onItemDown(m, c)} />
+                    ))}
+                  {ends &&
+                    (['start', 'end'] as const).map((h) => {
+                      const px = h === 'start' ? m.x : m.x + m.w;
+                      const py = h === 'start' ? m.y : m.y + m.h;
+                      return (
+                        <span
+                          key={h}
+                          className="mark-handle end"
+                          data-handle={h}
+                          aria-hidden="true"
+                          style={{ left: pct((px - b.x) / b.w), top: pct((py - b.y) / b.h) }}
+                          onPointerDown={onItemDown(m, h)}
+                        />
+                      );
+                    })}
                   <button
                     type="button"
                     className="mark-remove"

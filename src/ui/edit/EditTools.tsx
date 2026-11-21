@@ -1,15 +1,22 @@
-import type { InkColor } from '../../model/document';
+import type { HighlightColor, InkColor } from '../../model/document';
+import { HIGHLIGHT } from '../../edit/draw';
 import { INK, type MarkSize } from '../../edit/text';
 import { strings } from '../strings';
-import { PLACE_TOOLS, type CoverColor, type EditTool, type PlaceTool } from './MarkLayer';
+import { DRAW_TOOLS, PLACE_TOOLS, type CoverColor, type DrawTool, type EditTool, type PlaceTool } from './MarkLayer';
 
 const INK_LABEL = (c: InkColor) => (c === 'black' ? strings.inkBlack : c === 'blue' ? strings.inkBlue : strings.inkRed);
 const SIZE_LABEL = (s: MarkSize) => (s === 1 ? strings.sizeSmall : s === 2 ? strings.sizeMedium : strings.sizeLarge);
-const PLACE_HINT: Record<PlaceTool, () => string> = {
+const HL_LABEL = (c: HighlightColor) => (c === 'yellow' ? strings.hlYellow : c === 'green' ? strings.hlGreen : strings.hlPink);
+const HINT: Record<PlaceTool | DrawTool, () => string> = {
   write: () => strings.writeHint,
   tick: () => strings.tickHint,
   cross: () => strings.tickHint,
   date: () => strings.dateHint,
+  pen: () => strings.penHint,
+  highlight: () => strings.highlightHint,
+  arrow: () => strings.arrowHint,
+  rect: () => strings.shapeHint,
+  ellipse: () => strings.shapeHint,
 };
 
 /** Tool strip at the bottom of the preview in "Edytuj". */
@@ -22,6 +29,8 @@ export function EditTools({
   onInk,
   size,
   onSize,
+  highlight,
+  onHighlight,
   onSign,
   onCropAll,
   onCropNone,
@@ -34,12 +43,15 @@ export function EditTools({
   onInk(c: InkColor): void;
   size: MarkSize;
   onSize(s: MarkSize): void;
+  highlight: HighlightColor;
+  onHighlight(c: HighlightColor): void;
   onSign(): void;
   onCropAll(): void;
   onCropNone(): void;
 }) {
   const toggle = (t: Exclude<EditTool, null>) => () => onTool(tool === t ? null : t);
   const placing = PLACE_TOOLS.includes(tool as PlaceTool);
+  const drawing = DRAW_TOOLS.includes(tool as DrawTool);
   const toolButton = (t: Exclude<EditTool, null>, icon: string, label: string) => (
     <button type="button" className="edit-tool" aria-pressed={tool === t} aria-label={label} onClick={toggle(t)}>
       <span className="edit-tool-icon" aria-hidden="true">
@@ -77,11 +89,23 @@ export function EditTools({
           </div>
         </div>
       )}
-      {placing && (
+      {(placing || drawing) && (
         <div className="edit-options">
-          <p className="edit-hint">{PLACE_HINT[tool as PlaceTool]()}</p>
+          <p className="edit-hint">{HINT[tool as PlaceTool | DrawTool]()}</p>
           <div className="edit-style">
-            {(['black', 'blue', 'red'] as const).map((c) => (
+            {tool === 'highlight' &&
+              (['yellow', 'green', 'pink'] as const).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="ink-swatch"
+                  aria-pressed={highlight === c}
+                  aria-label={HL_LABEL(c)}
+                  style={{ background: HIGHLIGHT[c] }}
+                  onClick={() => onHighlight(c)}
+                />
+              ))}
+            {tool !== 'highlight' && (['black', 'blue', 'red'] as const).map((c) => (
               <button
                 key={c}
                 type="button"
@@ -92,7 +116,7 @@ export function EditTools({
                 onClick={() => onInk(c)}
               />
             ))}
-            <div className="segmented edit-sizes" role="group">
+            {placing && <div className="segmented edit-sizes" role="group">
               {([1, 2, 3] as const).map((s) => (
                 <button key={s} type="button" aria-pressed={size === s} aria-label={SIZE_LABEL(s)} onClick={() => onSize(s)}>
                   <span style={{ fontSize: 10 + s * 3 }} aria-hidden="true">
@@ -100,7 +124,7 @@ export function EditTools({
                   </span>
                 </button>
               ))}
-            </div>
+            </div>}
           </div>
         </div>
       )}
@@ -109,6 +133,11 @@ export function EditTools({
         {toolButton('tick', '✓', strings.toolTick)}
         {toolButton('cross', '✗', strings.toolCross)}
         {toolButton('date', '📅', strings.toolDate)}
+        {toolButton('pen', '✎', strings.toolPen)}
+        {toolButton('highlight', '🖍', strings.toolHighlight)}
+        {toolButton('arrow', '↗', strings.toolArrow)}
+        {toolButton('rect', '▭', strings.toolRect)}
+        {toolButton('ellipse', '◯', strings.toolEllipse)}
         {toolButton('cover', '▬', strings.cover)}
         {toolButton('crop', '⛶', strings.pageCrop)}
         <button type="button" className="edit-tool" aria-label={strings.sign} onClick={onSign}>

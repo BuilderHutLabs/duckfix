@@ -19,7 +19,7 @@ import { MarkTextSheet } from './edit/MarkTextSheet';
 import { loadEditStyle, saveEditStyle, type EditStyle } from './edit/style';
 import { FONT_FRAC, TICK_FRAC, newTextBox, tickBox, todayText, type MarkSize } from '../edit/text';
 import { currentLanguage } from '../i18n';
-import type { InkColor, Mark } from '../model/document';
+import type { HighlightColor, InkColor, Mark } from '../model/document';
 
 interface Props {
   /** Visible pages in grid order; the arrows walk this list. */
@@ -182,8 +182,11 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     saveEditStyle(s);
     // a selected text or tick takes the new colour / size at once
     if (!selected) return;
-    if (next.ink && (selected.kind === 'text' || selected.kind === 'check' || selected.kind === 'cross')) {
+    if (next.ink && selected.kind !== 'cover' && selected.kind !== 'highlight') {
       updateMark(page.id, selected.id, { color: next.ink });
+    }
+    if (next.highlight && selected.kind === 'highlight') {
+      updateMark(page.id, selected.id, { color: next.highlight });
     }
     if (next.size && selected.kind === 'text') {
       const h = selected.text.split('\n').length * 1.25 * FONT_FRAC[next.size];
@@ -292,6 +295,8 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             editing={editing && tool !== 'crop'}
             tool={tool}
             coverColor={coverColor}
+            ink={style.ink}
+            highlight={style.highlight}
             selectedId={selectedId}
             onSelect={setSelectedId}
             onPlace={placeMark}
@@ -316,6 +321,8 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           onInk={(ink: InkColor) => changeStyle({ ink })}
           size={style.size}
           onSize={(size: MarkSize) => changeStyle({ size })}
+          highlight={style.highlight}
+          onHighlight={(highlight: HighlightColor) => changeStyle({ highlight })}
           onSign={sign}
           onCropAll={() => setCrop(doc.pages.map((p) => p.id), page.crop)}
           onCropNone={() => setCrop([page.id], undefined)}
