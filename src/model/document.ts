@@ -1,3 +1,4 @@
+import { turnPage } from '../edit/turn';
 import type { ScanFilter } from '../scan/enhance';
 
 export type Rotation = 0 | 90 | 180 | 270;
@@ -81,9 +82,13 @@ function mapPages(doc: Doc, ids: string[], fn: (p: Page) => Page): Doc {
 /** Flags a manual rotation resolves: the user has looked at the page ("checked"). */
 const CHECKED_BY_ROTATION: readonly PageFlag[] = ['check-orientation', 'low-text', 'blank'];
 
-export function rotatePages(doc: Doc, ids: string[], delta: 90 | -90 | 180): Doc {
+/**
+ * `aspectOf` gives width / height of a page as it looks before the turn (for upright text and signatures);
+ * unknown pages are taken as A4 standing up.
+ */
+export function rotatePages(doc: Doc, ids: string[], delta: 90 | -90 | 180, aspectOf?: (id: string) => number | undefined): Doc {
   return mapPages(doc, ids, (p) => ({
-    ...p,
+    ...turnPage(p, delta, aspectOf?.(p.id) ?? Math.SQRT1_2),
     rotation: addRotation(p.rotation, delta),
     flags: p.flags.filter((f) => !CHECKED_BY_ROTATION.includes(f)),
   }));

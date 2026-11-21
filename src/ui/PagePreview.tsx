@@ -265,7 +265,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => setEditing(true))}>
               {strings.edit}
             </button>
-            <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => rotate([page.id], 90))}>
+            <button type="button" className="btn btn-plain preview-rotate" onClick={guarded(() => rotate([page.id], 90, () => (rect && rect.height > 0 ? rect.width / rect.height : undefined)))}>
               {strings.rotate}
             </button>
           </>

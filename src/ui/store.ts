@@ -443,9 +443,9 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       });
     },
 
-    rotate(ids: Iterable<string>, delta: 90 | -90 | 180) {
+    rotate(ids: Iterable<string>, delta: 90 | -90 | 180, aspectOf?: (id: string) => number | undefined) {
       const valid = existing(ids);
-      if (valid.length) commit(rotatePages(history.present, valid, delta));
+      if (valid.length) commit(rotatePages(history.present, valid, delta, aspectOf));
     },
 
     move(from: number, to: number) {
