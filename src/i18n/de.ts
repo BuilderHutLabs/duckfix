@@ -68,6 +68,11 @@ export const de: Strings = {
   filterColor: 'Farbe',
   filterWhiten: 'Aufgehellt',
   filterBw: 'Schwarzweiß',
+  pageLook: 'Seitenaussehen',
+  pageLookCount: (n) => `Gilt für ${n} ${n === 1 ? 'Seite' : 'Seiten'}`,
+  filterWhitenHint: 'Weißer Hintergrund ohne Schatten, klarer Text.',
+  filterBwHint: 'Nur schwarzer Text. Kleinste Datei, gut zum Drucken.',
+  filterColorHint: 'Wie gescannt.',
   insertHere: 'Seiten hier einfügen',
   addAtEnd: 'Dateien hinzufügen',
 

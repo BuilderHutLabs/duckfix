@@ -114,7 +114,7 @@ export const PageThumb = memo(function PageThumb({
   // Render the miniature only when it comes near the viewport.
   useEffect(() => {
     if (!source) return;
-    const request = () => cache.request(page.id, source, page.source);
+    const request = () => cache.request(page.id, source, page.source, page.filter ?? 'color');
     const el = box.current;
     if (!el || typeof IntersectionObserver === 'undefined') return request();
     const io = new IntersectionObserver(
@@ -128,7 +128,7 @@ export const PageThumb = memo(function PageThumb({
     );
     io.observe(el);
     return () => io.disconnect();
-  }, [cache, page.id, page.source, source]);
+  }, [cache, page.id, page.source, page.filter, source]);
 
   const hold = useMouseHold(page.id, onPreview);
   const angle = useContinuousAngle(effectiveRotation(page) + page.skewDeg);

@@ -1,3 +1,4 @@
+import type { ScanFilter } from '../scan/enhance';
 import { storageKey } from '../config';
 import { currentLanguage, formatSize, type Lang } from '../i18n';
 import { createOcrEngine, type OcrEngine } from '../export/ocr';
@@ -9,6 +10,7 @@ import {
   insertPages,
   movePage,
   rotatePages,
+  setPageFilter,
   type Doc,
   type Page,
 } from '../model/document';
@@ -50,6 +52,8 @@ export interface AppState {
   saveSheetOpen: boolean;
   /** Camera photo waiting on the crop screen. */
   scanPhoto: File | null;
+  /** Pages the "Wygląd stron" sheet applies to (open while set). */
+  filterSheetIds: string[] | null;
   /** Where the cropped photo goes: a page index, or null for the end / a new document. */
   scanIndex: number | null;
   /** Last choices in the save sheet (remembered). */
@@ -220,6 +224,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     exportReady: null,
     saveSheetOpen: false,
     scanPhoto: null,
+    filterSheetIds: null,
     scanIndex: null,
     exportOptions: loadExportOptions(deps.storage),
     notice: null,
@@ -455,6 +460,22 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         })
         .catch(() => set({ error: strings.genericError }));
       return scanChain;
+    },
+
+    openFilterSheet(ids: Iterable<string>) {
+      const valid = existing(ids);
+      if (valid.length) set({ filterSheetIds: valid });
+    },
+
+    closeFilterSheet() {
+      set({ filterSheetIds: null });
+    },
+
+    /** Sets the look of pages (undoable); the sheet closes. */
+    setFilter(ids: Iterable<string>, filter: ScanFilter) {
+      const valid = existing(ids);
+      set({ filterSheetIds: null });
+      if (valid.length) commit(setPageFilter(history.present, valid, filter));
     },
 
     showError(message: string) {

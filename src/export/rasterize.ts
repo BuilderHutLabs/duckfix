@@ -2,6 +2,7 @@ import { effectiveRotation } from '../model/document';
 import { releaseCanvas, renderPage, getPdf } from '../imaging/render';
 import { isNearBitonal, toGray } from '../imaging/gray';
 import type { Rasterizer } from './exportPdf';
+import { applyCanvasFilter } from '../imaging/filter';
 
 const DPI = 300;
 const IMAGE_MAX_SIDE = 3508; // A4 @ 300 DPI
@@ -81,6 +82,7 @@ export const browserRasterizer: Rasterizer = async (page, source, opts) => {
   const maxSide = budgetedMaxSide(dims.w, dims.h, deg, dims.desiredMaxSide);
   const raw = await renderPage(source, page.source, maxSide);
   try {
+    applyCanvasFilter(raw, page.filter);
     return await finish(raw, page, deg, dims, compress);
   } finally {
     releaseCanvas(raw);

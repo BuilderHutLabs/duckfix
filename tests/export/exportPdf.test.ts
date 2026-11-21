@@ -166,6 +166,15 @@ describe('exportPdf', () => {
     expect(ocr.textLayer).toHaveBeenCalledTimes(1);
   });
 
+  it('a page with a look (Wybielony) is rasterized, untouched PDF page or not', async () => {
+    const src = await makePdf([[100, 100], [100, 100]]);
+    const r = fakeRaster();
+    const doc: Doc = { pages: [pdfPage(0, { filter: 'whiten' }), pdfPage(1)] };
+    await exportPdf(doc, new Map([['f1', src]]), r);
+    expect(r).toHaveBeenCalledTimes(1);
+    expect(r.mock.calls[0][0].filter).toBe('whiten');
+  });
+
   it('always rasterizes image pages', async () => {
     const img: SourceFile = { id: 'i1', name: 'foto.jpg', type: 'image', blob: new Blob([PNG as BlobPart]) };
     const r = fakeRaster();

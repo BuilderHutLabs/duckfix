@@ -1,3 +1,5 @@
+import type { ScanFilter } from '../scan/enhance';
+
 export type Rotation = 0 | 90 | 180 | 270;
 export type PageFlag = 'check-orientation' | 'low-text' | 'blank';
 
@@ -13,6 +15,8 @@ export interface Page {
   flags: PageFlag[];
   autoRotation: Rotation | null;
   analyzed: boolean;
+  /** Look of the page ("Wygląd strony"); missing = as scanned. */
+  filter?: ScanFilter;
 }
 
 export interface Doc {
@@ -44,6 +48,11 @@ export function movePage(doc: Doc, fromIndex: number, toIndex: number): Doc {
   const [moved] = pages.splice(fromIndex, 1);
   pages.splice(toIndex, 0, moved);
   return { pages };
+}
+
+/** Sets the look (Kolor / Wybielony / Czarno-biały) of the given pages. */
+export function setPageFilter(doc: Doc, ids: string[], filter: ScanFilter): Doc {
+  return mapPages(doc, ids, (p) => ({ ...p, filter }));
 }
 
 export function deletePages(doc: Doc, ids: string[]): Doc {

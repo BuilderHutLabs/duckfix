@@ -6,7 +6,7 @@ import { ThemePicker } from './ThemePicker';
 
 /** The ⋯ popover of the review top bar: select mode, deskew switch, diagnostics. */
 export function MoreMenu() {
-  const { deskew, setDeskew, toggleSelecting, openDiagnostics } = useAppStore();
+  const { deskew, setDeskew, toggleSelecting, openDiagnostics, openFilterSheet, doc } = useAppStore();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
@@ -48,6 +48,9 @@ export function MoreMenu() {
         <div className="menu-panel">
           <button type="button" className="menu-item" onClick={choose(toggleSelecting)}>
             {strings.select}
+          </button>
+          <button type="button" className="menu-item" onClick={choose(() => openFilterSheet(doc.pages.map((p) => p.id)))}>
+            {strings.pageLook}
           </button>
           <div className="menu-sep" />
           <label className="switch-row">

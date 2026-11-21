@@ -1,4 +1,6 @@
 import type { SourceRef } from '../model/document';
+import type { ScanFilter } from '../scan/enhance';
+import { applyCanvasFilter } from '../imaging/filter';
 import type { SourceFile } from '../import/importFiles';
 import { releaseCanvas, renderPage } from '../imaging/render';
 
@@ -10,11 +12,12 @@ export interface ThumbnailDeps {
   toBlob(canvas: HTMLCanvasElement): Promise<Blob>;
   createUrl(blob: Blob): string;
   revokeUrl(url: string): void;
+  applyFilter(canvas: HTMLCanvasElement, filter: ScanFilter): void;
 }
 
 export interface ThumbnailCache {
   /** Queues a render of the raw page unless it is already cached or queued. */
-  request(pageId: string, source: SourceFile, ref: SourceRef): void;
+  request(pageId: string, source: SourceFile, ref: SourceRef, filter?: ScanFilter): void;
   get(pageId: string): ThumbState | undefined;
   subscribe(pageId: string, cb: () => void): () => void;
   /** Drops (and revokes) every entry whose page id is not in `ids`. */
@@ -35,16 +38,20 @@ export const browserThumbnailDeps: ThumbnailDeps = {
     ),
   createUrl: (b) => URL.createObjectURL(b),
   revokeUrl: (u) => URL.revokeObjectURL(u),
+  applyFilter: applyCanvasFilter,
 };
 
 interface Job {
   pageId: string;
   source: SourceFile;
   ref: SourceRef;
+  filter: ScanFilter;
 }
 
 export function createThumbnailCache(deps: ThumbnailDeps = browserThumbnailDeps): ThumbnailCache {
   const entries = new Map<string, ThumbState>();
+  /** look each entry was drawn with; a new look draws the page again */
+  const looks = new Map<string, ScanFilter>();
   const listeners = new Map<string, Set<() => void>>();
   let queue: Job[] = [];
   let active = 0;
@@ -70,6 +77,7 @@ export function createThumbnailCache(deps: ThumbnailDeps = browserThumbnailDeps)
     let canvas: HTMLCanvasElement | undefined;
     try {
       canvas = await deps.render(job.source, job.ref, MAX_SIDE);
+      if (job.filter !== 'color') deps.applyFilter(canvas, job.filter);
       const blob = await deps.toBlob(canvas);
       settle(() => ({ status: 'ready', url: deps.createUrl(blob) }));
     } catch {
@@ -91,10 +99,14 @@ export function createThumbnailCache(deps: ThumbnailDeps = browserThumbnailDeps)
   };
 
   return {
-    request(pageId, source, ref) {
-      if (entries.has(pageId)) return;
+    request(pageId, source, ref, filter = 'color') {
+      if (entries.has(pageId)) {
+        if ((looks.get(pageId) ?? 'color') === filter) return;
+        drop(pageId);
+      }
+      looks.set(pageId, filter);
       entries.set(pageId, { status: 'pending' });
-      queue.push({ pageId, source, ref });
+      queue.push({ pageId, source, ref, filter });
       pump();
     },
     get: (pageId) => entries.get(pageId),

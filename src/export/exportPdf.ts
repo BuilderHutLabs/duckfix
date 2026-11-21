@@ -21,7 +21,7 @@ export function exportFileName(original: string, suffix: string = strings.export
 }
 
 function needsRaster(page: Page): boolean {
-  return page.source.kind === 'image' || page.skewDeg !== 0;
+  return page.source.kind === 'image' || page.skewDeg !== 0 || (page.filter !== undefined && page.filter !== 'color');
 }
 
 /** A PDF page copied as is keeps its own text; anything else has none until OCR adds it. */

@@ -24,6 +24,7 @@ function setup(fail: Set<string> = new Set()) {
     toBlob: vi.fn(async () => new Blob(['png'])),
     createUrl: vi.fn(() => `blob:${++n}`),
     revokeUrl: vi.fn(),
+    applyFilter: vi.fn(),
   };
   const releaseAll = async () => {
     while (pending.length) {
@@ -89,5 +90,21 @@ describe('thumbnail cache', () => {
     expect(t.deps.createUrl).not.toHaveBeenCalled();
     expect(t.deps.release).toHaveBeenCalledTimes(1);
     expect(cache.get('a')).toBeUndefined();
+  });
+
+  it('a page whose look changed (Wybielony) is drawn again with the filter', async () => {
+    const t = setup();
+    const cache = createThumbnailCache(t.deps);
+    cache.request('p0', source, ref);
+    await t.releaseAll();
+    expect(t.deps.applyFilter).not.toHaveBeenCalled();
+    cache.request('p0', source, ref, 'whiten');
+    await t.releaseAll();
+    expect(t.deps.render).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(t.deps.applyFilter).mock.calls[0][1]).toBe('whiten');
+    expect(t.deps.revokeUrl).toHaveBeenCalledWith('blob:1');
+    cache.request('p0', source, ref, 'whiten'); // same look: kept
+    await t.releaseAll();
+    expect(t.deps.render).toHaveBeenCalledTimes(2);
   });
 });

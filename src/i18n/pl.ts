@@ -75,6 +75,11 @@ export const pl = {
   filterColor: 'Kolor',
   filterWhiten: 'Wybielony',
   filterBw: 'Czarno-biały',
+  pageLook: 'Wygląd stron',
+  pageLookCount: (n: number) => `Dotyczy stron: ${n}`,
+  filterWhitenHint: 'Białe tło bez cieni, wyraźny tekst.',
+  filterBwHint: 'Sam czarny tekst. Najlżejszy plik, dobry do druku.',
+  filterColorHint: 'Tak, jak zeskanowano.',
   insertHere: 'Wstaw strony tutaj',
   addAtEnd: 'Dodaj pliki',
 

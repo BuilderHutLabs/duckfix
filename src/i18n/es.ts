@@ -68,6 +68,11 @@ export const es: Strings = {
   filterColor: 'Color',
   filterWhiten: 'Blanqueado',
   filterBw: 'Blanco y negro',
+  pageLook: 'Aspecto de las páginas',
+  pageLookCount: (n) => `Se aplica a ${n} ${n === 1 ? 'página' : 'páginas'}`,
+  filterWhitenHint: 'Fondo blanco sin sombras, texto nítido.',
+  filterBwHint: 'Solo texto negro. El archivo más ligero, ideal para imprimir.',
+  filterColorHint: 'Tal como se escaneó.',
   insertHere: 'Insertar páginas aquí',
   addAtEnd: 'Añadir archivos',
 

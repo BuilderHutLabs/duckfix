@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { effectiveRotation } from '../model/document';
 import { releaseCanvas, renderPage } from '../imaging/render';
+import { applyCanvasFilter } from '../imaging/filter';
 import type { ThumbnailCache } from './thumbnails';
 import { useAppStore } from './store';
 import { strings } from './strings';
@@ -39,6 +40,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   const open = page !== undefined && index >= 0;
   const source = page ? sources.get(page.source.fileId) : undefined;
   const sourceRef = page?.source;
+  const look = page?.filter;
   const pageId = open ? page.id : null;
 
   const [full, setFull] = useState<{ id: string; url: string } | null>(null);
@@ -55,6 +57,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
       try {
         canvas = await render(source, sourceRef, previewMaxSide());
         if (cancelled) return;
+        applyCanvasFilter(canvas, look);
         const blob = await canvasToBlob(canvas);
         if (cancelled) return;
         url = URL.createObjectURL(blob);
@@ -73,7 +76,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
         setFull((cur) => (cur?.url === revoked ? null : cur));
       }
     };
-  }, [pageId, source, sourceRef, render]);
+  }, [pageId, source, sourceRef, look, render]);
 
   const prevId = index > 0 ? pageIds[index - 1] : null;
   const nextId = index >= 0 && index < pageIds.length - 1 ? pageIds[index + 1] : null;

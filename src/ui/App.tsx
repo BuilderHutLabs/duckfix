@@ -7,6 +7,7 @@ import { Home } from './Home';
 import { Toolbar } from './Toolbar';
 import { ActionBar } from './ActionBar';
 import { SaveSheet } from './SaveSheet';
+import { FilterSheet } from './FilterSheet';
 import { ScanCrop } from './ScanCrop';
 import { CameraInput } from './camera';
 import { Progress } from './Progress';
@@ -105,6 +106,7 @@ function Shell() {
           <ReviewGrid />
           <ActionBar />
           <SaveSheetHost />
+          <FilterSheetHost />
         </div>
       )}
     </>
@@ -114,6 +116,11 @@ function Shell() {
 function ScanHost() {
   const { scanPhoto } = useAppStore();
   return scanPhoto ? <ScanCrop key={`${scanPhoto.name}-${scanPhoto.lastModified}-${scanPhoto.size}`} file={scanPhoto} /> : null;
+}
+
+function FilterSheetHost() {
+  const { filterSheetIds } = useAppStore();
+  return filterSheetIds ? <FilterSheet ids={filterSheetIds} /> : null;
 }
 
 function SaveSheetHost() {
