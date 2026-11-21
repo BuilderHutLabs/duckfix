@@ -36,7 +36,7 @@ export function ActionBar() {
       {s.exportReady ? (
         // separate tap: the share sheet needs a fresh user activation after a long export
         <button type="button" className="btn btn-primary" onClick={() => void s.shareExport()}>
-          {strings.shareExport}
+          {s.exportSend ? strings.sendNow : strings.shareExport}
         </button>
       ) : s.busy === 'exporting' ? (
         <>

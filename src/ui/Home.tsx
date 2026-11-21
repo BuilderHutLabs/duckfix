@@ -42,6 +42,10 @@ export function Home() {
         {strings.appName}
       </h1>
       <p className="home-subtitle">{strings.appDescription}</p>
+      <p className="home-privacy">
+        <span aria-hidden="true">🔒</span>
+        {strings.privacyNote}
+      </p>
       {restorable ? (
         <div className="home-restore">
           <button type="button" className="btn btn-primary btn-huge" onClick={restore}>
@@ -52,12 +56,7 @@ export function Home() {
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          className="btn btn-primary btn-huge"
-          disabled={busy === 'opening'}
-          onClick={() => input.current?.click()}
-        >
+        <button type="button" className="btn btn-primary btn-huge" disabled={busy === 'opening'} onClick={() => input.current?.click()}>
           {busy === 'opening' ? strings.opening : strings.open}
         </button>
       )}

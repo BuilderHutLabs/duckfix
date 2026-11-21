@@ -40,7 +40,7 @@ import type { OrientationDetector } from '../orientation/detector';
 import { DEFAULT_THRESHOLDS } from '../orientation/policy';
 import { exportFileName, exportPdf } from '../export/exportPdf';
 import { browserRasterizer } from '../export/rasterize';
-import { downloadFile, pdfFile, prefersShareSheet, shareOrDownload } from '../export/share';
+import { canShareFiles, downloadFile, pdfFile, prefersShareSheet, shareOrDownload } from '../export/share';
 import { createMetrics } from '../diagnostics/metrics';
 import { indexedDbSession, type SessionStorage, type StoredSession } from '../storage/session';
 import { strings } from './strings';
@@ -64,6 +64,10 @@ export interface AppState {
   exportProgress: { done: number; total: number; ocr: boolean } | null;
   /** Exported PDF waiting for the user's tap on "Udostępnij / Zapisz". */
   exportReady: File | File[] | null;
+  /** The ready file came from "Wyślij" (the button says so); else from saving on iPhone/iPad. */
+  exportSend: boolean;
+  /** "Wyślij" is offered (the phone's share menu takes files). */
+  canShareFiles: boolean;
   /** "Zapisz PDF" opened the save options sheet. */
   saveSheetOpen: boolean;
   /** Pages the save sheet saves (select mode); null = the whole document. */
@@ -114,6 +118,10 @@ export interface StoreDeps {
   download(file: File): void;
   /** iPhone/iPad: save through the share sheet on a separate tap instead of a download. */
   shareFirst: boolean;
+  /** The phone's share menu takes files ("Wyślij" in the save sheet). */
+  canShareFiles: boolean;
+  /** Locks a finished PDF with a password. */
+  encryptPdf(bytes: Uint8Array, password: string): Promise<Uint8Array>;
   forgetPdf(fileId: string): Promise<void>;
   storage: StorageLike | null;
   session: SessionStorage | null;
@@ -145,6 +153,8 @@ function browserDeps(): StoreDeps {
     share: shareOrDownload,
     download: downloadFile,
     shareFirst: prefersShareSheet(),
+    canShareFiles: canShareFiles(),
+    encryptPdf: (bytes, password) => import('../export/encrypt').then((m) => m.encryptPdf(bytes, password)),
     forgetPdf,
     storage: browserStorage(),
     session: indexedDbSession,
@@ -253,6 +263,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     busy: null,
     exportProgress: null,
     exportReady: null,
+    exportSend: false,
+    canShareFiles: deps.canShareFiles,
     saveSheetOpen: false,
     saveSheetIds: null,
     scanPhoto: null,
@@ -634,12 +646,27 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     },
 
     /** Builds the PDF; sharing is a separate tap (shareExport) with a fresh user activation. */
-    async export(opts: ExportOptions = state.exportOptions, extra: { name?: string; ids?: string[] | null } = {}) {
+    async export(
+      opts: ExportOptions = state.exportOptions,
+      extra: {
+        name?: string;
+        ids?: string[] | null;
+        /** Lock the PDF with this password (never remembered). */
+        password?: string;
+        /** One PDF per page. */
+        split?: boolean;
+        /** "Wyślij": the file waits for one tap that opens the share menu, instead of a download. */
+        send?: boolean;
+      } = {},
+    ) {
       if (state.busy || history.present.pages.length === 0) return;
       saveExportOptions(deps.storage, opts);
       const own = session;
-      const only = extra.ids ? new Set(extra.ids) : null;
-      const doc = only ? { pages: history.present.pages.filter((p) => only.has(p.id)) } : history.present;
+      const byId = new Map(history.present.pages.map((p) => [p.id, p]));
+      // the chosen pages in the chosen order ("5-3" saves 5, 4, 3)
+      const doc = extra.ids ? { pages: extra.ids.map((id) => byId.get(id)).filter((p): p is Page => !!p) } : history.present;
+      const send = !!extra.send;
+      const ready = send || deps.shareFirst;
       if (doc.pages.length === 0) return;
       const base = (extra.name ?? '').trim().replace(/[\\/:*?"<>|]+/g, '-') || actions.defaultFileName();
       const ctrl = new AbortController();
@@ -648,6 +675,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         busy: 'exporting',
         exportProgress: null,
         exportReady: null,
+        exportSend: false,
         error: null,
         notice: null,
         saveSheetOpen: false,
@@ -668,9 +696,9 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
           const files = blobs.map(
             (b, i) => new File([b], blobs.length === 1 ? `${base}.jpg` : `${base} ${i + 1}.jpg`, { type: 'image/jpeg' }),
           );
-          if (deps.shareFirst) {
+          if (ready) {
             exportedDoc = history.present;
-            set({ busy: null, exportProgress: null, exportReady: files });
+            set({ busy: null, exportProgress: null, exportReady: files, exportSend: send });
           } else {
             files.forEach((f) => deps.download(f));
             const size = formatSize(files.reduce((s, f) => s + f.size, 0));
@@ -687,22 +715,34 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
             ocrFailed = true; // save without the text layer and say so
           }
         }
-        const bytes = await deps.exportPdf(
-          doc,
-          state.sources,
-          (done, total) => {
-            if (own === session) set({ exportProgress: { done, total, ocr: engine !== null } });
-          },
-          { compress: opts.compress, ocr: engine, signal: ctrl.signal },
-        );
-        if (own !== session) return;
-        const file = pdfFile(bytes, `${base}.pdf`);
-        if (deps.shareFirst) {
+        // one file, or one per page ("Każda strona osobno")
+        const parts = extra.split && doc.pages.length > 1 ? doc.pages.map((p) => ({ pages: [p] })) : [doc];
+        const total = doc.pages.length;
+        let before = 0;
+        const files: File[] = [];
+        for (const [i, part] of parts.entries()) {
+          let bytes = await deps.exportPdf(
+            part,
+            state.sources,
+            (done) => {
+              if (own === session) set({ exportProgress: { done: before + done, total, ocr: engine !== null } });
+            },
+            { compress: opts.compress, ocr: engine, signal: ctrl.signal },
+          );
+          if (own !== session) return;
+          if (extra.password) bytes = await deps.encryptPdf(bytes, extra.password);
+          if (own !== session) return;
+          before += part.pages.length;
+          files.push(pdfFile(bytes, parts.length === 1 ? `${base}.pdf` : `${base} ${i + 1}.pdf`));
+        }
+        const out = files.length === 1 ? files[0] : files;
+        if (ready) {
           exportedDoc = history.present;
-          set({ busy: null, exportProgress: null, exportReady: file, notice: ocrFailed ? strings.ocrUnavailable : null });
+          set({ busy: null, exportProgress: null, exportReady: out, exportSend: send, notice: ocrFailed ? strings.ocrUnavailable : null });
         } else {
-          deps.download(file);
-          const saved = strings.savedNotice(file.name, formatSize(file.size));
+          files.forEach((f) => deps.download(f));
+          const size = formatSize(files.reduce((n, f) => n + f.size, 0));
+          const saved = strings.savedNotice(files.length === 1 ? files[0].name : `${base} (${files.length})`, size);
           set({ busy: null, exportProgress: null, notice: ocrFailed ? `${saved} ${strings.ocrUnavailable}` : saved });
         }
       } catch (e) {
@@ -722,7 +762,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         const result = await deps.share(file);
         if (result !== 'cancelled' && state.exportReady === file) {
           exportedDoc = null;
-          set({ exportReady: null });
+          set({ exportReady: null, exportSend: false });
         }
       } catch {
         set({ error: strings.exportError });

@@ -39,3 +39,10 @@ describe('Home screen', () => {
     expect(screen.queryByRole('checkbox', { name: strings.deskew })).toBeNull();
   });
 });
+
+describe('privacy note', () => {
+  it('the home screen says the files stay on the device', () => {
+    render(<App store={createAppStore(fakeDeps())} />);
+    expect(screen.getByText(strings.privacyNote)).toBeTruthy();
+  });
+});

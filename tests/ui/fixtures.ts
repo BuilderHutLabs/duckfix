@@ -40,6 +40,8 @@ export function fakeDeps(over: Partial<StoreDeps> = {}): StoreDeps {
     share: vi.fn(async () => 'downloaded' as const),
     download: vi.fn(),
     shareFirst: true,
+    canShareFiles: false,
+    encryptPdf: vi.fn(async (b: Uint8Array) => b),
     forgetPdf: vi.fn(async () => {}),
     storage: null,
     session: null,

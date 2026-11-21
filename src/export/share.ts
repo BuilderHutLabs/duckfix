@@ -48,3 +48,14 @@ export function prefersShareSheet(): boolean {
   if (/iPhone|iPad|iPod/.test(ua)) return true;
   return /Macintosh/.test(ua) && (nav.maxTouchPoints ?? 0) > 1;
 }
+
+/** The phone's share menu takes PDF files (Android Chrome, iPhone/iPad; not most computers). */
+export function canShareFiles(): boolean {
+  try {
+    const nav = typeof navigator === 'undefined' ? undefined : navigator;
+    if (!nav?.share || !nav.canShare) return false;
+    return nav.canShare({ files: [new File([''], 'a.pdf', { type: 'application/pdf' })] });
+  } catch {
+    return false;
+  }
+}

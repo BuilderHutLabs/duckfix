@@ -2,6 +2,7 @@ import { ThemePicker } from './ThemePicker';
 import { useEffect, useRef, useState } from 'react';
 import { isFlagged, useAppStore } from './store';
 import { strings } from './strings';
+import { openTour } from './DuckTour';
 import { IconClose, IconFilter, IconGear, IconRedo, IconUndo } from './icons';
 import { MoreMenu } from './MoreMenu';
 
@@ -53,24 +54,10 @@ export function Toolbar() {
         </span>
       )}
       <span className="toolbar-spacer" />
-      <button
-        type="button"
-        className="btn btn-icon"
-        aria-label={strings.undo}
-        title={strings.undo}
-        disabled={!s.canUndo}
-        onClick={s.undo}
-      >
+      <button type="button" className="btn btn-icon" aria-label={strings.undo} title={strings.undo} disabled={!s.canUndo} onClick={s.undo}>
         <IconUndo />
       </button>
-      <button
-        type="button"
-        className="btn btn-icon"
-        aria-label={strings.redo}
-        title={strings.redo}
-        disabled={!s.canRedo}
-        onClick={s.redo}
-      >
+      <button type="button" className="btn btn-icon" aria-label={strings.redo} title={strings.redo} disabled={!s.canRedo} onClick={s.redo}>
         <IconRedo />
       </button>
       <MoreMenu />
@@ -121,6 +108,17 @@ export function Settings() {
           <p className="settings-hint">{strings.deskewHint}</p>
           <div className="menu-sep" />
           <ThemePicker />
+          <div className="menu-sep" />
+          <button
+            type="button"
+            className="menu-item"
+            onClick={() => {
+              setOpen(false);
+              openTour();
+            }}
+          >
+            {strings.tourAgain}
+          </button>
         </div>
       )}
     </div>

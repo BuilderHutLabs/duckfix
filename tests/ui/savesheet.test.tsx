@@ -155,3 +155,63 @@ describe('save sheet: name, chosen pages, JPG', () => {
     expect(vi.mocked(deps.download).mock.calls[0][0].type).toBe('image/jpeg');
   });
 });
+
+describe('save sheet: pages, one file per page, password, send', () => {
+  it('"Strony": only the typed pages are saved; a wrong range blocks saving', async () => {
+    const { deps } = setup();
+    fireEvent.click(saveButton());
+    const pages = screen.getByRole('textbox', { name: strings.pagesField });
+    fireEvent.change(pages, { target: { value: '9' } });
+    expect(screen.getByText(strings.pagesInvalid(2))).toBeTruthy();
+    expect((screen.getByRole('button', { name: strings.saveConfirm }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(pages, { target: { value: '2' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm }));
+    await waitFor(() => expect(deps.exportPdf).toHaveBeenCalled());
+    expect(vi.mocked(deps.exportPdf).mock.calls[0][0].pages.map((p) => p.id)).toEqual(['p2']);
+  });
+
+  it('"Każda strona osobno": one PDF per page, numbered', async () => {
+    const { deps } = setup();
+    fireEvent.click(saveButton());
+    fireEvent.click(screen.getByRole('switch', { name: strings.splitPages }));
+    fireEvent.change(screen.getByRole('textbox', { name: strings.fileName }), { target: { value: 'Umowa' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm }));
+    await waitFor(() => expect(deps.download).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(deps.exportPdf).mock.calls.map(([d]) => d.pages.map((p) => p.id))).toEqual([['p1'], ['p2']]);
+    expect(vi.mocked(deps.download).mock.calls.map(([f]) => f.name)).toEqual(['Umowa 1.pdf', 'Umowa 2.pdf']);
+  });
+
+  it('password: the PDF is locked with the typed password; an empty password blocks saving; it is not remembered', async () => {
+    const encryptPdf = vi.fn(async () => new Uint8Array([7, 7]));
+    const { deps } = setup({ encryptPdf });
+    fireEvent.click(saveButton());
+    fireEvent.click(screen.getByRole('switch', { name: strings.passwordSwitch }));
+    expect((screen.getByRole('button', { name: strings.saveConfirm }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText(strings.passwordField), { target: { value: 'tajne1' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm }));
+    await waitFor(() => expect(deps.download).toHaveBeenCalled());
+    expect(encryptPdf).toHaveBeenCalledWith(new Uint8Array([1]), 'tajne1');
+    expect(vi.mocked(deps.download).mock.calls[0][0].size).toBe(2);
+
+    fireEvent.click(saveButton());
+    expect(screen.getByRole('switch', { name: strings.passwordSwitch }).getAttribute('aria-checked')).toBe('false');
+    expect(JSON.stringify(deps.storage)).not.toContain('tajne1');
+  });
+
+  it('"Wyślij": after building, one tap opens the phone\'s share menu', async () => {
+    const { deps } = setup({ canShareFiles: true });
+    fireEvent.click(saveButton());
+    fireEvent.click(screen.getByRole('button', { name: strings.sendConfirm }));
+    const send = await screen.findByRole('button', { name: strings.sendNow });
+    expect(deps.download).not.toHaveBeenCalled();
+    await act(async () => fireEvent.click(send));
+    expect(deps.share).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(deps.share).mock.calls[0][0]).toMatchObject({ name: 'skan (poprawiony).pdf' });
+  });
+
+  it('no "Wyślij" where the browser cannot share files', () => {
+    setup({ canShareFiles: false });
+    fireEvent.click(saveButton());
+    expect(screen.queryByRole('button', { name: strings.sendConfirm })).toBeNull();
+  });
+});
