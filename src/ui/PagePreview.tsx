@@ -206,7 +206,6 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     } else {
       addMark(page.id, { id, kind: tool === 'tick' ? 'check' : 'cross', color: style.ink, ...tickBox(style.size, at, pageW, pageH) });
     }
-    setSelectedId(id);
   };
 
   const finishWriting = (text: string) => {
@@ -214,7 +213,6 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     if ('at' in writing) {
       const id = crypto.randomUUID();
       addMark(page.id, { id, kind: 'text', text, color: style.ink, size: style.size, ...newTextBox(text, style.size, writing.at, pageW, pageH, measureText) });
-      setSelectedId(id);
     } else {
       const m = page.marks?.find((x) => x.id === writing.id);
       if (m?.kind === 'text') {

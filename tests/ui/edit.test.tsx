@@ -184,6 +184,18 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     expect(marks(store)[0]).toMatchObject({ kind: 'cross' });
   });
 
+  it('a new item comes without handles; touching it shows them, touching the page hides them', () => {
+    const store = openPreview();
+    startTool(strings.toolTick);
+    tap(layer(), 250, 350);
+    expect(document.querySelector('.mark-item.selected')).toBeNull();
+    tap(document.querySelector(`[data-mark="${marks(store)[0].id}"]`)!, 250, 350);
+    expect(document.querySelector('.mark-item.selected')).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: strings.toolTick })); // tool off
+    tap(layer(), 50, 600);
+    expect(document.querySelector('.mark-item.selected')).toBeNull();
+  });
+
   it('Data writes today\'s date with one tap', () => {
     const store = openPreview();
     startTool(strings.toolDate);

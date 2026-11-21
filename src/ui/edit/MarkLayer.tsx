@@ -112,10 +112,9 @@ export function MarkLayer({
   /** A finger on an empty part of the page: place, draw or cover, depending on the tool. */
   const onLayerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!editing || e.target !== e.currentTarget) return;
-    if (!tool || tool === 'crop') {
-      onSelect(null);
-      return;
-    }
+    // a touch outside the selected item hides its handles; new items come without them
+    onSelect(null);
+    if (!tool || tool === 'crop') return;
     e.preventDefault();
     const layer = e.currentTarget;
     const a = frac(e, layer);
@@ -187,7 +186,6 @@ export function MarkLayer({
           const m = shape();
           addMark(page.id, tool === 'cover' && hasBox(m) ? { ...m, w: Math.max(m.w, MIN), h: Math.max(m.h, MIN) } : m);
         }
-        onSelect(id);
       },
     );
   };
