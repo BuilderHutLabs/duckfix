@@ -122,8 +122,8 @@ export function findSheet(photo: Photo): Quad | null {
 }
 
 /** Straightens the sheet inside `q` (photo pixels) into an upright JPEG. */
-export async function warpToBlob(photo: Photo, q: Quad, filter: ScanFilter = 'whiten'): Promise<Blob> {
-  const { w, h } = warpSize(q);
+export async function warpToBlob(photo: Photo, q: Quad, filter: ScanFilter = 'whiten', maxSide = 2400): Promise<Blob> {
+  const { w, h } = warpSize(q, maxSide);
   // sample from a copy no larger than needed (and within the canvas budget)
   const k = Math.min(1, SOURCE_SIDE / Math.max(photo.width, photo.height), Math.sqrt(MAX_CANVAS_PIXELS / 2 / (photo.width * photo.height)));
   const sw = Math.max(1, Math.round(photo.width * k));
@@ -177,4 +177,9 @@ export async function warpToBlob(photo: Photo, q: Quad, filter: ScanFilter = 'wh
     releaseCanvas(src);
     releaseCanvas(out);
   }
+}
+
+/** Small straightened copy with the chosen look, for the crop screen preview (object URL). */
+export async function warpPreview(photo: Photo, q: Quad, filter: ScanFilter): Promise<string> {
+  return URL.createObjectURL(await warpToBlob(photo, q, filter, 520));
 }

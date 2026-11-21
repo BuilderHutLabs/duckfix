@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { findSheet, loadPhoto, warpToBlob, type Photo } from '../scan/warp';
+import { findSheet, loadPhoto, warpPreview, warpToBlob, type Photo } from '../scan/warp';
 import { defaultQuad, type Quad } from '../scan/quad';
 import { openCamera } from './camera';
 import { storageKey } from '../config';
@@ -36,6 +36,9 @@ export function ScanCrop({ file }: { file: File }) {
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [quad, setQuad] = useState<Quad | null>(null);
   const [filter, setFilter] = useState<ScanFilter>(loadFilter);
+  const [preview, setPreview] = useState<string | null>(null);
+  /** corners while a finger is dragging; the preview waits for the drop */
+  const [dragging, setDragging] = useState(false);
   const stage = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ left: 0, top: 0, scale: 1 });
   /** the photo is handed to a running warp; the warp closes it, not the unmount */
@@ -65,6 +68,30 @@ export function ScanCrop({ file }: { file: File }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [file]);
 
+  // preview of the straightened page with the chosen look (after a drag ends, not on every move)
+  useEffect(() => {
+    if (!photo || !quad || dragging) return;
+    let alive = true;
+    let made: string | null = null;
+    const t = setTimeout(() => {
+      void warpPreview(photo, quad, filter)
+        .then((url) => {
+          made = url;
+          if (alive) setPreview(url);
+          else URL.revokeObjectURL(url);
+        })
+        .catch(() => {});
+    }, 120);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+      if (made) {
+        const old = made;
+        setTimeout(() => URL.revokeObjectURL(old), 1000); // after the next preview replaced it
+      }
+    };
+  }, [photo, quad, filter, dragging]);
+
   // where the photo sits inside the stage (object-fit: contain)
   useEffect(() => {
     if (!photo || !stage.current) return;
@@ -83,6 +110,7 @@ export function ScanCrop({ file }: { file: File }) {
     e.preventDefault();
     const el = e.currentTarget;
     el.setPointerCapture?.(e.pointerId);
+    setDragging(true);
     const move = (ev: PointerEvent) => {
       const r = stage.current!.getBoundingClientRect();
       const x = Math.min(photo.width, Math.max(0, (ev.clientX - r.left - box.left) / box.scale));
@@ -90,6 +118,7 @@ export function ScanCrop({ file }: { file: File }) {
       setQuad((q) => q && (q.map((p, k) => (k === i ? { x, y } : p)) as Quad));
     };
     const up = () => {
+      setDragging(false);
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
@@ -140,6 +169,7 @@ export function ScanCrop({ file }: { file: File }) {
             ))}
           </>
         )}
+        {preview && <img className="scan-preview" src={preview} alt={strings.cropPreview} />}
       </div>
       <div className="segmented scan-filters" role="group">
         {FILTERS.map((f) => (

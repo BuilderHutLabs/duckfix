@@ -15,6 +15,7 @@ vi.mock('../../src/scan/warp', () => ({
   loadPhoto: vi.fn(async () => ({ width: 4000, height: 3000, url: 'blob:photo', bitmap: {}, close: vi.fn() })),
   findSheet: vi.fn(() => null),
   warpToBlob: vi.fn(async () => new Blob(['jpg'], { type: 'image/jpeg' })),
+  warpPreview: vi.fn(async () => 'blob:preview'),
 }));
 
 const photo = () => new File(['x'], 'IMG_0001.jpg', { type: 'image/jpeg' });
@@ -127,6 +128,19 @@ describe('camera scan', () => {
     await takePhoto();
     await screen.findByRole('dialog', { name: strings.cropTitle });
     expect(opt(strings.filterBw).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('a small preview shows the straightened page with the chosen look, and follows the choice', async () => {
+    const { warpPreview } = await import('../../src/scan/warp');
+    localStorage.clear();
+    render(<App store={createAppStore(fakeDeps())} />);
+    await takePhoto();
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    const img = await screen.findByRole('img', { name: strings.cropPreview });
+    expect(img.getAttribute('src')).toBe('blob:preview');
+    expect(vi.mocked(warpPreview).mock.calls.at(-1)![2]).toBe('whiten');
+    fireEvent.click(screen.getByRole('button', { name: strings.filterBw }));
+    await waitFor(() => expect(vi.mocked(warpPreview).mock.calls.at(-1)![2]).toBe('bw'));
   });
 
   it('Anuluj closes the crop screen without adding anything', async () => {

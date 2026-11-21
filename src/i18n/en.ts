@@ -64,6 +64,7 @@ export const en: Strings = {
   cropHint: 'Drag the circles to the corners of the page.',
   cropCorner: (n) => `Corner ${n}`,
 
+  cropPreview: 'Page preview',
   filterColor: 'Colour',
   filterWhiten: 'Whitened',
   filterBw: 'Black & white',

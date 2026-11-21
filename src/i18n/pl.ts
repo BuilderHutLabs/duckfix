@@ -71,6 +71,7 @@ export const pl = {
   cropHint: 'Przeciągnij kółka do rogów kartki.',
   cropCorner: (n: number) => `Róg ${n}`,
 
+  cropPreview: 'Podgląd strony',
   filterColor: 'Kolor',
   filterWhiten: 'Wybielony',
   filterBw: 'Czarno-biały',

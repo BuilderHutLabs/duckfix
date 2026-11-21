@@ -64,6 +64,7 @@ export const es: Strings = {
   cropHint: 'Arrastra los círculos a las esquinas de la página.',
   cropCorner: (n) => `Esquina ${n}`,
 
+  cropPreview: 'Vista previa de la página',
   filterColor: 'Color',
   filterWhiten: 'Blanqueado',
   filterBw: 'Blanco y negro',
