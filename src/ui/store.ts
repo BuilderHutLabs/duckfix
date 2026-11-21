@@ -74,6 +74,10 @@ export interface AppState {
   saveSheetIds: string[] | null;
   /** Camera photo waiting on the crop screen. */
   scanPhoto: File | null;
+  /** More camera photos waiting for the crop screen after this one (several pages in a row). */
+  scanQueue: File[];
+  /** How many photos this crop round has in all (for "Zdjęcie 2 z 3"). */
+  scanTotal: number;
   /** Pages the "Wygląd stron" sheet applies to (open while set). */
   filterSheetIds: string[] | null;
   /** Where the cropped photo goes: a page index, or null for the end / a new document. */
@@ -268,6 +272,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     saveSheetOpen: false,
     saveSheetIds: null,
     scanPhoto: null,
+    scanQueue: [],
+    scanTotal: 0,
     filterSheetIds: null,
     scanIndex: null,
     exportOptions: loadExportOptions(deps.storage),
@@ -490,7 +496,21 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     },
 
     setScanPhoto(file: File | null, index: number | null = null) {
-      set({ scanPhoto: file, scanIndex: file ? index : null });
+      set({ scanPhoto: file, scanIndex: file ? index : null, scanQueue: [], scanTotal: file ? 1 : 0 });
+    },
+
+    /** Several camera photos go through the crop screen one after another. */
+    setScanPhotos(files: File[], index: number | null = null) {
+      if (!files.length) return actions.setScanPhoto(null);
+      set({ scanPhoto: files[0], scanQueue: files.slice(1), scanTotal: files.length, scanIndex: index });
+    },
+
+    /** Next photo of the round; `added`: the current one became a page (the place moves on by one). */
+    nextScan(added: boolean) {
+      const [next, ...rest] = state.scanQueue;
+      if (!next) return actions.setScanPhoto(null);
+      const at = state.scanIndex === null ? null : state.scanIndex + (added ? 1 : 0);
+      set({ scanPhoto: next, scanQueue: rest, scanIndex: at });
     },
 
     /** Adds a straightened camera page: opens a new document from Home, else appends it. */

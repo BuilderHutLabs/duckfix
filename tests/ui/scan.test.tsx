@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { App } from '../../src/ui/App';
 import { createAppStore } from '../../src/ui/store';
 import { strings } from '../../src/ui/strings';
+import { storageKey } from '../../src/config';
 import { fakeDeps, page, source } from './fixtures';
 
 vi.mock('../../src/imaging/render', () => ({
@@ -17,6 +18,21 @@ vi.mock('../../src/scan/warp', () => ({
   warpToBlob: vi.fn(async () => new Blob(['jpg'], { type: 'image/jpeg' })),
   warpPreview: vi.fn(async () => 'blob:preview'),
 }));
+
+// what the live camera "sees" in each frame (a real canvas is needed for that)
+const frame = vi.hoisted(() => ({ current: null as null | { quad: unknown; width: number; height: number; light: number } }));
+vi.mock('../../src/scan/liveFrame', () => ({ analyzeFrame: vi.fn(() => frame.current) }));
+const fullSheet = {
+  quad: [
+    { x: 40, y: 20 },
+    { x: 360, y: 20 },
+    { x: 360, y: 280 },
+    { x: 40, y: 280 },
+  ],
+  width: 400,
+  height: 300,
+  light: 150,
+};
 
 const photo = () => new File(['x'], 'IMG_0001.jpg', { type: 'image/jpeg' });
 
@@ -188,8 +204,8 @@ describe('built-in camera', () => {
     expect(stop).toHaveBeenCalled();
   });
 
-  it('the shutter takes the picture and goes on to the crop screen', async () => {
-    render(<App store={createAppStore(fakeDeps())} />);
+  async function openLive(deps = fakeDeps()) {
+    render(<App store={createAppStore(deps)} />);
     fireEvent.click(screen.getByRole('button', { name: strings.homeScan }));
     await screen.findByRole('dialog', { name: strings.cameraTitle });
     const video = document.querySelector('video') as HTMLVideoElement;
@@ -200,9 +216,93 @@ describe('built-in camera', () => {
       cb(new Blob(['jpg'], { type: 'image/jpeg' }));
     });
     await waitFor(() => expect((screen.getByRole('button', { name: strings.cameraShoot }) as HTMLButtonElement).disabled).toBe(false));
-    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraShoot })));
-    expect(await screen.findByRole('dialog', { name: strings.cropTitle })).toBeTruthy();
+    return deps;
+  }
+  const shoot = () => act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraShoot })));
+
+  beforeEach(() => {
+    frame.current = null;
+    localStorage.clear();
+    localStorage.setItem(storageKey('duckfix-tour2'), '1'); // the duck tour has its own "Dalej" / "Pomiń"
+  });
+
+  it('shots stay in the camera; "Gotowe (2)" opens the crop screen page by page', async () => {
+    const deps = await openLive();
+    await shoot();
+    await shoot();
+    expect(screen.getByRole('dialog', { name: strings.cameraTitle })).toBeTruthy();
+    expect(screen.getByText('2')).toBeTruthy(); // count on the thumbnail
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraDone(2) })));
     expect(screen.queryByRole('dialog', { name: strings.cameraTitle })).toBeNull();
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    expect(screen.getByText(strings.cropPageOf(1, 2))).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropNextQueued })));
+    expect(await screen.findByText(strings.cropPageOf(2, 2))).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropDone })));
+    await waitFor(() => expect(deps.importFiles).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: strings.cropTitle })).toBeNull());
+  });
+
+  it('"Dodaj wszystkie" adds the rest with the found outline, without asking page by page', async () => {
+    const deps = await openLive();
+    await shoot();
+    await shoot();
+    await shoot();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraDone(3) })));
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropAddAll })));
+    await waitFor(() => expect(deps.importFiles).toHaveBeenCalledTimes(3));
+    expect(screen.queryByRole('dialog', { name: strings.cropTitle })).toBeNull();
+  });
+
+  it('"Pomiń" leaves a photo out', async () => {
+    const deps = await openLive();
+    await shoot();
+    await shoot();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraDone(2) })));
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropSkip })));
+    expect(await screen.findByText(strings.cropPageOf(2, 2))).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropDone })));
+    await waitFor(() => expect(deps.importFiles).toHaveBeenCalledTimes(1));
+  });
+
+  it('✕ with photos taken asks first', async () => {
+    await openLive();
+    await shoot();
+    const ask = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    fireEvent.click(screen.getByRole('button', { name: strings.close }));
+    expect(ask).toHaveBeenCalledWith(strings.cameraDiscard(1));
+    expect(screen.getByRole('dialog', { name: strings.cameraTitle })).toBeTruthy();
+  });
+
+  it('the sheet is outlined live and taken by itself when the phone is held still (Auto)', async () => {
+    frame.current = fullSheet;
+    await openLive();
+    expect(screen.getByRole('button', { name: strings.cameraAuto }).getAttribute('aria-pressed')).toBe('true');
+    await waitFor(() => expect(document.querySelector('.live-camera-outline polygon')).not.toBeNull());
+    expect(await screen.findByRole('button', { name: strings.cameraDone(1) }, { timeout: 3000 })).toBeTruthy();
+  });
+
+  it('with Auto off nothing is taken by itself, and the choice is remembered', async () => {
+    frame.current = fullSheet;
+    await openLive();
+    fireEvent.click(screen.getByRole('button', { name: strings.cameraAuto }));
+    await new Promise((r) => setTimeout(r, 1500));
+    expect(screen.queryByRole('button', { name: strings.cameraDone(1) })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: strings.close }));
+    fireEvent.click(screen.getByRole('button', { name: strings.homeScan }));
+    expect((await screen.findByRole('button', { name: strings.cameraAuto })).getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('hints: find the sheet, come closer, too dark', async () => {
+    frame.current = { ...fullSheet, quad: null };
+    await openLive();
+    expect(await screen.findByText(strings.hintFind)).toBeTruthy();
+    frame.current = { ...fullSheet, quad: [{ x: 180, y: 130 }, { x: 240, y: 130 }, { x: 240, y: 180 }, { x: 180, y: 180 }] };
+    expect(await screen.findByText(strings.hintCloser)).toBeTruthy();
+    frame.current = { ...fullSheet, quad: null, light: 30 };
+    expect(await screen.findByText(strings.hintDark)).toBeTruthy();
   });
 
   it('when the camera cannot start (no permission), the phone camera is offered', async () => {

@@ -27,6 +27,12 @@ function saveFilter(f: ScanFilter): void {
 import { useAppStore } from './store';
 import { strings } from './strings';
 
+/** Straightening runs one page at a time, so pages land in the order they were accepted. */
+let warpChain: Promise<unknown> = Promise.resolve();
+function queueWarp(job: () => Promise<unknown>): void {
+  warpChain = warpChain.then(job, job);
+}
+
 /**
  * Full-screen crop step after a camera photo: the detected sheet outline with 4 draggable corners,
  * then the straightened page goes into the document.
@@ -128,25 +134,59 @@ export function ScanCrop({ file }: { file: File }) {
     el.addEventListener('pointercancel', up);
   };
 
+  /** Straightens this photo with the corners as set and adds it (in turn with the others). */
+  const addThis = (at: number | null) => {
+    if (!photo || !quad) return;
+    handedOff.current = true;
+    const p = photo;
+    const q = quad;
+    queueWarp(() =>
+      warpToBlob(p, q, filter)
+        .then((blob) => s.addScan(blob, at))
+        .catch(() => s.showError(strings.genericError))
+        .finally(() => p.close()),
+    );
+  };
+
   /** Straightens the page and adds it; `next` opens the camera again for the following sheet. */
   const accept = (next: boolean) => {
     if (!photo || !quad) return;
     if (next) openCamera(); // straight from the tap: the browser needs the user gesture
-    handedOff.current = true;
-    const p = photo;
-    const at = s.scanIndex;
-    s.setScanPhoto(null);
-    void warpToBlob(p, quad, filter)
-      .then((blob) => s.addScan(blob, at))
-      .catch(() => s.showError(strings.genericError))
-      .finally(() => p.close());
+    addThis(s.scanIndex);
+    s.nextScan(true); // the next photo of the round, or the end
   };
+
+  /** This photo and all the waiting ones are added with the outline found in each. */
+  const addAll = () => {
+    if (!photo || !quad) return;
+    const start = s.scanIndex;
+    addThis(start);
+    s.scanQueue.forEach((file, i) => {
+      const at = start === null ? null : start + i + 1;
+      queueWarp(async () => {
+        const p = await loadPhoto(file);
+        try {
+          await s.addScan(await warpToBlob(p, findSheet(p) ?? defaultQuad(p.width, p.height), filter), at);
+        } finally {
+          p.close();
+        }
+      });
+    });
+    s.setScanPhoto(null);
+  };
+
+  const round = s.scanTotal > 1;
+  const waiting = s.scanQueue.length > 0;
+  const position = s.scanTotal - s.scanQueue.length;
 
   const pts = quad?.map((p) => ({ x: box.left + p.x * box.scale, y: box.top + p.y * box.scale }));
 
   return (
     <div className="scan" role="dialog" aria-modal="true" aria-label={strings.cropTitle}>
-      <p className="scan-hint">{strings.cropHint}</p>
+      <p className="scan-hint">
+        {round && <strong className="scan-count">{strings.cropPageOf(position, s.scanTotal)}</strong>}
+        {strings.cropHint}
+      </p>
       <div className="scan-stage" ref={stage}>
         {photo && <img className="scan-photo" src={photo.url} alt="" draggable={false} />}
         {pts && (
@@ -187,25 +227,43 @@ export function ScanCrop({ file }: { file: File }) {
         ))}
       </div>
       <div className="scan-actions">
-        <button type="button" className="btn" onClick={() => s.setScanPhoto(null)}>
-          {strings.cancel}
-        </button>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => {
-            openCamera();
-            s.setScanPhoto(null);
-          }}
-        >
-          {strings.cropRetake}
-        </button>
-        <button type="button" className="btn" disabled={!quad} onClick={() => accept(true)}>
-          {strings.cropNext}
-        </button>
-        <button type="button" className="btn btn-primary" disabled={!quad} onClick={() => accept(false)}>
-          {strings.cropDone}
-        </button>
+        {round ? (
+          <>
+            <button type="button" className="btn" onClick={() => s.nextScan(false)}>
+              {strings.cropSkip}
+            </button>
+            {waiting && (
+              <button type="button" className="btn" disabled={!quad} onClick={addAll}>
+                {strings.cropAddAll}
+              </button>
+            )}
+            <button type="button" className="btn btn-primary" disabled={!quad} onClick={() => accept(false)}>
+              {waiting ? strings.cropNextQueued : strings.cropDone}
+            </button>
+          </>
+        ) : (
+          <>
+            <button type="button" className="btn" onClick={() => s.setScanPhoto(null)}>
+              {strings.cancel}
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                openCamera();
+                s.setScanPhoto(null);
+              }}
+            >
+              {strings.cropRetake}
+            </button>
+            <button type="button" className="btn" disabled={!quad} onClick={() => accept(true)}>
+              {strings.cropNext}
+            </button>
+            <button type="button" className="btn btn-primary" disabled={!quad} onClick={() => accept(false)}>
+              {strings.cropDone}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
