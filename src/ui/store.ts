@@ -44,7 +44,8 @@ import { exportFileName, exportPdf } from '../export/exportPdf';
 import { browserRasterizer } from '../export/rasterize';
 import { canShareFiles, downloadFile, pdfFile, prefersShareSheet, shareOrDownload } from '../export/share';
 import { createMetrics } from '../diagnostics/metrics';
-import { indexedDbSession, type SessionStorage, type StoredSession } from '../storage/session';
+import { docNameFrom, indexedDbLibrary, sizeOf, type DocLibrary, type DocMeta } from '../storage/library';
+import { docThumbnail } from '../storage/docThumb';
 import { strings } from './strings';
 
 export type Phase = 'home' | 'analyzing' | 'review';
@@ -94,6 +95,10 @@ export interface AppState {
   deskew: boolean;
   /** A document from an earlier visit is stored and can be restored (shown on Home). */
   restorable: boolean;
+  /** "Moje dokumenty": every document kept on this phone, newest first. */
+  library: DocMeta[];
+  /** The "Moje dokumenty" list is open. */
+  docsOpen: boolean;
   diagnostics: boolean;
 }
 
@@ -134,7 +139,10 @@ export interface StoreDeps {
   encryptPdf(bytes: Uint8Array, password: string): Promise<Uint8Array>;
   forgetPdf(fileId: string): Promise<void>;
   storage: StorageLike | null;
-  session: SessionStorage | null;
+  /** "Moje dokumenty": where documents are kept. */
+  library: DocLibrary | null;
+  /** Small picture of a page for the list. */
+  docThumb(page: Page, source: SourceFile): Promise<string | null>;
 }
 
 function browserStorage(): StorageLike | null {
@@ -169,7 +177,8 @@ function browserDeps(): StoreDeps {
     encryptPdf: (bytes, password) => import('../export/encrypt').then((m) => m.encryptPdf(bytes, password)),
     forgetPdf,
     storage: browserStorage(),
-    session: indexedDbSession,
+    library: indexedDbLibrary,
+    docThumb: docThumbnail,
   };
 }
 
@@ -215,10 +224,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
   let session: Session = { controller: new AbortController(), runs: 0 };
   let detector: Promise<OrientationDetector> | null = null;
   let metrics = createMetrics();
-  /** Session found in storage at startup, until restored or discarded. */
-  let stored: StoredSession | null = null;
-  /** Set once storage was cleared/overwritten: a startup load still in flight is stale then. */
-  let storedReplaced = false;
+  /** The open document's place in "Moje dokumenty" (null on Home). */
+  let docId: string | null = null;
   /** Last doc handed to session storage, and the pending debounced save. */
   let persistedDoc: Doc = history.present;
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -288,6 +295,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     error: null,
     deskew: readDeskew(),
     restorable: false,
+    library: [],
+    docsOpen: false,
     diagnostics: false,
   };
 
@@ -297,15 +306,70 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     savePendingSince = null;
   };
 
+  /** Reads the list of kept documents again (after a change, on Home). */
+  const refreshLibrary = () => {
+    const asked = libraryChanges;
+    return deps.library?.list().then(
+      (list) => {
+        if (asked === libraryChanges) set({ library: list, restorable: list.length > 0 }); // else a newer change is shown
+      },
+      () => {},
+    );
+  };
+  /** Counts renames and deletions, so a list read before one of them is not shown after it. */
+  let libraryChanges = 0;
+
+  /** Makes the small picture of the first page for the list (in the background). */
+  const updateThumb = (id: string, doc: Doc, sources: Map<string, SourceFile>) => {
+    const first = doc.pages[0];
+    const src = first && sources.get(first.source.fileId);
+    if (!first || !src || !deps.library) return;
+    const lib = deps.library;
+    void deps
+      .docThumb(first, src)
+      .then((thumb) => (thumb ? lib.patch(id, { thumb }) : undefined))
+      .then(() => (state.phase === 'home' ? refreshLibrary() : undefined))
+      .catch(() => {})
+      .finally(() => {
+        // the document was closed meanwhile: let go of its PDF again
+        if (docId !== id) void deps.forgetPdf(src.id).catch(() => {});
+      });
+  };
+
+  /** Documents kept without a small picture (from an earlier version) get one, one at a time. */
+  let filling = false;
+  const fillThumbs = async () => {
+    const lib = deps.library;
+    if (filling || !lib) return;
+    filling = true;
+    try {
+      for (const m of state.library.filter((x) => !x.thumb).slice(0, 10)) {
+        const s = await lib.load(m.id);
+        const first = s?.doc.pages[0];
+        const src = first && s.sources.find((f) => f.id === first.source.fileId);
+        if (!first || !src) continue;
+        const thumb = await deps.docThumb(first, src);
+        if (src.id && docId !== m.id && !state.sources.has(src.id)) void deps.forgetPdf(src.id).catch(() => {});
+        if (!thumb) continue;
+        await lib.patch(m.id, { thumb });
+        set({ library: state.library.map((x) => (x.id === m.id ? { ...x, thumb } : x)) });
+      }
+    } catch {
+      /* no picture: the page icon stays */
+    } finally {
+      filling = false;
+    }
+  };
+
   const saveDocNow = () => {
     cancelDocSave();
     persistedDoc = history.present;
-    void deps.session?.saveDoc(persistedDoc);
+    if (docId) void deps.library?.saveDoc(docId, persistedDoc, { updatedAt: Date.now(), pages: persistedDoc.pages.length });
   };
 
   /** Stores the doc 500 ms after the last change (but at most 2.5 s after the first unsaved one), while a document is open. */
   const scheduleDocSave = () => {
-    if (!deps.session || state.sources.size === 0 || history.present === persistedDoc) return;
+    if (!deps.library || !docId || state.sources.size === 0 || history.present === persistedDoc) return;
     const now = Date.now();
     const since = savePendingSince ?? now;
     cancelDocSave();
@@ -314,20 +378,27 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     saveTimer = setTimeout(saveDocNow, delay);
   };
 
-  /** Stores doc + sources at once (the source set changed). */
+  /** Stores doc + sources at once (a new document, or the source set changed). */
   const saveAll = () => {
     cancelDocSave();
     persistedDoc = history.present;
-    void deps.session?.save({ doc: persistedDoc, sources: [...state.sources.values()] });
+    if (!docId || !deps.library) return;
+    const sources = [...state.sources.values()];
+    const s = { doc: persistedDoc, sources };
+    const known = state.library.find((m) => m.id === docId);
+    const meta: DocMeta = {
+      id: docId,
+      name: known?.name ?? docName ?? docNameFrom(sources[0]?.name ?? strings.defaultDocName),
+      updatedAt: Date.now(),
+      pages: persistedDoc.pages.length,
+      size: sizeOf(s),
+      thumb: known?.thumb ?? null,
+    };
+    docName = meta.name;
+    void deps.library.save(meta, s).then(() => updateThumb(meta.id, s.doc, state.sources));
   };
-
-  const clearStored = () => {
-    cancelDocSave();
-    stored = null;
-    storedReplaced = true;
-    persistedDoc = history.present;
-    void deps.session?.clear();
-  };
+  /** The open document's name in the list. */
+  let docName: string | null = null;
 
   /** Publishes a new snapshot; doc/canUndo/canRedo always come from the history. */
   const set = (patch: Partial<AppState>) => {
@@ -441,23 +512,27 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     async open(files: File[]) {
       if (files.length === 0 || state.busy) return;
       // The stored document is only replaced once the import succeeded (saveAll overwrites it).
-      set({ busy: 'opening', error: null, restorable: false });
+      set({ busy: 'opening', error: null, docsOpen: false });
       try {
         const { sources, pages } = await deps.importFiles(files);
-        stored = null;
-        storedReplaced = true;
         actions.load({ pages }, sources);
+        docId = crypto.randomUUID();
+        docName = null;
         saveAll();
       } catch (e) {
-        set({ busy: null, error: errorMessage(e), restorable: stored !== null });
-        if (stored === null && !storedReplaced) loadStored(); // startup load was ignored while busy
+        set({ busy: null, error: errorMessage(e) });
       }
     },
 
+    /** Closes the document; it stays in "Moje dokumenty". */
     goHome() {
+      if (saveTimer !== null) saveDocNow();
+      if (docId) updateThumb(docId, history.present, state.sources);
+      docId = null;
+      docName = null;
       closeSession();
       history = createHistory<Doc>({ pages: [] });
-      clearStored();
+      persistedDoc = history.present;
       set({
         phase: 'home',
         sources: new Map(),
@@ -469,6 +544,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         busy: null,
         exportProgress: null,
       });
+      void refreshLibrary();
     },
 
     rotate(ids: Iterable<string>, delta: 90 | -90 | 180, aspectOf?: (id: string) => number | undefined) {
@@ -697,7 +773,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     /** Suggested file name (without extension): first file's name + " (poprawiony)". */
     defaultFileName(): string {
       const first = state.sources.values().next().value as SourceFile | undefined;
-      return exportFileName(first?.name ?? strings.defaultDocName).replace(/\.pdf$/, '');
+      return exportFileName(docName ? `${docName}.pdf` : (first?.name ?? strings.defaultDocName)).replace(/\.pdf$/, '');
     },
 
     /** Stops a running export; nothing is saved and no error is shown. */
@@ -877,17 +953,54 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       set({ error: null });
     },
 
-    /** Reopens the document stored by an earlier visit and finishes analyzing its pages. */
+    /** Reopens the newest kept document ("Wróć do ostatniego dokumentu"). */
     restore() {
-      const s = stored;
-      stored = null;
-      if (s) actions.load(s.doc, s.sources);
+      const last = state.library[0];
+      if (last) void actions.openStored(last.id);
     },
 
-    /** "Zacznij od nowa": forgets the stored document. */
-    discardStored() {
-      clearStored();
-      set({ restorable: false });
+    /** Opens a document from "Moje dokumenty" where it was left, and finishes analyzing its pages. */
+    async openStored(id: string) {
+      if (state.busy || !deps.library) return;
+      set({ busy: 'opening', error: null });
+      const s = await deps.library.load(id);
+      if (!s) {
+        set({ busy: null, error: strings.docMissing });
+        void refreshLibrary();
+        return;
+      }
+      actions.load(s.doc, s.sources);
+      docId = id;
+      docName = state.library.find((m) => m.id === id)?.name ?? null;
+      set({ docsOpen: false });
+    },
+
+    openDocs() {
+      set({ docsOpen: true });
+      void refreshLibrary()?.then(fillThumbs);
+    },
+
+    closeDocs() {
+      set({ docsOpen: false });
+    },
+
+    async renameStored(id: string, name: string) {
+      const clean = name.trim();
+      if (!clean || !deps.library) return;
+      if (id === docId) docName = clean;
+      libraryChanges++;
+      set({ library: state.library.map((m) => (m.id === id ? { ...m, name: clean } : m)) });
+      await deps.library.patch(id, { name: clean });
+      await refreshLibrary();
+    },
+
+    async removeStored(id: string) {
+      if (!deps.library || id === docId) return;
+      const library = state.library.filter((m) => m.id !== id);
+      libraryChanges++;
+      set({ library, restorable: library.length > 0 });
+      await deps.library.remove(id);
+      await refreshLibrary();
     },
 
     /** Writes a pending debounced doc save now (the page is being hidden / may be killed). */
@@ -909,18 +1022,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     },
   };
 
-  function loadStored() {
-    void deps.session?.load().then(
-      (s) => {
-        // ignore when the user already opened (or closed) something while it loaded
-        if (!s || storedReplaced || state.phase !== 'home' || state.busy) return;
-        stored = s;
-        set({ restorable: true });
-      },
-      () => {},
-    );
-  }
-  loadStored();
+  void refreshLibrary();
 
   return {
     ...actions,

@@ -7,6 +7,7 @@ import { Settings } from './Toolbar';
 import { useSecretTaps } from './Diagnostics';
 import { isSinglePhoto, openCamera } from './camera';
 import { DuckTour } from './DuckTour';
+import { DocsSheet } from './DocsSheet';
 import { IconCamera } from './icons';
 
 export const FILE_ACCEPT = 'application/pdf,image/*';
@@ -106,7 +107,7 @@ function HomeAction({
 }
 
 export function Home() {
-  const { open, setScanPhoto, busy, restorable, restore, discardStored, openDiagnostics } = useAppStore();
+  const { open, setScanPhoto, busy, restorable, restore, openDiagnostics, library, docsOpen, openDocs } = useAppStore();
   const input = useRef<HTMLInputElement>(null);
   const onTitleTap = useSecretTaps(openDiagnostics);
   // the duck quacks once per app start, not every time the user comes back to the home screen
@@ -130,6 +131,12 @@ export function Home() {
         <span className="glow glow-4" />
       </div>
       <div className="home-top">
+        {library.length > 0 && (
+          <button type="button" className="home-docs" onClick={openDocs}>
+            <IconFolder />
+            {strings.docsShort(library.length)}
+          </button>
+        )}
         <Settings />
       </div>
       <div className="home-hero">
@@ -159,19 +166,15 @@ export function Home() {
           disabled={busy === 'opening'}
           onClick={pickFiles}
         />
-        {restorable && (
-          <>
-            <HomeAction
-              id="restore"
-              icon={<IconHistory />}
-              label={strings.restoreSession}
-              hint={strings.homeRestoreHint}
-              onClick={restore}
-            />
-            <button type="button" className="btn btn-plain home-start-over" onClick={discardStored}>
-              {strings.startOver}
-            </button>
-          </>
+        {restorable && library[0] && (
+          <HomeAction
+            id="restore"
+            icon={<IconHistory />}
+            label={strings.restoreSession}
+            hint={library[0].name}
+            disabled={busy === 'opening'}
+            onClick={restore}
+          />
         )}
         <div className="home-privacy">
           <span className="home-privacy-icon">
@@ -183,6 +186,7 @@ export function Home() {
           </span>
         </div>
       </section>
+      {docsOpen && <DocsSheet />}
       <DuckTour delayed={isStandaloneLaunch()} />
       <input
         ref={input}

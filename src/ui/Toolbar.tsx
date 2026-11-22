@@ -30,9 +30,7 @@ export function Toolbar() {
         className="btn btn-icon"
         aria-label={strings.close}
         title={strings.close}
-        onClick={() => {
-          if (window.confirm(strings.confirmClose)) s.goHome();
-        }}
+        onClick={() => s.goHome()}
       >
         <IconClose />
       </button>
