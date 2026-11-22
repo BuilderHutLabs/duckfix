@@ -69,6 +69,8 @@ export const es: Strings = {
   cropCorner: (n) => `Esquina ${n}`,
 
   cropPreview: 'Vista previa de la página',
+  previewHide: 'Ocultar vista previa',
+  previewShow: 'Mostrar vista previa',
   filterColor: 'Color',
   filterWhiten: 'Blanqueado',
   filterBw: 'Blanco y negro',

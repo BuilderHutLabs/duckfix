@@ -69,6 +69,8 @@ export const de: Strings = {
   cropCorner: (n) => `Ecke ${n}`,
 
   cropPreview: 'Seitenvorschau',
+  previewHide: 'Vorschau ausblenden',
+  previewShow: 'Vorschau zeigen',
   filterColor: 'Farbe',
   filterWhiten: 'Aufgehellt',
   filterBw: 'Schwarzweiß',

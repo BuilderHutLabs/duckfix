@@ -28,6 +28,7 @@ import { useAppStore } from './store';
 import { LOUPE, loupeSpot } from './loupe';
 import { composeIdCard } from '../scan/card';
 import { strings } from './strings';
+import { ScanPreview } from './ScanPreview';
 
 /** Straightening runs one page at a time, so pages land in the order they were accepted. */
 let warpChain: Promise<unknown> = Promise.resolve();
@@ -271,7 +272,7 @@ export function ScanCrop({ file }: { file: File }) {
             ))}
           </>
         )}
-        {preview && <img className="scan-preview" src={preview} alt={strings.cropPreview} />}
+        {preview && <ScanPreview src={preview} />}
         {photo && pts && lens !== null && (
           <div
             className="loupe"

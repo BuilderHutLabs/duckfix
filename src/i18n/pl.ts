@@ -76,6 +76,8 @@ export const pl = {
   cropCorner: (n: number) => `Róg ${n}`,
 
   cropPreview: 'Podgląd strony',
+  previewHide: 'Zwiń podgląd',
+  previewShow: 'Pokaż podgląd',
   filterColor: 'Kolor',
   filterWhiten: 'Wybielony',
   filterBw: 'Czarno-biały',
