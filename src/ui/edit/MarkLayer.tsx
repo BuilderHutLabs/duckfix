@@ -1,3 +1,4 @@
+import { loupeAt, loupeOff } from '../loupe';
 import { createPortal } from 'react-dom';
 import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Box, HighlightColor, InkColor, Mark, Page } from '../../model/document';
@@ -208,6 +209,7 @@ export function MarkLayer({
     // a second finger (pinch zoom) or the browser took the pointer: nothing is made
     const cancel = () => {
       off();
+      loupeOff();
       setLive(null);
       setErased([]);
     };
@@ -352,6 +354,7 @@ export function MarkLayer({
       e.currentTarget,
       e.pointerId,
       (ev) => {
+        loupeAt(ev); // a finger hides the spot it drags: show it magnified
         const b = frac(ev, layer);
         if (dist(a, b) > 6) far = true;
         if (!far) return;
@@ -371,6 +374,7 @@ export function MarkLayer({
         setLive(next);
       },
       () => {
+        loupeOff();
         setLive(null);
         if (far && next !== m) {
           const { id: _id, kind: _kind, ...patch } = next as Mark & Record<string, unknown>;

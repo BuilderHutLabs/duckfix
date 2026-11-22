@@ -180,6 +180,21 @@ describe('camera scan', () => {
     vi.mocked(warp.findSheet).mockReturnValue(null);
   });
 
+  it('dragging a corner with a finger shows a magnifier of the photo around it', async () => {
+    render(<App store={createAppStore(fakeDeps())} />);
+    await takePhoto();
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    const corner = (await screen.findAllByRole('slider'))[0];
+    const t = { pointerId: 2, pointerType: 'touch' };
+    fireEvent.pointerDown(corner, { ...t, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(corner, { ...t, clientX: 20, clientY: 25 });
+    const loupe = document.querySelector('.loupe') as HTMLElement;
+    expect(loupe).not.toBeNull();
+    expect(loupe.style.backgroundImage).toContain('blob:photo');
+    fireEvent.pointerUp(corner, t);
+    expect(document.querySelector('.loupe')).toBeNull();
+  });
+
   it('Anuluj closes the crop screen without adding anything', async () => {
     const deps = fakeDeps();
     render(<App store={createAppStore(deps)} />);
@@ -345,7 +360,15 @@ describe('built-in camera', () => {
     frame.current = { ...fullSheet, quad: null };
     await openLive();
     expect(await screen.findByText(strings.hintFind)).toBeTruthy();
-    frame.current = { ...fullSheet, quad: [{ x: 180, y: 130 }, { x: 240, y: 130 }, { x: 240, y: 180 }, { x: 180, y: 180 }] };
+    frame.current = {
+      ...fullSheet,
+      quad: [
+        { x: 180, y: 130 },
+        { x: 240, y: 130 },
+        { x: 240, y: 180 },
+        { x: 180, y: 180 },
+      ],
+    };
     expect(await screen.findByText(strings.hintCloser)).toBeTruthy();
     frame.current = { ...fullSheet, quad: null, light: 30 };
     expect(await screen.findByText(strings.hintDark)).toBeTruthy();

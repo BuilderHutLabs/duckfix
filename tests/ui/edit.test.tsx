@@ -627,6 +627,28 @@ describe('Edytuj: gumka, grubość, na wszystkie strony, podpis, powiększanie',
     expect(store.getState().doc.pages[1].stamps).toHaveLength(1);
   });
 
+  it('dragging a corner dot with a finger shows a magnifier of the page under it; a mouse does not', () => {
+    const doc = addMark(docWithFlags(1), 'p1', { id: 'r', kind: 'rect', color: 'red', x: 0.2, y: 0.4, w: 0.3, h: 0.2 });
+    openPreview(doc);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    const item = document.querySelector('[data-mark="r"]') as HTMLElement;
+    tap(item, 150, 320);
+    const corner = document.querySelector('.mark-item.selected .mark-handle.se') as HTMLElement;
+    const t = { pointerId: 3, pointerType: 'touch' };
+    fireEvent.pointerDown(corner, { ...t, clientX: 250, clientY: 420 });
+    fireEvent.pointerMove(corner, { ...t, clientX: 270, clientY: 440 });
+    const loupe = document.querySelector('.loupe') as HTMLElement;
+    expect(loupe).not.toBeNull();
+    fireEvent.pointerUp(corner, { ...t, clientX: 270, clientY: 440 });
+    expect(document.querySelector('.loupe')).toBeNull();
+
+    const m = { pointerId: 4, pointerType: 'mouse' };
+    fireEvent.pointerDown(corner, { ...m, clientX: 270, clientY: 440 });
+    fireEvent.pointerMove(corner, { ...m, clientX: 290, clientY: 460 });
+    expect(document.querySelector('.loupe')).toBeNull();
+    fireEvent.pointerUp(corner, { ...m, clientX: 290, clientY: 460 });
+  });
+
   it('a tiny tick is marked small, so its corner dots sit further out', () => {
     const doc = addMark(docWithFlags(1), 'p1', { id: 'k', kind: 'check', color: 'black', x: 0.1, y: 0.1, w: 0.05, h: 0.035 });
     openPreview(doc);

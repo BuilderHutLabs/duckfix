@@ -11,6 +11,7 @@ import { usePageBox } from './edit/pageBox';
 import { MarkLayer, moved, type CoverColor, type EditTool } from './edit/MarkLayer';
 import { EditTools, type ToolGroup } from './edit/EditTools';
 import { MarkBubble, StampBubble } from './edit/MarkBubble';
+import { EditLoupe } from './edit/EditLoupe';
 import { CropFrame } from './edit/CropFrame';
 import { cropClip } from './edit/MarksSvg';
 import { TextSheet } from './TextSheet';
@@ -517,6 +518,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             <CropFrame rect={rect} zoom={zoom.z} crop={page.crop} onCommit={(b) => setCrop([page.id], b)} />
           )}
         </div>
+        {editing && <EditLoupe stage={stageRef.current} img={imgRef.current} zoom={zoom} />}
         {editing && zoom.z > 1 && (
           <button type="button" className="preview-zoom-reset" onClick={() => setZoom(NO_ZOOM)}>
             {strings.zoomOut} · {zoom.z.toFixed(1)}×

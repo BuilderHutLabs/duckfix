@@ -25,6 +25,7 @@ function saveFilter(f: ScanFilter): void {
   }
 }
 import { useAppStore } from './store';
+import { LOUPE, loupeSpot } from './loupe';
 import { strings } from './strings';
 
 /** Straightening runs one page at a time, so pages land in the order they were accepted. */
@@ -45,6 +46,8 @@ export function ScanCrop({ file }: { file: File }) {
   const [preview, setPreview] = useState<string | null>(null);
   /** corners while a finger is dragging; the preview waits for the drop */
   const [dragging, setDragging] = useState(false);
+  /** The corner a finger is dragging: shown magnified above the finger. */
+  const [lens, setLens] = useState<number | null>(null);
   const stage = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState({ left: 0, top: 0, scale: 1 });
   /** the photo is handed to a running warp; the warp closes it, not the unmount */
@@ -119,6 +122,7 @@ export function ScanCrop({ file }: { file: File }) {
     el.setPointerCapture?.(e.pointerId);
     setDragging(true);
     const move = (ev: PointerEvent) => {
+      if (ev.pointerType === 'touch') setLens(i);
       const r = stage.current!.getBoundingClientRect();
       const x = Math.min(photo.width, Math.max(0, (ev.clientX - r.left - box.left) / box.scale));
       const y = Math.min(photo.height, Math.max(0, (ev.clientY - r.top - box.top) / box.scale));
@@ -126,6 +130,7 @@ export function ScanCrop({ file }: { file: File }) {
     };
     const up = () => {
       setDragging(false);
+      setLens(null);
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
@@ -231,6 +236,20 @@ export function ScanCrop({ file }: { file: File }) {
           </>
         )}
         {preview && <img className="scan-preview" src={preview} alt={strings.cropPreview} />}
+        {photo && pts && lens !== null && (
+          <div
+            className="loupe"
+            aria-hidden="true"
+            style={{
+              ...loupeSpot(pts[lens].x, pts[lens].y, stage.current?.clientWidth ?? 0),
+              width: LOUPE.size,
+              height: LOUPE.size,
+              backgroundImage: `url("${photo.url}")`,
+              backgroundSize: `${photo.width * box.scale * LOUPE.zoom}px ${photo.height * box.scale * LOUPE.zoom}px`,
+              backgroundPosition: `${LOUPE.size / 2 - (pts[lens].x - box.left) * LOUPE.zoom}px ${LOUPE.size / 2 - (pts[lens].y - box.top) * LOUPE.zoom}px`,
+            }}
+          />
+        )}
       </div>
       <div className="scan-bottom">
         <div className="scan-filters" role="group">

@@ -1,3 +1,4 @@
+import { loupeAt, loupeOff } from './loupe';
 import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { PageBox, Rect } from './edit/pageBox';
 import { BUBBLE_GAP, BubbleAnchor, bubblePlace } from './edit/MarkLayer';
@@ -53,6 +54,7 @@ export function StampLayer({
     let box: Box = { x: s.x, y: s.y, w: s.w, h: s.h, rot: s.rot };
     const t = ((s.rot ?? 0) * Math.PI) / 180;
     const move = (ev: PointerEvent) => {
+      if (onSelect) loupeAt(ev); // only while editing
       const px = (ev.clientX - x0) / zoom;
       const py = (ev.clientY - y0) / zoom;
       if (Math.hypot(px, py) > 3) moved = true;
@@ -69,6 +71,7 @@ export function StampLayer({
       setLive({ id: s.id, box });
     };
     const up = () => {
+      loupeOff();
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);

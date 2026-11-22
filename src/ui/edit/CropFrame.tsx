@@ -1,3 +1,4 @@
+import { loupeAt, loupeOff } from '../loupe';
 import { useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Box } from '../../model/document';
 import { dragCrop, type CropHandle } from '../../signature/geometry';
@@ -7,7 +8,17 @@ const CORNERS: CropHandle[] = ['nw', 'ne', 'sw', 'se'];
 const WHOLE: Box = { x: 0, y: 0, w: 1, h: 1 };
 
 /** "Kadruj": a frame over the page; corners resize it, the middle moves it. Each drag is committed once. */
-export function CropFrame({ rect, zoom = 1, crop, onCommit }: { rect: Rect; zoom?: number; crop: Box | undefined; onCommit(b: Box): void }) {
+export function CropFrame({
+  rect,
+  zoom = 1,
+  crop,
+  onCommit,
+}: {
+  rect: Rect;
+  zoom?: number;
+  crop: Box | undefined;
+  onCommit(b: Box): void;
+}) {
   const [live, setLive] = useState<Box | null>(null);
   const box = live ?? crop ?? WHOLE;
 
@@ -21,10 +32,12 @@ export function CropFrame({ rect, zoom = 1, crop, onCommit }: { rect: Rect; zoom
     const from = crop ?? WHOLE;
     let next = from;
     const move = (ev: PointerEvent) => {
+      loupeAt(ev);
       next = dragCrop(from, handle, (ev.clientX - x0) / zoom / rect.width, (ev.clientY - y0) / zoom / rect.height, 1, 1, 0.1);
       setLive(next);
     };
     const up = () => {
+      loupeOff();
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);
