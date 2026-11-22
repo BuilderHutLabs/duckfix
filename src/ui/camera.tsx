@@ -84,9 +84,9 @@ export function CameraInput() {
       {open && (
         <LiveCamera
           onClose={() => setLiveOpen(false)}
-          onDone={(files) => {
+          onDone={(files, card) => {
             setLiveOpen(false);
-            setScanPhotos(files);
+            setScanPhotos(files, null, card);
           }}
           onPhoneCamera={() => {
             setLiveOpen(false);
@@ -109,20 +109,32 @@ const LOOK_MS = 200;
 /** Below this mean brightness (0–255) the picture is too dark for a good scan. */
 const DARK = 55;
 
-function loadAuto(): boolean {
+/** Auto: outline + picture by itself; Ręcznie: just the shutter; Dowód: front and back of a card, one page. */
+type CameraMode = 'auto' | 'manual' | 'card';
+const MODES: Array<[CameraMode, () => string]> = [
+  ['auto', () => strings.modeAuto],
+  ['manual', () => strings.modeManual],
+  ['card', () => strings.modeCard],
+];
+
+function loadMode(): CameraMode {
   try {
-    return localStorage.getItem(AUTO_KEY) !== '0';
+    const v = localStorage.getItem(AUTO_KEY);
+    return v === '0' ? 'manual' : 'auto';
   } catch {
-    return true;
+    return 'auto';
   }
 }
-function saveAuto(on: boolean): void {
+function saveMode(m: CameraMode): void {
+  if (m === 'card') return; // "Dowód" is for this once; the next scan starts as before
   try {
-    localStorage.setItem(AUTO_KEY, on ? '1' : '0');
+    localStorage.setItem(AUTO_KEY, m === 'manual' ? '0' : '1');
   } catch {
     /* private mode */
   }
 }
+/** "Dowód" finishes by itself after the back: a moment later, so the flash is seen. */
+const CARD_DONE_MS = 450;
 
 function hintFor(state: LiveState, light: number): string {
   if (light < DARK && state !== 'hold' && state !== 'ready') return strings.hintDark;
@@ -138,13 +150,23 @@ export const takenByHand = new WeakSet<File>();
  * Full-screen camera inside the app. The sheet is outlined live; with "Auto" the picture is taken by
  * itself once the phone is held still. Pages are collected in a row and go to the crop screen on "Gotowe".
  */
-export function LiveCamera({ onClose, onDone, onPhoneCamera }: { onClose(): void; onDone(files: File[]): void; onPhoneCamera(): void }) {
+export function LiveCamera({
+  onClose,
+  onDone,
+  onPhoneCamera,
+}: {
+  onClose(): void;
+  /** `card`: the photos are the front and back of a card, for one page. */
+  onDone(files: File[], card?: boolean): void;
+  onPhoneCamera(): void;
+}) {
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const [state, setState] = useState<'starting' | 'ready' | 'failed'>('starting');
   const [torch, setTorch] = useState<boolean | null>(null);
   const [shots, setShots] = useState<Array<{ file: File; url: string }>>([]);
-  const [auto, setAuto] = useState(loadAuto);
+  const [mode, setMode] = useState(loadMode);
+  const auto = mode !== 'manual';
   const [live, setLive] = useState<{ pts: Pt[] | null; state: LiveState; progress: number; hint: string }>({
     pts: null,
     state: 'none',
@@ -254,6 +276,20 @@ export function LiveCamera({ onClose, onDone, onPhoneCamera }: { onClose(): void
     };
   }, [state, auto]);
 
+  // "Dowód": after the front and the back, straight on to the crop screen
+  useEffect(() => {
+    if (mode !== 'card' || shots.length < 2) return;
+    const t = setTimeout(
+      () =>
+        onDone(
+          shots.slice(0, 2).map((s) => s.file),
+          true,
+        ),
+      CARD_DONE_MS,
+    );
+    return () => clearTimeout(t);
+  }, [mode, shots, onDone]);
+
   const toggleTorch = () => {
     const track = stream.current?.getVideoTracks()[0];
     if (!track || torch === null) return;
@@ -315,18 +351,21 @@ export function LiveCamera({ onClose, onDone, onPhoneCamera }: { onClose(): void
           )}
         </div>
       </div>
+      {mode === 'card' && shots.length < 2 && (
+        <p className="live-camera-step">{shots.length === 0 ? strings.cardFront : strings.cardBack}</p>
+      )}
       <div className="live-camera-modes" role="group">
-        {([true, false] as const).map((on) => (
+        {MODES.map(([m, label]) => (
           <button
-            key={String(on)}
+            key={m}
             type="button"
-            aria-pressed={auto === on}
+            aria-pressed={mode === m}
             onClick={() => {
-              setAuto(on);
-              saveAuto(on);
+              setMode(m);
+              saveMode(m);
             }}
           >
-            {on ? strings.modeAuto : strings.modeManual}
+            {label()}
           </button>
         ))}
       </div>
@@ -349,7 +388,16 @@ export function LiveCamera({ onClose, onDone, onPhoneCamera }: { onClose(): void
           onClick={() => shoot()}
         />
         {shots.length ? (
-          <button type="button" className="live-camera-done" onClick={() => onDone(shots.map((s) => s.file))}>
+          <button
+            type="button"
+            className="live-camera-done"
+            onClick={() =>
+              onDone(
+                shots.map((s) => s.file),
+                mode === 'card',
+              )
+            }
+          >
             {strings.cameraDone(shots.length)}
           </button>
         ) : (

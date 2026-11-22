@@ -254,3 +254,22 @@ describe('diagnostics', () => {
     await waitFor(() => expect(writeText).toHaveBeenCalledWith(pre.textContent));
   });
 });
+
+describe('shortcuts on the app icon', () => {
+  afterEach(() => window.history.replaceState(null, '', '/'));
+
+  it('"Ostatni dokument" (?go=last) opens the stored document by itself and tidies the address', async () => {
+    const { session } = memorySession(stored);
+    window.history.replaceState(null, '', '/?go=last');
+    render(<App store={createAppStore(fakeDeps({ session }))} />);
+    expect(await screen.findByRole('button', { name: strings.save })).toBeTruthy(); // review screen
+    expect(window.location.search).toBe('');
+  });
+
+  it('"Ostatni dokument" with nothing stored just shows Home', async () => {
+    window.history.replaceState(null, '', '/?go=last');
+    render(<App store={createAppStore(fakeDeps())} />);
+    expect(await screen.findByRole('button', { name: strings.homeScan })).toBeTruthy();
+    expect(window.location.search).toBe('');
+  });
+});

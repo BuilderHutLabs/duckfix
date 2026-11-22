@@ -1,3 +1,4 @@
+import { paintWatermark } from './watermark';
 import type { Doc } from '../model/document';
 import type { SourceFile } from '../import/importFiles';
 import type { Rasterizer } from './exportPdf';
@@ -11,7 +12,7 @@ export async function exportImages(
   sources: Map<string, SourceFile>,
   rasterize: Rasterizer,
   onProgress?: (done: number, total: number) => void,
-  opts: { compress?: boolean; signal?: AbortSignal } = {},
+  opts: { compress?: boolean; signal?: AbortSignal; watermark?: string } = {},
 ): Promise<Blob[]> {
   const out: Blob[] = [];
   const total = doc.pages.length;
@@ -20,13 +21,13 @@ export async function exportImages(
     const source = sources.get(page.source.fileId);
     if (!source) throw new Error(`Missing source file ${page.source.fileId}`);
     const r = await rasterize(page, source, { compress: opts.compress === true });
-    out.push(await toJpeg(r.bytes, r.format, opts.compress === true));
+    out.push(await toJpeg(r.bytes, r.format, opts.compress === true, opts.watermark));
     onProgress?.(out.length, total);
   }
   return out;
 }
 
-async function toJpeg(bytes: Uint8Array, format: 'png' | 'jpg', compress: boolean): Promise<Blob> {
+async function toJpeg(bytes: Uint8Array, format: 'png' | 'jpg', compress: boolean, watermark?: string): Promise<Blob> {
   const bmp = await createImageBitmap(new Blob([bytes as BlobPart], { type: format === 'png' ? 'image/png' : 'image/jpeg' }));
   const c = Object.assign(document.createElement('canvas'), { width: bmp.width, height: bmp.height });
   try {
@@ -35,6 +36,7 @@ async function toJpeg(bytes: Uint8Array, format: 'png' | 'jpg', compress: boolea
     ctx.fillRect(0, 0, c.width, c.height);
     ctx.drawImage(bmp, 0, 0);
     bmp.close();
+    if (watermark) paintWatermark(ctx, watermark, c.width, c.height);
     return await new Promise<Blob>((resolve, reject) =>
       c.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', compress ? 0.7 : 0.9),
     );

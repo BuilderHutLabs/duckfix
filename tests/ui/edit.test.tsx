@@ -135,6 +135,44 @@ describe('Edytuj', () => {
     expect(store.getState().doc.pages.map((p) => p.crop?.w)).toEqual([undefined, 0.8, 0.8]);
   });
 
+  it('"Ukryj dane osobowe" reads the page and covers a PESEL and a phone in one undo step', async () => {
+    const pesel = {
+      words: [
+        { text: 'PESEL', bbox: { x0: 0.1, y0: 0.2, x1: 0.2, y1: 0.22 } },
+        { text: '44051401359', bbox: { x0: 0.22, y0: 0.2, x1: 0.4, y1: 0.22 } },
+      ],
+    };
+    const phone = {
+      words: ['601', '234', '567'].map((t, i) => ({ text: t, bbox: { x0: 0.5 + i * 0.06, y0: 0.5, x1: 0.55 + i * 0.06, y1: 0.52 } })),
+    };
+    fakeLayout();
+    const deps = fakeDeps({ pageLines: vi.fn(async () => [pesel, phone]) });
+    const store = createAppStore(deps);
+    store.load(docWithFlags(1), [source]);
+    render(<App store={store} />);
+    act(() => store.openPreview('p1'));
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    openGroup(strings.groupHide);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.hidePersonal })));
+    const covers = marks(store).filter((m) => m.kind === 'cover') as Array<{ x: number; w: number; color: string }>;
+    expect(covers).toHaveLength(2);
+    expect(covers[0].x).toBeLessThan(0.22);
+    expect(covers[0].x + covers[0].w).toBeGreaterThan(0.4);
+    expect(covers[1].x + covers[1].w).toBeGreaterThan(0.67); // all three groups of the phone
+    expect(screen.getByText(strings.personalFound(2))).toBeTruthy();
+    act(() => store.undo());
+    expect(marks(store)).toHaveLength(0);
+  });
+
+  it('"Ukryj dane osobowe" says so when there is nothing to hide', async () => {
+    openPreview();
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    openGroup(strings.groupHide);
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.hidePersonal })));
+    expect(screen.getByText(strings.personalNone)).toBeTruthy();
+  });
+
   it('outside Kadruj the preview shows only the cropped part', () => {
     openPreview(setCrop(docWithFlags(1), ['p1'], { x: 0.1, y: 0.2, w: 0.5, h: 0.5 }));
     const page = document.querySelector('.preview-clip') as HTMLElement;

@@ -78,6 +78,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     removeStamp,
     markOnAllPages,
     stampOnAllPages,
+    hidePersonal,
     undo,
     redo,
     canUndo,
@@ -548,6 +549,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           highlight={style.highlight}
           onHighlight={(highlight: HighlightColor) => changeStyle({ highlight })}
           onSign={sign}
+          onHidePersonal={() => hidePersonal(page.id, coverColor)}
           onCropAll={() =>
             setCrop(
               doc.pages.map((p) => p.id),

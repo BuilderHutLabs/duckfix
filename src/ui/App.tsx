@@ -1,6 +1,6 @@
 import { Splash, isStandaloneLaunch } from './Splash';
 import { chromeIntentUrl, detectInAppBrowser } from './inAppBrowser';
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import { useLanguage } from '../i18n';
 import { AppStoreProvider, createAppStore, useAppStore, type AppStore } from './store';
 import { Home } from './Home';
@@ -9,7 +9,7 @@ import { ActionBar } from './ActionBar';
 import { SaveSheet } from './SaveSheet';
 import { FilterSheet } from './FilterSheet';
 import { ScanCrop } from './ScanCrop';
-import { CameraInput } from './camera';
+import { CameraInput, openCamera } from './camera';
 import { useIncomingFiles } from '../share/incoming';
 import { Progress } from './Progress';
 import { ReviewGrid } from './ReviewGrid';
@@ -41,11 +41,42 @@ export function App({ store }: { store?: AppStore }) {
         <Shell />
         <CameraInput />
         <ScanHost />
+        <ShortcutHost />
         <UpdatePrompt />
       </Fragment>
       {splash && <Splash onDone={() => setSplash(false)} />}
     </AppStoreProvider>
   );
+}
+
+/**
+ * Shortcuts on the app icon (manifest "shortcuts"): ?go=scan opens the camera, ?go=last the last
+ * document. The address is tidied at once, so a refresh does not do it again.
+ */
+function ShortcutHost() {
+  const { restorable, restore, phase } = useAppStore();
+  const [go] = useState(() => new URLSearchParams(window.location.search).get('go'));
+  const done = useRef(false);
+
+  useEffect(() => {
+    if (!go) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('go');
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    if (go === 'scan' && !done.current) {
+      done.current = true;
+      openCamera();
+    }
+  }, [go]);
+
+  // the stored document is found a moment after start
+  useEffect(() => {
+    if (go === 'last' && restorable && phase === 'home' && !done.current) {
+      done.current = true;
+      void restore();
+    }
+  }, [go, restorable, phase, restore]);
+  return null;
 }
 
 function Shell() {
@@ -157,7 +188,7 @@ function NoticeBanner() {
 }
 
 function InAppBanner() {
-  const platform = detectInAppBrowser(typeof navigator === 'undefined' ? '' : navigator.userAgent ?? '');
+  const platform = detectInAppBrowser(typeof navigator === 'undefined' ? '' : (navigator.userAgent ?? ''));
   if (!platform) return null;
   return (
     <div className="inapp-banner" role="alert">

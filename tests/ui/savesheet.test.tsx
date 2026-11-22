@@ -100,7 +100,11 @@ describe('searchable text', () => {
   });
 
   it('when OCR cannot start (offline, first German use) the file is still saved and the user is told', async () => {
-    const { store, deps } = setup({ createOcr: vi.fn(async () => { throw new Error('offline'); }) });
+    const { store, deps } = setup({
+      createOcr: vi.fn(async () => {
+        throw new Error('offline');
+      }),
+    });
     await act(() => store.export({ compress: false, ocr: true, format: 'pdf' }));
     expect(deps.download).toHaveBeenCalledTimes(1);
     expect(vi.mocked(deps.exportPdf).mock.calls[0][3]).toMatchObject({ ocr: null });
@@ -213,5 +217,30 @@ describe('save sheet: pages, one file per page, password, send', () => {
     setup({ canShareFiles: false });
     fireEvent.click(saveButton());
     expect(screen.queryByRole('button', { name: strings.sendConfirm })).toBeNull();
+  });
+});
+
+describe('save sheet: watermark', () => {
+  it('"Znak wodny": the typed text and today’s date go on every page; an empty text blocks saving', async () => {
+    const { deps } = setup();
+    fireEvent.click(saveButton());
+    fireEvent.click(screen.getByRole('switch', { name: strings.watermarkSwitch }));
+    expect((screen.getByRole('button', { name: strings.saveConfirm }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByRole('textbox', { name: strings.watermarkField }), { target: { value: 'Kopia dla banku' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm }));
+    await waitFor(() => expect(deps.download).toHaveBeenCalled());
+    const opts = vi.mocked(deps.exportPdf).mock.calls[0][3];
+    expect(opts.watermark).toBe(`Kopia dla banku – ${new Date().toLocaleDateString('pl')}`);
+  });
+
+  it('works for JPG too', async () => {
+    const { deps } = setup();
+    fireEvent.click(saveButton());
+    fireEvent.click(screen.getByRole('button', { name: 'JPG' }));
+    fireEvent.click(screen.getByRole('switch', { name: strings.watermarkSwitch }));
+    fireEvent.change(screen.getByRole('textbox', { name: strings.watermarkField }), { target: { value: 'Tylko dla ZUS' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm }));
+    await waitFor(() => expect(deps.download).toHaveBeenCalled());
+    expect(vi.mocked(deps.exportImages).mock.calls[0][3].watermark).toMatch(/^Tylko dla ZUS – /);
   });
 });

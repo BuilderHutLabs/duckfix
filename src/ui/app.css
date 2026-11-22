@@ -3313,3 +3313,52 @@ span.live-camera-side {
   height: 2px;
   margin-top: -1px;
 }
+
+/* "Ukryj dane osobowe" under Zasłoń */
+.edit-wide {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--pv-chip);
+  color: var(--pv-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.edit-wide:disabled {
+  opacity: 0.55;
+}
+.edit-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--pv-text-2);
+  text-align: center;
+}
+.sheet-mark {
+  margin: 0 0 8px;
+}
+/* "Dowód": which side to photograph now */
+.live-camera-step {
+  position: absolute;
+  left: 50%;
+  top: calc(70px + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 16px;
+  background: #ffd60a;
+  color: #000;
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  z-index: 1;
+}
+.live-camera-modes button {
+  min-width: 70px;
+}

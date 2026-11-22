@@ -26,10 +26,13 @@ function saveFilter(f: ScanFilter): void {
 }
 import { useAppStore } from './store';
 import { LOUPE, loupeSpot } from './loupe';
+import { composeIdCard } from '../scan/card';
 import { strings } from './strings';
 
 /** Straightening runs one page at a time, so pages land in the order they were accepted. */
 let warpChain: Promise<unknown> = Promise.resolve();
+/** "Dowód": the straightened sides of the card collected in this round, for one page at the end. */
+const cardSides: Blob[] = [];
 function queueWarp(job: () => Promise<unknown>): void {
   warpChain = warpChain.then(job, job);
 }
@@ -54,6 +57,7 @@ export function ScanCrop({ file }: { file: File }) {
   const handedOff = useRef(false);
 
   useEffect(() => {
+    if (s.scanCard && s.scanTotal - s.scanQueue.length === 1) cardSides.length = 0; // a new card round
     let alive = true;
     let loaded: Photo | null = null;
     handedOff.current = false;
@@ -146,20 +150,35 @@ export function ScanCrop({ file }: { file: File }) {
     handedOff.current = true;
     const p = photo;
     const q = quad;
+    const card = s.scanCard;
     queueWarp(() =>
       warpToBlob(p, q, filter)
-        .then((blob) => s.addScan(blob, at))
+        .then((blob) => (card ? void cardSides.push(blob) : s.addScan(blob, at)))
         .catch(() => s.showError(strings.genericError))
         .finally(() => p.close()),
     );
   };
+
+  /** "Dowód": the collected sides become one A4 page (after the warps queued before it). */
+  const finishCard = (at: number | null) =>
+    queueWarp(async () => {
+      const sides = cardSides.splice(0);
+      if (sides.length) await s.addScan(await composeIdCard(sides), at).catch(() => s.showError(strings.genericError));
+    });
 
   /** Straightens the page and adds it; `next` opens the camera again for the following sheet. */
   const accept = (next: boolean) => {
     if (!photo || !quad) return;
     if (next) openCamera(); // straight from the tap: the browser needs the user gesture
     addThis(s.scanIndex);
-    s.nextScan(true); // the next photo of the round, or the end
+    if (s.scanCard && !s.scanQueue.length) finishCard(s.scanIndex);
+    s.nextScan(!s.scanCard); // the next photo of the round, or the end (a card is one page: the place stays)
+  };
+
+  /** "Pomiń": this photo is left out (a card round still makes its page from the other side). */
+  const skip = () => {
+    if (s.scanCard && !s.scanQueue.length) finishCard(s.scanIndex);
+    s.nextScan(false);
   };
 
   /** This photo and all the waiting ones are added with the outline found in each. */
@@ -167,17 +186,21 @@ export function ScanCrop({ file }: { file: File }) {
     if (!photo || !quad) return;
     const start = s.scanIndex;
     addThis(start);
+    const card = s.scanCard;
     s.scanQueue.forEach((file, i) => {
       const at = start === null ? null : start + i + 1;
       queueWarp(async () => {
         const p = await loadPhoto(file);
         try {
-          await s.addScan(await warpToBlob(p, findSheet(p) ?? defaultQuad(p.width, p.height), filter), at);
+          const blob = await warpToBlob(p, findSheet(p) ?? defaultQuad(p.width, p.height), filter);
+          if (card) cardSides.push(blob);
+          else await s.addScan(blob, at);
         } finally {
           p.close();
         }
       });
     });
+    if (card) finishCard(start);
     s.setScanPhoto(null);
   };
 
@@ -209,7 +232,11 @@ export function ScanCrop({ file }: { file: File }) {
           ✕
         </button>
         <div className="scan-pill">
-          {round && <strong className="scan-count">{strings.cropPageOf(position, s.scanTotal)}</strong>}
+          {s.scanCard ? (
+            <strong className="scan-count">{position === 1 ? strings.cropCardFront : strings.cropCardBack}</strong>
+          ) : (
+            round && <strong className="scan-count">{strings.cropPageOf(position, s.scanTotal)}</strong>
+          )}
           <span className="scan-hint">{strings.cropHint}</span>
         </div>
       </div>
@@ -269,7 +296,7 @@ export function ScanCrop({ file }: { file: File }) {
         </div>
         <div className="scan-bar">
           {round ? (
-            <BarButton icon={ICON.skip} label={strings.cropSkip} onClick={() => s.nextScan(false)} />
+            <BarButton icon={ICON.skip} label={strings.cropSkip} onClick={skip} />
           ) : (
             <BarButton
               icon={ICON.retake}

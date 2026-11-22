@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { HIGHLIGHT_COLORS, INK_COLORS, type HighlightColor, type InkColor } from '../../model/document';
 import { HIGHLIGHT } from '../../edit/draw';
 import { INK, type MarkSize } from '../../edit/text';
@@ -129,6 +129,7 @@ export function EditTools({
   onSign,
   onCropAll,
   onCropNone,
+  onHidePersonal,
 }: {
   tool: EditTool;
   onTool(t: EditTool): void;
@@ -147,7 +148,15 @@ export function EditTools({
   onSign(): void;
   onCropAll(): void;
   onCropNone(): void;
+  /** "Ukryj dane osobowe": covers what it finds on the page; resolves to how many. */
+  onHidePersonal?(): Promise<number>;
 }) {
+  const [personal, setPersonal] = useState<'busy' | 'failed' | number | null>(null);
+  const hidePersonal = () => {
+    if (!onHidePersonal || personal === 'busy') return;
+    setPersonal('busy');
+    onHidePersonal().then(setPersonal, () => setPersonal('failed'));
+  };
   /** The tool last used in each group: tapping the group again brings it back. */
   const last = useRef<Partial<Record<ToolGroup, Tool>>>({});
   if (tool) last.current[groupOf(tool)] = tool;
@@ -216,6 +225,25 @@ export function EditTools({
                 </>
               )}
             </div>
+          )}
+          {tool === 'cover' && onHidePersonal && (
+            <>
+              <button type="button" className="edit-wide" disabled={personal === 'busy'} onClick={hidePersonal}>
+                <Icon name="shield" size={18} />
+                {strings.hidePersonal}
+              </button>
+              {personal !== null && (
+                <p className="edit-status" role="status">
+                  {personal === 'busy'
+                    ? strings.personalBusy
+                    : personal === 'failed'
+                      ? strings.personalFailed
+                      : personal === 0
+                        ? strings.personalNone
+                        : strings.personalFound(personal)}
+                </p>
+              )}
+            </>
           )}
         </div>
       )}

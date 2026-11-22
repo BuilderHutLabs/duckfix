@@ -35,6 +35,7 @@ export function fakeDeps(over: Partial<StoreDeps> = {}): StoreDeps {
     exportPdf: vi.fn(async () => new Uint8Array([1])),
     exportImages: vi.fn(async () => [new Blob(['jpg'])]),
     pageText: vi.fn(async () => ''),
+    pageLines: vi.fn(async () => []),
     copyText: vi.fn(async () => {}),
     createOcr: vi.fn(async () => ({ textLayer: vi.fn(), text: vi.fn(async () => ''), dispose: vi.fn(async () => {}) })),
     share: vi.fn(async () => 'downloaded' as const),

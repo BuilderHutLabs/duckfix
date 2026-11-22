@@ -6,15 +6,11 @@ import type { Doc, Page, Rotation } from '../../src/model/document';
 import type { SourceFile } from '../../src/import/importFiles';
 
 // 1x1 transparent-ish PNG
-const PNG = Uint8Array.from(
-  atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='),
-  (c) => c.charCodeAt(0),
+const PNG = Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=='), (c) =>
+  c.charCodeAt(0),
 );
 
-async function makePdf(
-  sizes: Array<[number, number]>,
-  baseRotation: Rotation = 0,
-): Promise<SourceFile> {
+async function makePdf(sizes: Array<[number, number]>, baseRotation: Rotation = 0): Promise<SourceFile> {
   const pdf = await PDFDocument.create();
   const font = await pdf.embedFont(StandardFonts.Helvetica);
   sizes.forEach(([w, h], i) => {
@@ -43,12 +39,10 @@ const fakeRaster = (): Rasterizer & ReturnType<typeof vi.fn> =>
   vi.fn(async () => ({ bytes: PNG, format: 'png' as const, widthPt: 300, heightPt: 400 }));
 
 function imageCount(pdf: PDFDocument): number {
-  return pdf.context
-    .enumerateIndirectObjects()
-    .filter(([, o]) => {
-      const dict = (o as { dict?: PDFDict }).dict;
-      return dict?.get(PDFName.of('Subtype')) === PDFName.of('Image');
-    }).length;
+  return pdf.context.enumerateIndirectObjects().filter(([, o]) => {
+    const dict = (o as { dict?: PDFDict }).dict;
+    return dict?.get(PDFName.of('Subtype')) === PDFName.of('Image');
+  }).length;
 }
 
 /** stand-in for tesseract's text-only page */
@@ -64,7 +58,11 @@ async function load(bytes: Uint8Array) {
 
 describe('exportPdf', () => {
   it('keeps order and deletions', async () => {
-    const src = await makePdf([[100, 100], [200, 200], [300, 300]]);
+    const src = await makePdf([
+      [100, 100],
+      [200, 200],
+      [300, 300],
+    ]);
     const doc: Doc = { pages: [pdfPage(2), pdfPage(0)] };
     const out = await load(await exportPdf(doc, new Map([['f1', src]]), fakeRaster()));
     expect(out.getPageCount()).toBe(2);
@@ -81,15 +79,17 @@ describe('exportPdf', () => {
 
   it('keeps a landscape page 842x595', async () => {
     const src = await makePdf([[842, 595]]);
-    const out = await load(
-      await exportPdf({ pages: [pdfPage(0)] }, new Map([['f1', src]]), fakeRaster()),
-    );
+    const out = await load(await exportPdf({ pages: [pdfPage(0)] }, new Map([['f1', src]]), fakeRaster()));
     expect(out.getPage(0).getSize()).toEqual({ width: 842, height: 595 });
     expect(out.getPage(0).getRotation().angle).toBe(0);
   });
 
   it('reports progress after every page', async () => {
-    const src = await makePdf([[100, 100], [200, 200], [300, 300]]);
+    const src = await makePdf([
+      [100, 100],
+      [200, 200],
+      [300, 300],
+    ]);
     const doc: Doc = { pages: [pdfPage(0), pdfPage(1, { skewDeg: 1 }), pdfPage(2)] };
     const progress: Array<[number, number]> = [];
     await exportPdf(doc, new Map([['f1', src]]), fakeRaster(), (done, total) => progress.push([done, total]));
@@ -101,7 +101,10 @@ describe('exportPdf', () => {
   });
 
   it('rasterizes only skewed pages', async () => {
-    const src = await makePdf([[100, 100], [100, 100]]);
+    const src = await makePdf([
+      [100, 100],
+      [100, 100],
+    ]);
     const r = fakeRaster();
     const doc: Doc = { pages: [pdfPage(0), pdfPage(1, { skewDeg: 2 })] };
     const out = await load(await exportPdf(doc, new Map([['f1', src]]), r));
@@ -113,7 +116,10 @@ describe('exportPdf', () => {
   });
 
   it('smaller file: every page is rasterized, untouched PDF pages too, with compress on', async () => {
-    const src = await makePdf([[100, 100], [100, 100]]);
+    const src = await makePdf([
+      [100, 100],
+      [100, 100],
+    ]);
     const r = fakeRaster();
     const doc: Doc = { pages: [pdfPage(0), pdfPage(1, { skewDeg: 2 })] };
     const out = await load(await exportPdf(doc, new Map([['f1', src]]), r, undefined, { compress: true }));
@@ -130,7 +136,11 @@ describe('exportPdf', () => {
   });
 
   it('cancelling stops the export with an AbortError', async () => {
-    const src = await makePdf([[100, 100], [100, 100], [100, 100]]);
+    const src = await makePdf([
+      [100, 100],
+      [100, 100],
+      [100, 100],
+    ]);
     const ctrl = new AbortController();
     const run = exportPdf(
       { pages: [pdfPage(0), pdfPage(1), pdfPage(2)] },
@@ -150,7 +160,16 @@ describe('exportPdf', () => {
     const imagePage: Page = { ...pdfPage(0), id: 'img', source: { kind: 'image', fileId: 'i1' } };
     const doc: Doc = { pages: [pdfPage(0), imagePage] };
     const out = await load(
-      await exportPdf(doc, new Map([['f1', src], ['i1', img]]), fakeRaster(), undefined, { ocr }),
+      await exportPdf(
+        doc,
+        new Map([
+          ['f1', src],
+          ['i1', img],
+        ]),
+        fakeRaster(),
+        undefined,
+        { ocr },
+      ),
     );
     expect(ocr.textLayer).toHaveBeenCalledTimes(1);
     expect(out.getPageCount()).toBe(2);
@@ -167,7 +186,10 @@ describe('exportPdf', () => {
   });
 
   it('a page with a look (Wybielony) is rasterized, untouched PDF page or not', async () => {
-    const src = await makePdf([[100, 100], [100, 100]]);
+    const src = await makePdf([
+      [100, 100],
+      [100, 100],
+    ]);
     const r = fakeRaster();
     const doc: Doc = { pages: [pdfPage(0, { filter: 'whiten' }), pdfPage(1)] };
     await exportPdf(doc, new Map([['f1', src]]), r);
@@ -188,7 +210,11 @@ describe('exportPdf', () => {
   });
 
   it('a page with a cover or a crop is saved as an image (the PDF text under a cover is gone)', async () => {
-    const src = await makePdf([[100, 100], [100, 100], [100, 100]]);
+    const src = await makePdf([
+      [100, 100],
+      [100, 100],
+      [100, 100],
+    ]);
     const r = fakeRaster();
     const cover = { id: 'm', kind: 'cover' as const, color: 'black' as const, x: 0, y: 0, w: 1, h: 0.2 };
     const doc: Doc = { pages: [pdfPage(0, { marks: [cover] }), pdfPage(1, { crop: { x: 0, y: 0, w: 0.5, h: 1 } }), pdfPage(2)] };
@@ -222,5 +248,46 @@ describe('exportFileName', () => {
   it('does not stack the suffix when a corrected file is opened again', () => {
     expect(exportFileName('skan (poprawiony).pdf')).toBe('skan (poprawiony).pdf');
     expect(exportFileName('skan (poprawiony) (1).pdf')).toBe('skan (poprawiony).pdf');
+  });
+});
+
+/** A PDF holding just the test PNG once (to count the objects one embedded picture makes). */
+async function pngOnlyPdf(): Promise<Uint8Array> {
+  const pdf = await PDFDocument.create();
+  pdf.addPage([10, 10]).drawImage(await pdf.embedPng(PNG), { x: 0, y: 0, width: 1, height: 1 });
+  return pdf.save();
+}
+
+describe('watermark "Kopia dla…"', () => {
+  it('every page gets the watermark picture, see-through, over a copied PDF page and over a picture page; the PDF text stays', async () => {
+    const src = await makePdf([
+      [595, 842],
+      [595, 842],
+    ]);
+    const doc: Doc = { pages: [pdfPage(0), pdfPage(1, { skewDeg: 3 })] };
+    const raster = fakeRaster();
+    const bytes = await exportPdf(doc, new Map([['f1', src]]), raster, undefined, {
+      watermark: { png: PNG, width: 400, height: 60 },
+    });
+    const out = await PDFDocument.load(bytes);
+    const plain = await PDFDocument.load(await exportPdf(doc, new Map([['f1', src]]), fakeRaster()));
+    // the watermark picture is added once and shared by both pages; the first page stays a copied PDF page
+    expect(imageCount(out)).toBe(imageCount(plain) + imageCount(await PDFDocument.load(await pngOnlyPdf())));
+    expect(raster).toHaveBeenCalledTimes(1);
+    for (const p of out.getPages()) expect(p.node.Resources()!.lookup(PDFName.of('XObject'))).toBeTruthy();
+    // drawn see-through (a graphics state with fill opacity below 1)
+    for (const p of out.getPages()) {
+      const states = p.node.Resources()!.lookup(PDFName.of('ExtGState'), PDFDict);
+      const opacities = states
+        .values()
+        .map((v) => (out.context.lookup(v, PDFDict).get(PDFName.of('ca')) as unknown as { asNumber(): number }).asNumber());
+      expect(opacities.some((o) => o < 1)).toBe(true);
+    }
+  });
+
+  it('without a watermark nothing is added', async () => {
+    const src = await makePdf([[595, 842]]);
+    const bytes = await exportPdf({ pages: [pdfPage(0)] }, new Map([['f1', src]]), fakeRaster());
+    expect(imageCount(await PDFDocument.load(bytes))).toBe(0);
   });
 });

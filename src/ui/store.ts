@@ -3,7 +3,9 @@ import { storageKey } from '../config';
 import { currentLanguage, formatSize, type Lang } from '../i18n';
 import { createOcrEngine, type OcrEngine } from '../export/ocr';
 import { exportImages } from '../export/images';
-import { pageText } from '../export/pageText';
+import { pageLines, pageText } from '../export/pageText';
+import { watermarkLine, watermarkPng } from '../export/watermark';
+import { findPersonal, type OcrLine } from '../edit/personal';
 import { loadExportOptions, saveExportOptions, type ExportOptions } from '../export/options';
 import { createContext, createElement, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import {
@@ -78,6 +80,8 @@ export interface AppState {
   scanQueue: File[];
   /** How many photos this crop round has in all (for "Zdjęcie 2 z 3"). */
   scanTotal: number;
+  /** The round is the front and back of a card ("Dowód"): they become one page. */
+  scanCard: boolean;
   /** Pages the "Wygląd stron" sheet applies to (open while set). */
   filterSheetIds: string[] | null;
   /** Where the cropped photo goes: a page index, or null for the end / a new document. */
@@ -103,17 +107,19 @@ export interface StoreDeps {
     doc: Doc,
     sources: Map<string, SourceFile>,
     onProgress: (done: number, total: number) => void,
-    opts: { compress: boolean; ocr: OcrEngine | null; signal: AbortSignal },
+    opts: { compress: boolean; ocr: OcrEngine | null; signal: AbortSignal; watermark?: string },
   ): Promise<Uint8Array>;
   /** "JPG": every page as a JPEG picture. */
   exportImages(
     doc: Doc,
     sources: Map<string, SourceFile>,
     onProgress: (done: number, total: number) => void,
-    opts: { compress: boolean; signal: AbortSignal },
+    opts: { compress: boolean; signal: AbortSignal; watermark?: string },
   ): Promise<Blob[]>;
   /** Text of one page (own text layer or OCR). */
   pageText(page: Page, source: SourceFile, ocr: () => Promise<OcrEngine>): Promise<string>;
+  /** Lines of words of a page as saved, boxes as fractions of that picture ("Ukryj dane osobowe"). */
+  pageLines(page: Page, source: SourceFile, ocr: () => Promise<OcrEngine>): Promise<OcrLine[]>;
   copyText(text: string): Promise<void>;
   /** OCR engine for "Tekst do wyszukiwania" in the given language (may download deu/spa data). */
   createOcr(lang: Lang): Promise<OcrEngine>;
@@ -144,14 +150,16 @@ function browserDeps(): StoreDeps {
     importFiles,
     analyzePages,
     createDetector: () => createTesseractDetector({ basePath: import.meta.env.BASE_URL, workers: 2 }),
-    exportPdf: (doc, sources, onProgress, opts) =>
+    exportPdf: async (doc, sources, onProgress, opts) =>
       exportPdf(doc, sources, browserRasterizer, onProgress, {
         compress: opts.compress,
         ocr: opts.ocr ?? undefined,
         signal: opts.signal,
+        watermark: opts.watermark ? await watermarkPng(opts.watermark) : undefined,
       }),
     exportImages: (doc, sources, onProgress, opts) => exportImages(doc, sources, browserRasterizer, onProgress, opts),
     pageText: (page, source, ocr) => pageText(page, source, browserRasterizer, ocr),
+    pageLines: (page, source, ocr) => pageLines(page, source, browserRasterizer, ocr),
     copyText: (text) => navigator.clipboard.writeText(text),
     createOcr: (lang) => createOcrEngine(lang, tesseractPaths(import.meta.env.BASE_URL)),
     share: shareOrDownload,
@@ -185,9 +193,7 @@ export function mergeAnalysis(doc: Doc, a: PageAnalysis): Doc {
   if (!userRotated) return next;
   return {
     pages: next.pages.map((p) =>
-      p.id === a.pageId
-        ? { ...p, rotation: page.rotation, flags: p.flags.filter((f) => f !== 'check-orientation') }
-        : p,
+      p.id === a.pageId ? { ...p, rotation: page.rotation, flags: p.flags.filter((f) => f !== 'check-orientation') } : p,
     ),
   };
 }
@@ -274,6 +280,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     scanPhoto: null,
     scanQueue: [],
     scanTotal: 0,
+    scanCard: false,
     filterSheetIds: null,
     scanIndex: null,
     exportOptions: loadExportOptions(deps.storage),
@@ -496,13 +503,13 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     },
 
     setScanPhoto(file: File | null, index: number | null = null) {
-      set({ scanPhoto: file, scanIndex: file ? index : null, scanQueue: [], scanTotal: file ? 1 : 0 });
+      set({ scanPhoto: file, scanIndex: file ? index : null, scanQueue: [], scanTotal: file ? 1 : 0, scanCard: false });
     },
 
     /** Several camera photos go through the crop screen one after another. */
-    setScanPhotos(files: File[], index: number | null = null) {
+    setScanPhotos(files: File[], index: number | null = null, card = false) {
       if (!files.length) return actions.setScanPhoto(null);
-      set({ scanPhoto: files[0], scanQueue: files.slice(1), scanTotal: files.length, scanIndex: index });
+      set({ scanPhoto: files[0], scanQueue: files.slice(1), scanTotal: files.length, scanIndex: index, scanCard: card });
     },
 
     /** Next photo of the round; `added`: the current one became a page (the place moves on by one). */
@@ -587,6 +594,39 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
 
     removeStamp(pageId: string, stampId: string) {
       commit(removeStampFrom(history.present, pageId, stampId));
+    },
+
+    /**
+     * "Ukryj dane osobowe": reads the page, finds PESEL, ID and account numbers, phones and e-mails,
+     * and covers each with a cover of the given colour (one undo step). Returns how many it covered.
+     */
+    async hidePersonal(pageId: string, color: 'black' | 'white' = 'black'): Promise<number> {
+      const page = history.present.pages.find((p) => p.id === pageId);
+      const source = page && state.sources.get(page.source.fileId);
+      if (!page || !source) return 0;
+      const hits = findPersonal(await deps.pageLines(page, source, getOcr));
+      if (!hits.length || !existing([pageId]).length) return hits.length;
+      // the picture read is the cropped page: back to fractions of the whole page, with a small margin
+      const c = page.crop ?? { x: 0, y: 0, w: 1, h: 1 };
+      const PAD = 0.004;
+      const clamp = (v: number) => Math.min(1, Math.max(0, v));
+      let doc = history.present;
+      for (const h of hits) {
+        const x = clamp(c.x + (h.x0 - PAD) * c.w);
+        const y = clamp(c.y + (h.y0 - PAD) * c.h);
+        const mark: Mark = {
+          id: crypto.randomUUID(),
+          kind: 'cover',
+          color,
+          x,
+          y,
+          w: clamp(c.x + (h.x1 + PAD) * c.w) - x,
+          h: clamp(c.y + (h.y1 + PAD) * c.h) - y,
+        };
+        doc = addMarkTo(doc, pageId, mark);
+      }
+      commit(doc);
+      return hits.length;
     },
 
     /** Text of a page for "Kopiuj tekst". */
@@ -677,6 +717,8 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         split?: boolean;
         /** "Wyślij": the file waits for one tap that opens the share menu, instead of a download. */
         send?: boolean;
+        /** "Znak wodny": this text and today's date across every page. */
+        watermark?: string;
       } = {},
     ) {
       if (state.busy || history.present.pages.length === 0) return;
@@ -686,6 +728,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       // the chosen pages in the chosen order ("5-3" saves 5, 4, 3)
       const doc = extra.ids ? { pages: extra.ids.map((id) => byId.get(id)).filter((p): p is Page => !!p) } : history.present;
       const send = !!extra.send;
+      const watermark = extra.watermark?.trim() ? watermarkLine(extra.watermark, currentLanguage()) : undefined;
       const ready = send || deps.shareFirst;
       if (doc.pages.length === 0) return;
       const base = (extra.name ?? '').trim().replace(/[\\/:*?"<>|]+/g, '-') || actions.defaultFileName();
@@ -710,7 +753,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
             (done, total) => {
               if (own === session) set({ exportProgress: { done, total, ocr: false } });
             },
-            { compress: opts.compress, signal: ctrl.signal },
+            { compress: opts.compress, signal: ctrl.signal, watermark },
           );
           if (own !== session) return;
           const files = blobs.map(
@@ -722,7 +765,11 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
           } else {
             files.forEach((f) => deps.download(f));
             const size = formatSize(files.reduce((s, f) => s + f.size, 0));
-            set({ busy: null, exportProgress: null, notice: strings.savedNotice(files.length === 1 ? files[0].name : `${base} (${files.length})`, size) });
+            set({
+              busy: null,
+              exportProgress: null,
+              notice: strings.savedNotice(files.length === 1 ? files[0].name : `${base} (${files.length})`, size),
+            });
           }
           return;
         }
@@ -747,7 +794,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
             (done) => {
               if (own === session) set({ exportProgress: { done: before + done, total, ocr: engine !== null } });
             },
-            { compress: opts.compress, ocr: engine, signal: ctrl.signal },
+            { compress: opts.compress, ocr: engine, signal: ctrl.signal, watermark },
           );
           if (own !== session) return;
           if (extra.password) bytes = await deps.encryptPdf(bytes, extra.password);
@@ -863,12 +910,15 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
   };
 
   function loadStored() {
-    void deps.session?.load().then((s) => {
-      // ignore when the user already opened (or closed) something while it loaded
-      if (!s || storedReplaced || state.phase !== 'home' || state.busy) return;
-      stored = s;
-      set({ restorable: true });
-    }, () => {});
+    void deps.session?.load().then(
+      (s) => {
+        // ignore when the user already opened (or closed) something while it loaded
+        if (!s || storedReplaced || state.phase !== 'home' || state.busy) return;
+        stored = s;
+        set({ restorable: true });
+      },
+      () => {},
+    );
   }
   loadStored();
 
@@ -897,10 +947,7 @@ export function useAppStore(): AppState & AppActions & { getSource(fileId: strin
   const store = useContext(StoreContext);
   if (!store) throw new Error('useAppStore outside AppStoreProvider');
   const state = useSyncExternalStore(store.subscribe, store.getState);
-  return useMemo(
-    () => ({ ...store, ...state, getSource: (id: string) => state.sources.get(id) }),
-    [store, state],
-  );
+  return useMemo(() => ({ ...store, ...state, getSource: (id: string) => state.sources.get(id) }), [store, state]);
 }
 
 export const isFlagged = (p: Page): boolean => p.flags.length > 0;

@@ -1,5 +1,6 @@
 import { createWorker, OEM, type Worker, type WorkerOptions } from 'tesseract.js';
 import type { Lang } from '../i18n';
+import type { OcrLine } from '../edit/personal';
 
 /**
  * "Tekst do wyszukiwania": recognizes the final page image and returns an invisible text layer.
@@ -13,6 +14,8 @@ export interface OcrEngine {
   textLayer(image: Blob | Uint8Array): Promise<Uint8Array>;
   /** Recognized plain text of an upright page image. */
   text(image: Blob | Uint8Array): Promise<string>;
+  /** Recognized lines of words with their boxes (pixels of `image`), for "Ukryj dane osobowe". */
+  lines?(image: Blob | Uint8Array): Promise<OcrLine[]>;
   dispose(): Promise<void>;
 }
 
@@ -26,13 +29,29 @@ export async function createOcrEngine(lang: Lang, paths: Partial<WorkerOptions>)
   return {
     async textLayer(image) {
       const input = await toWorkerInput(image);
-      const { data } = await worker.recognize(input as Parameters<Worker['recognize']>[0], { pdfTextOnly: true }, { pdf: true, text: false, blocks: false });
+      const { data } = await worker.recognize(
+        input as Parameters<Worker['recognize']>[0],
+        { pdfTextOnly: true },
+        { pdf: true, text: false, blocks: false },
+      );
       if (!data.pdf) throw new Error('OCR produced no PDF');
       return Uint8Array.from(data.pdf);
     },
     async text(image) {
       const { data } = await worker.recognize((await toWorkerInput(image)) as Parameters<Worker['recognize']>[0]);
       return data.text ?? '';
+    },
+    async lines(image) {
+      const { data } = await worker.recognize(
+        (await toWorkerInput(image)) as Parameters<Worker['recognize']>[0],
+        {},
+        { blocks: true, text: false },
+      );
+      const out: OcrLine[] = [];
+      for (const block of data.blocks ?? [])
+        for (const para of block.paragraphs)
+          for (const line of para.lines) out.push({ words: line.words.map((w) => ({ text: w.text, bbox: w.bbox })) });
+      return out;
     },
     async dispose() {
       await worker.terminate();

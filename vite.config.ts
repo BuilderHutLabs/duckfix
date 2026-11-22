@@ -12,7 +12,10 @@ const APP_NAME = process.env.VITE_APP_NAME || 'DuckFix';
 const STORAGE_NS = process.env.VITE_STORAGE_NS ?? '';
 
 function namespaceInlineScript(): Plugin {
-  return { name: 'duckfix:namespace-inline-script', transformIndexHtml: (html) => namespaceHtml(html, STORAGE_NS).replaceAll('__APP_NAME__', APP_NAME) };
+  return {
+    name: 'duckfix:namespace-inline-script',
+    transformIndexHtml: (html) => namespaceHtml(html, STORAGE_NS).replaceAll('__APP_NAME__', APP_NAME),
+  };
 }
 
 /** public/calibrate.html is a dev-only OSD calibration page: keep it for `vite dev`, drop it from production dist/. */
@@ -65,6 +68,21 @@ export default defineConfig({
           {
             action: BASE,
             accept: { 'application/pdf': ['.pdf'], 'image/jpeg': ['.jpg', '.jpeg'], 'image/png': ['.png'] },
+          },
+        ],
+        // long-press on the app icon (Android): straight to the camera or to the last document
+        shortcuts: [
+          {
+            name: 'Skanuj dokument',
+            short_name: 'Skanuj',
+            url: `${BASE}?go=scan`,
+            icons: [{ src: 'icons/shortcut-scan.png', sizes: '96x96', type: 'image/png' }],
+          },
+          {
+            name: 'Ostatni dokument',
+            short_name: 'Ostatni',
+            url: `${BASE}?go=last`,
+            icons: [{ src: 'icons/shortcut-last.png', sizes: '96x96', type: 'image/png' }],
           },
         ],
         icons: [

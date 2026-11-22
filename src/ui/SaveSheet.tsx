@@ -33,8 +33,10 @@ export function SaveSheet() {
   const [locked, setLocked] = useState(false);
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [marked, setMarked] = useState(false);
+  const [markText, setMarkText] = useState('');
   const pdf = opts.format === 'pdf';
-  const blocked = rangeBad || (pdf && locked && !password);
+  const blocked = rangeBad || (pdf && locked && !password) || (marked && !markText.trim());
 
   const go = (send: boolean) => {
     if (blocked) return;
@@ -44,6 +46,7 @@ export function SaveSheet() {
       ids: chosen,
       split: pdf && split,
       password: pdf && locked ? password : undefined,
+      watermark: marked ? markText : undefined,
       send,
     });
   };
@@ -116,6 +119,20 @@ export function SaveSheet() {
           />
         )}
         {pdf && count > 1 && <Switch label={strings.splitPages} hint={strings.splitPagesHint} on={split} onChange={setSplit} />}
+        <Switch label={strings.watermarkSwitch} hint={strings.watermarkHint} on={marked} onChange={setMarked} />
+        {marked && (
+          <input
+            type="text"
+            className="sheet-input sheet-mark"
+            aria-label={strings.watermarkField}
+            placeholder={strings.watermarkPlaceholder}
+            value={markText}
+            onChange={(e) => setMarkText(e.target.value)}
+            autoComplete="off"
+            enterKeyHint="done"
+            autoFocus
+          />
+        )}
         {pdf && <Switch label={strings.passwordSwitch} hint={strings.passwordSwitchHint} on={locked} onChange={setLocked} />}
         {pdf && locked && (
           <span className="sheet-name sheet-password">

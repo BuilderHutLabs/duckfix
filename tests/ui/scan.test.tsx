@@ -34,6 +34,11 @@ const fullSheet = {
   light: 150,
 };
 
+vi.mock('../../src/scan/card', async (orig) => ({
+  ...(await orig<typeof import('../../src/scan/card')>()),
+  composeIdCard: vi.fn(async () => new Blob(['a4'], { type: 'image/jpeg' })),
+}));
+
 const photo = () => new File(['x'], 'IMG_0001.jpg', { type: 'image/jpeg' });
 
 function cameraInput(): HTMLInputElement {
@@ -356,6 +361,26 @@ describe('built-in camera', () => {
     expect((await screen.findByRole('button', { name: strings.modeManual })).getAttribute('aria-pressed')).toBe('true');
   });
 
+  it('"Dowód": two shots (front, back) go to the crop screen by themselves and become ONE page', async () => {
+    const card = await import('../../src/scan/card');
+    vi.mocked(card.composeIdCard).mockClear();
+    const deps = await openLive();
+    fireEvent.click(screen.getByRole('button', { name: strings.modeCard }));
+    expect(screen.getByText(strings.cardFront)).toBeTruthy();
+    await shoot();
+    expect(screen.getByText(strings.cardBack)).toBeTruthy();
+    await shoot();
+    // after the back the crop screen opens by itself
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    expect(screen.getByText(strings.cropCardFront)).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropNextQueued })));
+    expect(await screen.findByText(strings.cropCardBack)).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropDone })));
+    await waitFor(() => expect(deps.importFiles).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(card.composeIdCard).mock.calls[0][0]).toHaveLength(2);
+    expect(vi.mocked(deps.importFiles).mock.calls[0][0]).toHaveLength(1);
+  });
+
   it('hints: find the sheet, come closer, too dark', async () => {
     frame.current = { ...fullSheet, quad: null };
     await openLive();
@@ -383,5 +408,25 @@ describe('built-in camera', () => {
     fireEvent.click(screen.getAllByRole('button', { name: strings.cameraPhone })[0]);
     expect(click).toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: strings.cameraTitle })).toBeNull();
+  });
+});
+
+describe('shortcut "Skanuj" on the app icon', () => {
+  afterEach(() => {
+    window.history.replaceState(null, '', '/');
+    // @ts-expect-error back to jsdom's "no camera API"
+    delete navigator.mediaDevices;
+  });
+
+  it('?go=scan opens the camera straight away', async () => {
+    const track = { stop: vi.fn(), applyConstraints: vi.fn(), getCapabilities: () => ({}) };
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [track], getVideoTracks: () => [track] })) },
+    });
+    window.history.replaceState(null, '', '/?go=scan');
+    render(<App store={createAppStore(fakeDeps())} />);
+    expect(await screen.findByRole('dialog', { name: strings.cameraTitle })).toBeTruthy();
+    expect(window.location.search).toBe('');
   });
 });
