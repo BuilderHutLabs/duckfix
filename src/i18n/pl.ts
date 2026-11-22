@@ -170,6 +170,7 @@ export const pl = {
   cropWhole: 'Całe zdjęcie',
   cropDetect: 'Wykryj kartkę',
   cameraDone: (n: number) => `Gotowe (${n})`,
+  cameraSaving: 'Chwila…',
   cameraDiscard: (n: number) => (n === 1 ? 'Odrzucić zrobione zdjęcie?' : `Odrzucić ${n} zrobione zdjęcia?`),
   hintFind: 'Pokaż całą kartkę',
   hintCloser: 'Podejdź bliżej',

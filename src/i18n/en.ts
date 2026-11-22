@@ -163,6 +163,7 @@ export const en: Strings = {
   cropWhole: 'Whole photo',
   cropDetect: 'Find the page',
   cameraDone: (n: number) => `Done (${n})`,
+  cameraSaving: 'One moment…',
   cameraDiscard: (n: number) => (n === 1 ? 'Discard the photo?' : `Discard ${n} photos?`),
   hintFind: 'Show the whole page',
   hintCloser: 'Move closer',

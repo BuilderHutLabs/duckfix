@@ -404,6 +404,32 @@ describe('built-in camera', () => {
     expect(vi.mocked(card.composeIdCard).mock.calls[0][0]).toHaveLength(2);
   });
 
+  it('a photo counts at the flash; "Gotowe" pressed while it is still being saved waits for it and keeps it', async () => {
+    await openLive();
+    let save: BlobCallback | null = null;
+    vi.spyOn(HTMLCanvasElement.prototype, 'toBlob').mockImplementation(function (cb: BlobCallback) {
+      save = cb; // the full-size picture is still being written
+    });
+    await shoot();
+    expect(screen.getByText('1')).toBeTruthy(); // counted at once
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraDone(1) })));
+    const wait = screen.getByRole('button', { name: strings.cameraSaving });
+    expect((wait as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.queryByRole('dialog', { name: strings.cropTitle })).toBeNull();
+    await act(async () => save!(new Blob(['jpg'], { type: 'image/jpeg' })));
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+  });
+
+  it('"Gotowe" while the sheet is held in frame (the outline filling up) takes that page too, then goes on', async () => {
+    await openLive();
+    await shoot(); // one page already
+    frame.current = fullSheet;
+    await waitFor(() => expect(document.querySelector('.live-camera-progress')).not.toBeNull());
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraDone(1) })));
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    expect(screen.getByText(strings.cropPageOf(1, 2))).toBeTruthy();
+  });
+
   it('hints: find the sheet, come closer, too dark', async () => {
     frame.current = { ...fullSheet, quad: null };
     await openLive();

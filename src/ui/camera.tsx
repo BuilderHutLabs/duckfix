@@ -143,6 +143,32 @@ function hintFor(state: LiveState, light: number): string {
 
 let shotNo = 0;
 
+/** A photo of the camera row: its small picture now, its full-size file when written. */
+interface Shot {
+  url: string;
+  card: boolean;
+  file: Promise<File | null>;
+  saved: boolean;
+}
+
+/** A small picture of the frame for the counter, made at once (empty where the canvas cannot). */
+function thumbnail(frame: HTMLCanvasElement): string {
+  try {
+    const w = 160;
+    const t = document.createElement('canvas');
+    t.width = w;
+    t.height = Math.max(1, Math.round((frame.height / frame.width) * w));
+    const ctx = t.getContext('2d');
+    if (!ctx) return '';
+    ctx.drawImage(frame, 0, 0, t.width, t.height);
+    const url = t.toDataURL('image/jpeg', 0.7);
+    t.width = 0;
+    return url?.startsWith('data:image') ? url : '';
+  } catch {
+    return '';
+  }
+}
+
 /** Photos taken in "Ręcznie": the crop screen starts from the whole photo, without looking for the sheet. */
 export const takenByHand = new WeakSet<File>();
 
@@ -164,7 +190,16 @@ export function LiveCamera({
   const stream = useRef<MediaStream | null>(null);
   const [state, setState] = useState<'starting' | 'ready' | 'failed'>('starting');
   const [torch, setTorch] = useState<boolean | null>(null);
-  const [shots, setShots] = useState<Array<{ file: File; url: string; card: boolean }>>([]);
+  /**
+   * Photos taken so far. Each counts at the flash, with a small picture; the full-size file is written
+   * in the background ("Gotowe" waits for it).
+   */
+  const [shots, setShots] = useState<Shot[]>([]);
+  /** "Gotowe" pressed: waiting for the last photos to be written. */
+  const [finishing, setFinishing] = useState(false);
+  const finishingRef = useRef(false);
+  /** The same photos, kept at once (the state shows them on the next render). */
+  const taken = useRef<Shot[]>([]);
   /** Photos taken in "Dowód" (the card's sides); earlier ordinary photos are not counted. */
   const cardShots = shots.filter((s) => s.card).length;
   const modeRef = useRef<CameraMode>('auto');
@@ -177,12 +212,12 @@ export function LiveCamera({
     hint: '',
   });
   const [flash, setFlash] = useState(0);
+  /** What the live look saw last ("hold": the sheet is in frame, the outline filling up). */
+  const liveRef = useRef<LiveState>('none');
   const busy = useRef(false);
   const autoRef = useRef(auto);
   autoRef.current = auto;
   modeRef.current = mode;
-  const shotsRef = useRef(shots);
-  shotsRef.current = shots;
 
   useEffect(() => {
     let alive = true;
@@ -208,8 +243,6 @@ export function LiveCamera({
     };
   }, []);
 
-  // the small pictures of collected pages are freed when the camera closes
-  useEffect(() => () => shotsRef.current.forEach((s) => URL.revokeObjectURL(s.url)), []);
 
   const shoot = (byItself = false) => {
     const v = video.current;
@@ -226,19 +259,47 @@ export function LiveCamera({
     ctx.drawImage(v, 0, 0);
     setFlash((f) => f + 1);
     if (byItself) navigator.vibrate?.(40);
-    canvas.toBlob(
-      (blob) => {
-        canvas.width = 0; // free the picture memory at once (iOS)
-        busy.current = false;
-        if (!blob) return;
-        const file = new File([blob], `zdjecie-${Date.now()}-${++shotNo}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
-        if (!autoRef.current) takenByHand.add(file);
-        setShots((list) => [...list, { file, url: URL.createObjectURL(file), card: modeRef.current === 'card' }]);
-      },
-      'image/jpeg',
-      0.92,
+    const byHand = !autoRef.current;
+    // counted at once with a small picture; the full-size file follows
+    const file = new Promise<File | null>((resolve) =>
+      canvas.toBlob(
+        (blob) => {
+          canvas.width = 0; // free the picture memory at once (iOS)
+          busy.current = false;
+          if (!blob) return resolve(null);
+          const f = new File([blob], `zdjecie-${Date.now()}-${++shotNo}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
+          if (byHand) takenByHand.add(f);
+          resolve(f);
+        },
+        'image/jpeg',
+        0.92,
+      ),
+    );
+    const shot: Shot = { url: thumbnail(canvas), card: modeRef.current === 'card', file, saved: false };
+    taken.current = [...taken.current, shot];
+    void file.then(() => setShots((list) => list.map((x) => (x === shot ? { ...x, saved: true } : x))));
+    setShots((list) => [...list, shot]);
+  };
+
+  /**
+   * "Gotowe": with the sheet held in frame (the outline filling up) that page is taken first; then,
+   * once every photo is written, on to the crop screen.
+   */
+  const finish = async () => {
+    if (finishingRef.current) return;
+    finishingRef.current = true;
+    setFinishing(true);
+    if (autoRef.current && liveRef.current === 'hold' && !busy.current) shootRef.current();
+    const list = taken.current;
+    const files = await Promise.all(list.map((x) => x.file));
+    const kept = list.map((x, i) => ({ card: x.card, file: files[i] })).filter((x): x is { card: boolean; file: File } => !!x.file);
+    onDone(
+      kept.map((x) => x.file),
+      kept.filter((x) => x.card).map((x) => x.file),
     );
   };
+  const finishRef = useRef(finish);
+  finishRef.current = finish;
   const shootRef = useRef(shoot);
   shootRef.current = shoot;
 
@@ -263,13 +324,14 @@ export function LiveCamera({
       if (!r) return;
       const st = steady.push(r.quad, r.width, r.height, performance.now());
       const shown = outline.push(r.quad, r.width, r.height);
+      liveRef.current = st.state;
       setLive({
         pts: shown ? quadToView(shown, r.width, r.height, v.clientWidth, v.clientHeight) : null,
         state: st.state,
         progress: st.progress,
         hint: hintFor(st.state, r.light),
       });
-      if (st.state === 'ready' && !busy.current) {
+      if (st.state === 'ready' && !busy.current && !finishingRef.current) {
         steady.fired();
         shootRef.current(true);
       }
@@ -283,16 +345,9 @@ export function LiveCamera({
   // "Dowód": after the front and the back, straight on to the crop screen
   useEffect(() => {
     if (mode !== 'card' || cardShots < 2) return;
-    const t = setTimeout(
-      () =>
-        onDone(
-          shots.map((s) => s.file),
-          shots.filter((s) => s.card).map((s) => s.file),
-        ),
-      CARD_DONE_MS,
-    );
+    const t = setTimeout(() => void finishRef.current(), CARD_DONE_MS);
     return () => clearTimeout(t);
-  }, [mode, shots, cardShots, onDone]);
+  }, [mode, cardShots]);
 
   const toggleTorch = () => {
     const track = stream.current?.getVideoTracks()[0];
@@ -373,8 +428,8 @@ export function LiveCamera({
       </div>
       <div className="live-camera-bottom">
         {last ? (
-          <span className="live-camera-thumb" key={shots.length}>
-            <img src={last.url} alt="" />
+          <span className={`live-camera-thumb${last.saved ? '' : ' saving'}`} key={shots.length}>
+            {last.url ? <img src={last.url} alt="" /> : null}
             <span className="live-camera-count">{shots.length}</span>
           </span>
         ) : (
@@ -390,17 +445,8 @@ export function LiveCamera({
           onClick={() => shoot()}
         />
         {shots.length ? (
-          <button
-            type="button"
-            className="live-camera-done"
-            onClick={() =>
-              onDone(
-                shots.map((s) => s.file),
-                shots.filter((s) => s.card).map((s) => s.file),
-              )
-            }
-          >
-            {strings.cameraDone(shots.length)}
+          <button type="button" className="live-camera-done" disabled={finishing} onClick={() => void finish()}>
+            {finishing ? strings.cameraSaving : strings.cameraDone(shots.length)}
           </button>
         ) : (
           <span className="live-camera-side" aria-hidden="true" />

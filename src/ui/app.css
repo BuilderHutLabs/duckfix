@@ -3498,3 +3498,25 @@ span.live-camera-side {
   margin-top: 8px;
   text-align: center;
 }
+
+/* a photo still being written: a small spinner over its picture */
+.live-camera-thumb.saving::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: live-camera-spin 0.8s linear infinite;
+}
+@keyframes live-camera-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.live-camera-done:disabled {
+  opacity: 0.75;
+}

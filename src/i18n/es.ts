@@ -163,6 +163,7 @@ export const es: Strings = {
   cropWhole: 'Foto entera',
   cropDetect: 'Detectar la hoja',
   cameraDone: (n: number) => `Listo (${n})`,
+  cameraSaving: 'Un momento…',
   cameraDiscard: (n: number) => (n === 1 ? '¿Descartar la foto?' : `¿Descartar ${n} fotos?`),
   hintFind: 'Muestra toda la hoja',
   hintCloser: 'Acércate más',

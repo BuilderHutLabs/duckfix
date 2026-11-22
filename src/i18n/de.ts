@@ -163,6 +163,7 @@ export const de: Strings = {
   cropWhole: 'Ganzes Foto',
   cropDetect: 'Blatt erkennen',
   cameraDone: (n: number) => `Fertig (${n})`,
+  cameraSaving: 'Einen Moment…',
   cameraDiscard: (n: number) => (n === 1 ? 'Foto verwerfen?' : `${n} Fotos verwerfen?`),
   hintFind: 'Zeig das ganze Blatt',
   hintCloser: 'Geh näher heran',
