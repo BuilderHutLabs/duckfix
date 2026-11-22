@@ -288,6 +288,21 @@ describe('built-in camera', () => {
     await waitFor(() => expect(deps.importFiles).toHaveBeenCalledTimes(1));
   });
 
+  it('✕ on the crop screen in the middle of a round asks before dropping the rest', async () => {
+    await openLive();
+    await shoot();
+    await shoot();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraDone(2) })));
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    const ask = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    fireEvent.click(screen.getByRole('button', { name: strings.cancel }));
+    expect(ask).toHaveBeenCalledWith(strings.cameraDiscard(2));
+    expect(screen.getByRole('dialog', { name: strings.cropTitle })).toBeTruthy();
+    ask.mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: strings.cancel }));
+    expect(screen.queryByRole('dialog', { name: strings.cropTitle })).toBeNull();
+  });
+
   it('✕ with photos taken asks first', async () => {
     await openLive();
     await shoot();

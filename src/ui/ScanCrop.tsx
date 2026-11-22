@@ -187,12 +187,27 @@ export function ScanCrop({ file }: { file: File }) {
 
   const pts = quad?.map((p) => ({ x: box.left + p.x * box.scale, y: box.top + p.y * box.scale }));
 
+  const close = () => {
+    const left = s.scanQueue.length + 1;
+    if (round && !window.confirm(strings.cameraDiscard(left))) return;
+    s.setScanPhoto(null);
+  };
+  const toggleWhole = () => {
+    if (!photo) return;
+    setQuad(whole ? (findSheet(photo) ?? defaultQuad(photo.width, photo.height)) : fullQuad(photo.width, photo.height));
+  };
+
   return (
-    <div className="scan" role="dialog" aria-modal="true" aria-label={strings.cropTitle}>
-      <p className="scan-hint">
-        {round && <strong className="scan-count">{strings.cropPageOf(position, s.scanTotal)}</strong>}
-        {strings.cropHint}
-      </p>
+    <div className="scan scan-d" role="dialog" aria-modal="true" aria-label={strings.cropTitle}>
+      <div className="scan-top">
+        <button type="button" className="scan-close" aria-label={strings.cancel} title={strings.cancel} onClick={close}>
+          ✕
+        </button>
+        <div className="scan-pill">
+          {round && <strong className="scan-count">{strings.cropPageOf(position, s.scanTotal)}</strong>}
+          <span className="scan-hint">{strings.cropHint}</span>
+        </div>
+      </div>
       <div className="scan-stage" ref={stage}>
         {photo && <img className="scan-photo" src={photo.url} alt="" draggable={false} />}
         {pts && (
@@ -217,71 +232,83 @@ export function ScanCrop({ file }: { file: File }) {
         )}
         {preview && <img className="scan-preview" src={preview} alt={strings.cropPreview} />}
       </div>
-      {photo && (
-        <button
-          type="button"
-          className="scan-whole"
-          onClick={() =>
-            setQuad(whole ? (findSheet(photo) ?? defaultQuad(photo.width, photo.height)) : fullQuad(photo.width, photo.height))
-          }
-        >
-          {whole ? strings.cropDetect : strings.cropWhole}
-        </button>
-      )}
-      <div className="segmented scan-filters" role="group">
-        {FILTERS.map((f) => (
-          <button
-            key={f}
-            type="button"
-            aria-pressed={filter === f}
-            onClick={() => {
-              setFilter(f);
-              saveFilter(f);
-            }}
-          >
-            {{ color: strings.filterColor, whiten: strings.filterWhiten, bw: strings.filterBw }[f]}
-          </button>
-        ))}
-      </div>
-      <div className="scan-actions">
-        {round ? (
-          <>
-            <button type="button" className="btn" onClick={() => s.nextScan(false)}>
-              {strings.cropSkip}
-            </button>
-            {waiting && (
-              <button type="button" className="btn" disabled={!quad} onClick={addAll}>
-                {strings.cropAddAll}
-              </button>
-            )}
-            <button type="button" className="btn btn-primary" disabled={!quad} onClick={() => accept(false)}>
-              {waiting ? strings.cropNextQueued : strings.cropDone}
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="btn" onClick={() => s.setScanPhoto(null)}>
-              {strings.cancel}
-            </button>
+      <div className="scan-bottom">
+        <div className="scan-filters" role="group">
+          {FILTERS.map((f) => (
             <button
+              key={f}
               type="button"
-              className="btn"
+              aria-pressed={filter === f}
+              onClick={() => {
+                setFilter(f);
+                saveFilter(f);
+              }}
+            >
+              {{ color: strings.filterColor, whiten: strings.filterWhiten, bw: strings.filterBw }[f]}
+            </button>
+          ))}
+        </div>
+        <div className="scan-bar">
+          {round ? (
+            <BarButton icon={ICON.skip} label={strings.cropSkip} onClick={() => s.nextScan(false)} />
+          ) : (
+            <BarButton
+              icon={ICON.retake}
+              label={strings.cropRetake}
               onClick={() => {
                 openCamera();
                 s.setScanPhoto(null);
               }}
-            >
-              {strings.cropRetake}
-            </button>
-            <button type="button" className="btn" disabled={!quad} onClick={() => accept(true)}>
-              {strings.cropNext}
-            </button>
-            <button type="button" className="btn btn-primary" disabled={!quad} onClick={() => accept(false)}>
-              {strings.cropDone}
-            </button>
-          </>
-        )}
+            />
+          )}
+          <BarButton
+            icon={whole ? ICON.detect : ICON.whole}
+            label={whole ? strings.cropDetect : strings.cropWhole}
+            disabled={!photo}
+            onClick={toggleWhole}
+          />
+          {round ? (
+            waiting && <BarButton icon={ICON.all} label={strings.cropAddAll} disabled={!quad} onClick={addAll} />
+          ) : (
+            <BarButton icon={ICON.more} label={strings.cropNext} disabled={!quad} onClick={() => accept(true)} />
+          )}
+          <button type="button" className="scan-go" disabled={!quad} onClick={() => accept(false)}>
+            {round && waiting ? strings.cropNextQueued : strings.cropDone}
+            <span aria-hidden="true">{round && waiting ? ' →' : ' ✓'}</span>
+          </button>
+        </div>
       </div>
     </div>
+  );
+}
+
+/** Small line icons of the crop bar (24 px grid). */
+const ICON = {
+  skip: 'M4 12a8 8 0 0 1 14-5.3M18 3v4h-4M20 12a8 8 0 0 1-14 5.3',
+  retake: 'M3 8h3l2-3h8l2 3h3v11H3zM12 17a4 4 0 1 0 0-8 4 4 0 0 0 0 8z',
+  whole: 'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5',
+  detect: 'M6 5l12 1-1 13-12-1zM3 12h2M19 12h2M12 3v2M12 19v2',
+  all: 'M3 13l4 4 8-9M10 15l2 2 9-10',
+  more: 'M3 8h3l2-3h8l2 3h3v11H3zM12 10v6M9 13h6',
+};
+
+function BarButton({ icon, label, disabled, onClick }: { icon: string; label: string; disabled?: boolean; onClick(): void }) {
+  return (
+    <button type="button" className="scan-tool" aria-label={label} disabled={disabled} onClick={onClick}>
+      <svg
+        viewBox="0 0 24 24"
+        width="22"
+        height="22"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        <path d={icon} />
+      </svg>
+      <span aria-hidden="true">{label}</span>
+    </button>
   );
 }
