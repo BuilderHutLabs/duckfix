@@ -30,6 +30,22 @@ const IconFolder = () => (
     <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
   </svg>
 );
+const IconShield = () => (
+  <svg
+    width="20"
+    height="20"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z" />
+    <path d="M9 12l2 2 4-4" />
+  </svg>
+);
 const IconHistory = () => (
   <svg
     width="22"
@@ -157,10 +173,15 @@ export function Home() {
             </button>
           </>
         )}
-        <p className="home-privacy">
-          <span aria-hidden="true">🔒</span>
-          {strings.privacyNote}
-        </p>
+        <div className="home-privacy">
+          <span className="home-privacy-icon">
+            <IconShield />
+          </span>
+          <span className="home-privacy-text">
+            <strong>{strings.privacyTitle}</strong>
+            <span>{strings.privacyNote}</span>
+          </span>
+        </div>
       </section>
       <DuckTour delayed={isStandaloneLaunch()} />
       <input

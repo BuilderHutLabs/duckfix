@@ -41,9 +41,12 @@ describe('Home screen', () => {
 });
 
 describe('privacy note', () => {
-  it('the home screen says the files stay on the device', () => {
-    render(<App store={createAppStore(fakeDeps())} />);
+  it('the home screen says the files stay on the device: a bold title and a quiet line under it', () => {
+    const { container } = render(<App store={createAppStore(fakeDeps())} />);
+    expect(screen.getByText(strings.privacyTitle).tagName).toBe('STRONG');
     expect(screen.getByText(strings.privacyNote)).toBeTruthy();
+    expect(container.querySelector('.home-privacy svg')).toBeTruthy(); // a shield, not an emoji
+    expect(container.querySelector('.home-privacy')?.textContent).not.toContain('🔒');
   });
 });
 

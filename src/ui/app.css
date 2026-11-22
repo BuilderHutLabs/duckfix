@@ -2651,12 +2651,35 @@ span.live-camera-side {
 }
 .home-panel .home-privacy {
   align-self: center;
-  margin: 4px 0 0;
-  background: none;
+  gap: 10px;
+  margin: 6px 0 0;
   padding: 0;
-  font-weight: 500;
+  background: none;
+  font-weight: 400;
+}
+.home-privacy-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+.home-privacy-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.home-privacy-text strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.home-privacy-text span {
+  font-size: 13px;
   color: var(--text-2);
-  text-align: center;
 }
 @media (min-width: 600px) {
   .home-panel {
