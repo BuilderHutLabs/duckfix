@@ -3362,3 +3362,56 @@ span.live-camera-side {
 .live-camera-modes button {
   min-width: 70px;
 }
+
+/* ---------- "Twoje podpisy" ---------- */
+.sig-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin: 4px 0 12px;
+}
+.sig-tile {
+  position: relative;
+}
+.sig-pick {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px 8px;
+  border: 1px solid var(--sep);
+  border-radius: 14px;
+  background: #fff;
+  color: #1c1c1e;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.sig-pick img {
+  width: 100%;
+  height: 56px;
+  object-fit: contain;
+}
+.sig-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--fill);
+  color: var(--text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+.sig-all {
+  width: 100%;
+  margin-bottom: 4px;
+}
+.sig-local {
+  margin-top: 8px;
+  text-align: center;
+}

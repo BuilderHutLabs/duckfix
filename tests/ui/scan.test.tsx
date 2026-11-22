@@ -381,6 +381,29 @@ describe('built-in camera', () => {
     expect(vi.mocked(deps.importFiles).mock.calls[0][0]).toHaveLength(1);
   });
 
+  it('a normal photo first, then "Dowód": the card still needs its own front and back; the photo stays its own page', async () => {
+    const card = await import('../../src/scan/card');
+    vi.mocked(card.composeIdCard).mockClear();
+    const deps = await openLive();
+    await shoot(); // an ordinary page
+    fireEvent.click(screen.getByRole('button', { name: strings.modeCard }));
+    expect(screen.getByText(strings.cardFront)).toBeTruthy(); // not "Teraz tył"
+    await shoot();
+    expect(screen.getByText(strings.cardBack)).toBeTruthy();
+    expect(screen.queryByRole('dialog', { name: strings.cropTitle })).toBeNull();
+    await shoot();
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    expect(screen.getByText(strings.cropPageOf(1, 3))).toBeTruthy(); // the ordinary page
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropNextQueued })));
+    expect(await screen.findByText(strings.cropCardFront)).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropNextQueued })));
+    expect(await screen.findByText(strings.cropCardBack)).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropDone })));
+    // two pages: the ordinary one and the card page
+    await waitFor(() => expect(deps.importFiles).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(card.composeIdCard).mock.calls[0][0]).toHaveLength(2);
+  });
+
   it('hints: find the sheet, come closer, too dark', async () => {
     frame.current = { ...fullSheet, quad: null };
     await openLive();

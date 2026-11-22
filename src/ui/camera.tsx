@@ -84,9 +84,9 @@ export function CameraInput() {
       {open && (
         <LiveCamera
           onClose={() => setLiveOpen(false)}
-          onDone={(files, card) => {
+          onDone={(files, cardFiles) => {
             setLiveOpen(false);
-            setScanPhotos(files, null, card);
+            setScanPhotos(files, null, cardFiles);
           }}
           onPhoneCamera={() => {
             setLiveOpen(false);
@@ -156,15 +156,18 @@ export function LiveCamera({
   onPhoneCamera,
 }: {
   onClose(): void;
-  /** `card`: the photos are the front and back of a card, for one page. */
-  onDone(files: File[], card?: boolean): void;
+  /** `cardFiles`: the photos that are the front and back of a card (one page together). */
+  onDone(files: File[], cardFiles?: File[]): void;
   onPhoneCamera(): void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const stream = useRef<MediaStream | null>(null);
   const [state, setState] = useState<'starting' | 'ready' | 'failed'>('starting');
   const [torch, setTorch] = useState<boolean | null>(null);
-  const [shots, setShots] = useState<Array<{ file: File; url: string }>>([]);
+  const [shots, setShots] = useState<Array<{ file: File; url: string; card: boolean }>>([]);
+  /** Photos taken in "Dowód" (the card's sides); earlier ordinary photos are not counted. */
+  const cardShots = shots.filter((s) => s.card).length;
+  const modeRef = useRef<CameraMode>('auto');
   const [mode, setMode] = useState(loadMode);
   const auto = mode !== 'manual';
   const [live, setLive] = useState<{ pts: Pt[] | null; state: LiveState; progress: number; hint: string }>({
@@ -177,6 +180,7 @@ export function LiveCamera({
   const busy = useRef(false);
   const autoRef = useRef(auto);
   autoRef.current = auto;
+  modeRef.current = mode;
   const shotsRef = useRef(shots);
   shotsRef.current = shots;
 
@@ -229,7 +233,7 @@ export function LiveCamera({
         if (!blob) return;
         const file = new File([blob], `zdjecie-${Date.now()}-${++shotNo}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
         if (!autoRef.current) takenByHand.add(file);
-        setShots((list) => [...list, { file, url: URL.createObjectURL(file) }]);
+        setShots((list) => [...list, { file, url: URL.createObjectURL(file), card: modeRef.current === 'card' }]);
       },
       'image/jpeg',
       0.92,
@@ -278,17 +282,17 @@ export function LiveCamera({
 
   // "Dowód": after the front and the back, straight on to the crop screen
   useEffect(() => {
-    if (mode !== 'card' || shots.length < 2) return;
+    if (mode !== 'card' || cardShots < 2) return;
     const t = setTimeout(
       () =>
         onDone(
-          shots.slice(0, 2).map((s) => s.file),
-          true,
+          shots.map((s) => s.file),
+          shots.filter((s) => s.card).map((s) => s.file),
         ),
       CARD_DONE_MS,
     );
     return () => clearTimeout(t);
-  }, [mode, shots, onDone]);
+  }, [mode, shots, cardShots, onDone]);
 
   const toggleTorch = () => {
     const track = stream.current?.getVideoTracks()[0];
@@ -351,9 +355,7 @@ export function LiveCamera({
           )}
         </div>
       </div>
-      {mode === 'card' && shots.length < 2 && (
-        <p className="live-camera-step">{shots.length === 0 ? strings.cardFront : strings.cardBack}</p>
-      )}
+      {mode === 'card' && cardShots < 2 && <p className="live-camera-step">{cardShots === 0 ? strings.cardFront : strings.cardBack}</p>}
       <div className="live-camera-modes" role="group">
         {MODES.map(([m, label]) => (
           <button
@@ -394,7 +396,7 @@ export function LiveCamera({
             onClick={() =>
               onDone(
                 shots.map((s) => s.file),
-                mode === 'card',
+                shots.filter((s) => s.card).map((s) => s.file),
               )
             }
           >

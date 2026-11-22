@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { App } from '../../src/ui/App';
 import { createAppStore } from '../../src/ui/store';
 import { strings } from '../../src/ui/strings';
-import { saveSignature, loadSignature, clearSignature } from '../../src/signature/storage';
+import { addSignature, loadSignatures, removeSignature } from '../../src/signature/storage';
 import { addStamp, moveStamp, removeStamp } from '../../src/model/document';
 import { docWithFlags, fakeDeps, source } from './fixtures';
 
@@ -19,12 +19,21 @@ describe('signature', () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => vi.restoreAllMocks());
 
-  it('is remembered on the phone and can be forgotten', () => {
-    expect(loadSignature()).toBeNull();
-    saveSignature(SIG);
-    expect(loadSignature()).toEqual(SIG);
-    clearSignature();
-    expect(loadSignature()).toBeNull();
+  it('several signatures and initials are remembered on the phone, newest first, and can be removed', () => {
+    expect(loadSignatures()).toEqual([]);
+    const a = addSignature(SIG, 'signature');
+    const b = addSignature({ src: 'data:image/png;base64,BBBB', aspect: 1.5 }, 'initials');
+    expect(loadSignatures().map((x) => [x.id, x.kind])).toEqual([
+      [b.id, 'initials'],
+      [a.id, 'signature'],
+    ]);
+    removeSignature(a.id);
+    expect(loadSignatures().map((x) => x.id)).toEqual([b.id]);
+  });
+
+  it('the one signature saved by an earlier version is kept', () => {
+    localStorage.setItem('duckfix-signature', JSON.stringify(SIG));
+    expect(loadSignatures()).toEqual([expect.objectContaining({ ...SIG, kind: 'signature' })]);
   });
 
   it('model: add, move and remove a signature on a page', () => {
@@ -51,8 +60,8 @@ describe('signature', () => {
     expect(screen.getByRole('button', { name: strings.signatureScan })).toBeTruthy();
   });
 
-  it('with a saved signature "Podpisz" places it on the page (undoable), and it can be removed', () => {
-    saveSignature(SIG);
+  it('with a saved signature "Podpisz" shows your signatures; a tap places it on the page (undoable), and it can be removed', () => {
+    addSignature(SIG, 'signature');
     const store = createAppStore(fakeDeps());
     store.load(docWithFlags(1), [source]);
     render(<App store={store} />);
@@ -62,6 +71,9 @@ describe('signature', () => {
     vi.spyOn(Date, 'now').mockReturnValue(later);
     fireEvent.click(screen.getByRole('button', { name: strings.edit })); // Podpisz is one of the Edytuj tools
     fireEvent.click(screen.getByRole('button', { name: strings.sign }));
+    const picker = screen.getByRole('dialog', { name: strings.signaturesTitle });
+    fireEvent.click(within(picker).getByRole('button', { name: strings.signatureLabel }));
+    expect(screen.queryByRole('dialog', { name: strings.signaturesTitle })).toBeNull();
     const stamps = () => store.getState().doc.pages[0].stamps ?? [];
     expect(stamps()).toHaveLength(1);
     expect(stamps()[0].src).toBe(SIG.src);
@@ -122,5 +134,49 @@ describe('signature', () => {
     expect(store.getState().doc.pages[0].stamps![0].rot).toBe(90);
     act(() => store.undo());
     expect(store.getState().doc.pages[0].stamps![0].rot).toBe(45);
+  });
+
+  function openSign(pages = 1) {
+    const store = createAppStore(fakeDeps());
+    store.load(docWithFlags(pages), [source]);
+    render(<App store={store} />);
+    act(() => store.openPreview('p1'));
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    fireEvent.click(screen.getByRole('button', { name: strings.sign }));
+    return store;
+  }
+
+  it('initials go small into the lower right corner', () => {
+    addSignature(SIG, 'signature');
+    addSignature({ src: 'data:image/png;base64,CCCC', aspect: 1.5 }, 'initials');
+    const store = openSign();
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: strings.signaturesTitle })).getByRole('button', { name: strings.initialsLabel }),
+    );
+    const [st] = store.getState().doc.pages[0].stamps!;
+    expect(st.src).toBe('data:image/png;base64,CCCC');
+    expect(st.w).toBeLessThan(0.2);
+    expect(st.x + st.w).toBeGreaterThan(0.9);
+    expect(st.y + st.h).toBeGreaterThan(0.9);
+  });
+
+  it('"Parafuj wszystkie strony" puts the initials on every page', () => {
+    addSignature({ src: 'data:image/png;base64,CCCC', aspect: 1.5 }, 'initials');
+    const store = openSign(3);
+    fireEvent.click(screen.getByRole('button', { name: strings.initialsAllPages }));
+    expect(store.getState().doc.pages.map((p) => p.stamps?.length ?? 0)).toEqual([1, 1, 1]);
+    expect(store.getState().doc.pages[2].stamps![0].src).toBe('data:image/png;base64,CCCC');
+  });
+
+  it('a saved signature can be removed from the phone (after asking); "+ Parafka" opens the initials pad', () => {
+    addSignature(SIG, 'signature');
+    openSign();
+    const picker = screen.getByRole('dialog', { name: strings.signaturesTitle });
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(within(picker).getByRole('button', { name: strings.signatureRemove }));
+    expect(loadSignatures()).toEqual([]);
+    fireEvent.click(within(picker).getByRole('button', { name: strings.initialsNew }));
+    expect(screen.getByRole('dialog', { name: strings.initialsTitle })).toBeTruthy();
   });
 });

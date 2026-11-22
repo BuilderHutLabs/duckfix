@@ -80,8 +80,8 @@ export interface AppState {
   scanQueue: File[];
   /** How many photos this crop round has in all (for "Zdjęcie 2 z 3"). */
   scanTotal: number;
-  /** The round is the front and back of a card ("Dowód"): they become one page. */
-  scanCard: boolean;
+  /** Photos of the round that are the front and back of a card ("Dowód"): together they become one page. */
+  scanCardFiles: File[];
   /** Pages the "Wygląd stron" sheet applies to (open while set). */
   filterSheetIds: string[] | null;
   /** Where the cropped photo goes: a page index, or null for the end / a new document. */
@@ -280,7 +280,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     scanPhoto: null,
     scanQueue: [],
     scanTotal: 0,
-    scanCard: false,
+    scanCardFiles: [],
     filterSheetIds: null,
     scanIndex: null,
     exportOptions: loadExportOptions(deps.storage),
@@ -503,13 +503,13 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     },
 
     setScanPhoto(file: File | null, index: number | null = null) {
-      set({ scanPhoto: file, scanIndex: file ? index : null, scanQueue: [], scanTotal: file ? 1 : 0, scanCard: false });
+      set({ scanPhoto: file, scanIndex: file ? index : null, scanQueue: [], scanTotal: file ? 1 : 0, scanCardFiles: [] });
     },
 
     /** Several camera photos go through the crop screen one after another. */
-    setScanPhotos(files: File[], index: number | null = null, card = false) {
+    setScanPhotos(files: File[], index: number | null = null, cardFiles: File[] = []) {
       if (!files.length) return actions.setScanPhoto(null);
-      set({ scanPhoto: files[0], scanQueue: files.slice(1), scanTotal: files.length, scanIndex: index, scanCard: card });
+      set({ scanPhoto: files[0], scanQueue: files.slice(1), scanTotal: files.length, scanIndex: index, scanCardFiles: cardFiles });
     },
 
     /** Next photo of the round; `added`: the current one became a page (the place moves on by one). */

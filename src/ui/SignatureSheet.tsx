@@ -3,7 +3,7 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { extractInk, trimToInk } from '../signature/extract';
 import { cropRgba, inkBox, type PxRect } from '../signature/geometry';
 import { SignatureCrop } from './SignatureCrop';
-import { saveSignature, type SavedSignature } from '../signature/storage';
+import { addSignature, type SavedSignature, type SignatureKind, type StoredSignature } from '../signature/storage';
 import { loadPhoto } from '../scan/warp';
 import { releaseCanvas } from '../imaging/render';
 import { strings } from './strings';
@@ -28,7 +28,17 @@ function toSignature(data: Uint8ClampedArray, w: number, h: number): SavedSignat
 }
 
 /** "Mój podpis": draw it with a finger or take a photo of it on paper; it is kept on this phone. */
-export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature): void; onClose(): void }) {
+export function SignatureSheet({
+  kind = 'signature',
+  onSaved,
+  onClose,
+}: {
+  /** A full signature or initials (parafka): only the title and the saved kind differ. */
+  kind?: SignatureKind;
+  onSaved(s: StoredSignature): void;
+  onClose(): void;
+}) {
+  const title = kind === 'initials' ? strings.initialsTitle : strings.signatureTitle;
   const backdrop = useBackdropClose(() => onClose());
   const [mode, setMode] = useState<'draw' | 'scan'>('draw');
   const [drawn, setDrawn] = useState(false);
@@ -142,15 +152,14 @@ export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature
       if (ctx) sig = toSignature(ctx.getImageData(0, 0, PAD_W, PAD_H).data, PAD_W, PAD_H);
     }
     if (!sig) return;
-    saveSignature(sig);
-    onSaved(sig);
+    onSaved(addSignature(sig, kind));
   };
 
   return (
     <div className="sheet-backdrop" {...backdrop}>
-      <div className="sheet signature-sheet" role="dialog" aria-modal="true" aria-label={strings.signatureTitle}>
+      <div className="sheet signature-sheet" role="dialog" aria-modal="true" aria-label={title}>
         <div className="sheet-grabber" aria-hidden="true" />
-        <h2 className="sheet-title">{strings.signatureTitle}</h2>
+        <h2 className="sheet-title">{title}</h2>
         <div className="segmented" role="group">
           <button type="button" aria-pressed={mode === 'draw'} onClick={() => setMode('draw')}>
             {strings.signatureDraw}
@@ -239,13 +248,8 @@ export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature
               {strings.signatureCrop}
             </button>
           ) : (
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={mode === 'draw' ? !drawn : !scanned}
-              onClick={save}
-            >
-              {strings.signatureSave}
+            <button type="button" className="btn btn-primary" disabled={mode === 'draw' ? !drawn : !scanned} onClick={save}>
+              {kind === 'initials' ? strings.initialsSave : strings.signatureSave}
             </button>
           )}
         </div>

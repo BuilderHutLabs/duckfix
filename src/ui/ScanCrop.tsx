@@ -57,7 +57,7 @@ export function ScanCrop({ file }: { file: File }) {
   const handedOff = useRef(false);
 
   useEffect(() => {
-    if (s.scanCard && s.scanTotal - s.scanQueue.length === 1) cardSides.length = 0; // a new card round
+    if (s.scanTotal - s.scanQueue.length === 1) cardSides.length = 0; // a new round: no sides from before
     let alive = true;
     let loaded: Photo | null = null;
     handedOff.current = false;
@@ -144,13 +144,18 @@ export function ScanCrop({ file }: { file: File }) {
     el.addEventListener('pointercancel', up);
   };
 
+  /** This photo is a side of the card ("Dowód"), and whether another side of it is still waiting. */
+  const isCard = s.scanCardFiles.includes(file);
+  const cardLater = s.scanQueue.some((f) => s.scanCardFiles.includes(f));
+  const cardSide = s.scanCardFiles.indexOf(file);
+
   /** Straightens this photo with the corners as set and adds it (in turn with the others). */
   const addThis = (at: number | null) => {
     if (!photo || !quad) return;
     handedOff.current = true;
     const p = photo;
     const q = quad;
-    const card = s.scanCard;
+    const card = isCard;
     queueWarp(() =>
       warpToBlob(p, q, filter)
         .then((blob) => (card ? void cardSides.push(blob) : s.addScan(blob, at)))
@@ -171,13 +176,13 @@ export function ScanCrop({ file }: { file: File }) {
     if (!photo || !quad) return;
     if (next) openCamera(); // straight from the tap: the browser needs the user gesture
     addThis(s.scanIndex);
-    if (s.scanCard && !s.scanQueue.length) finishCard(s.scanIndex);
-    s.nextScan(!s.scanCard); // the next photo of the round, or the end (a card is one page: the place stays)
+    if (isCard && !cardLater) finishCard(s.scanIndex);
+    s.nextScan(!isCard); // the next photo of the round, or the end (the card's sides make one page: the place stays)
   };
 
   /** "Pomiń": this photo is left out (a card round still makes its page from the other side). */
   const skip = () => {
-    if (s.scanCard && !s.scanQueue.length) finishCard(s.scanIndex);
+    if (isCard && !cardLater && cardSides.length) finishCard(s.scanIndex);
     s.nextScan(false);
   };
 
@@ -186,11 +191,15 @@ export function ScanCrop({ file }: { file: File }) {
     if (!photo || !quad) return;
     const start = s.scanIndex;
     addThis(start);
-    const card = s.scanCard;
-    s.scanQueue.forEach((file, i) => {
-      const at = start === null ? null : start + i + 1;
+    const cards = s.scanCardFiles;
+    // ordinary pages take places one after another; the card page comes after them
+    let pages = isCard ? 0 : 1;
+    s.scanQueue.forEach((f) => {
+      const card = cards.includes(f);
+      const at = start === null || card ? null : start + pages;
+      if (!card) pages++;
       queueWarp(async () => {
-        const p = await loadPhoto(file);
+        const p = await loadPhoto(f);
         try {
           const blob = await warpToBlob(p, findSheet(p) ?? defaultQuad(p.width, p.height), filter);
           if (card) cardSides.push(blob);
@@ -200,7 +209,7 @@ export function ScanCrop({ file }: { file: File }) {
         }
       });
     });
-    if (card) finishCard(start);
+    if (isCard || s.scanQueue.some((f) => cards.includes(f))) finishCard(start === null ? null : start + pages);
     s.setScanPhoto(null);
   };
 
@@ -232,8 +241,8 @@ export function ScanCrop({ file }: { file: File }) {
           ✕
         </button>
         <div className="scan-pill">
-          {s.scanCard ? (
-            <strong className="scan-count">{position === 1 ? strings.cropCardFront : strings.cropCardBack}</strong>
+          {isCard ? (
+            <strong className="scan-count">{cardSide === 0 ? strings.cropCardFront : strings.cropCardBack}</strong>
           ) : (
             round && <strong className="scan-count">{strings.cropPageOf(position, s.scanTotal)}</strong>
           )}

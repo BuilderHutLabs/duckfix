@@ -16,7 +16,8 @@ import { CropFrame } from './edit/CropFrame';
 import { cropClip } from './edit/MarksSvg';
 import { TextSheet } from './TextSheet';
 import { SignatureSheet } from './SignatureSheet';
-import { loadSignature, type SavedSignature } from '../signature/storage';
+import { loadSignatures, removeSignature, type SavedSignature, type SignatureKind, type StoredSignature } from '../signature/storage';
+import { SignaturePicker } from './SignaturePicker';
 import { MarkTextSheet } from './edit/MarkTextSheet';
 import { loadEditStyle, saveEditStyle, type EditStyle } from './edit/style';
 import { FONT_FRAC, TICK_FRAC, newTextBox, tickBox, todayText, type MarkSize } from '../edit/text';
@@ -84,7 +85,10 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     canUndo,
     canRedo,
   } = useAppStore();
-  const [signing, setSigning] = useState(false);
+  /** Drawing a new signature or initials. */
+  const [signing, setSigning] = useState<SignatureKind | null>(null);
+  /** "Twoje podpisy" open, with the saved ones. */
+  const [picking, setPicking] = useState<StoredSignature[] | null>(null);
   const [reading, setReading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [tool, setTool] = useState<EditTool>(null);
@@ -197,20 +201,29 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
 
   if (!open) return null;
 
-  /** Puts the signature in the lower right part of the page, 35 % of its width. */
+  /**
+   * Puts a signature in the lower right part of the page (35 % of its width), initials small in the
+   * lower right corner. Returns what was placed.
+   */
   const place = (sig: SavedSignature) => {
     const box = imgRef.current?.getBoundingClientRect();
     const pageAspect = box && box.height ? box.width / box.height : 0.707;
-    const w = 0.35;
+    const initials = sig.kind === 'initials';
+    const w = initials ? 0.12 : 0.35;
     const h = Math.min(0.5, (w * pageAspect) / sig.aspect);
     const id = crypto.randomUUID();
-    addStamp(page.id, { id, src: sig.src, x: 0.55, y: Math.max(0, 0.82 - h), w, h });
+    const stamp = initials
+      ? { id, src: sig.src, x: 0.95 - w, y: Math.max(0, 0.96 - h), w, h }
+      : { id, src: sig.src, x: 0.55, y: Math.max(0, 0.82 - h), w, h };
+    addStamp(page.id, stamp);
     setSelectedId(id); // a new signature comes with its handles, ready to be moved
+    return stamp;
   };
+  /** "Podpisz": the saved signatures to choose from; none yet: draw the first one. */
   const sign = () => {
-    const saved = loadSignature();
-    if (saved) place(saved);
-    else setSigning(true);
+    const saved = loadSignatures();
+    if (saved.length) setPicking(saved);
+    else setSigning('signature');
   };
 
   const pageW = rect?.width || 1;
@@ -561,11 +574,38 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
       )}
       {writing && <MarkTextSheet initial={'text' in writing ? writing.text : ''} onDone={finishWriting} onClose={() => setWriting(null)} />}
       {reading && <TextSheet pageId={page.id} onClose={() => setReading(false)} />}
+      {picking && (
+        <SignaturePicker
+          items={picking}
+          onPick={(sig) => {
+            setPicking(null);
+            place(sig);
+          }}
+          onAllPages={
+            doc.pages.length > 1
+              ? (sig) => {
+                  setPicking(null);
+                  stampOnAllPages(page.id, place(sig)); // "Parafuj wszystkie strony"
+                }
+              : undefined
+          }
+          onNew={(kind) => {
+            setPicking(null);
+            setSigning(kind);
+          }}
+          onRemove={(id) => {
+            removeSignature(id);
+            setPicking(loadSignatures());
+          }}
+          onClose={() => setPicking(null)}
+        />
+      )}
       {signing && (
         <SignatureSheet
-          onClose={() => setSigning(false)}
+          kind={signing}
+          onClose={() => setSigning(null)}
           onSaved={(sig) => {
-            setSigning(false);
+            setSigning(null);
             place(sig);
           }}
         />

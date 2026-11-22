@@ -1,34 +1,61 @@
 import { storageKey } from '../config';
 
-/** The user's signature, kept only on this phone: transparent PNG + width/height ratio. */
+/** A full signature, or short initials (parafka) for the corner of every page. */
+export type SignatureKind = 'signature' | 'initials';
+
+/** A signature kept only on this phone: transparent PNG + width/height ratio. */
 export interface SavedSignature {
   src: string;
   aspect: number;
+  id?: string;
+  kind?: SignatureKind;
 }
+export type StoredSignature = Required<SavedSignature>;
 
-const KEY = storageKey('duckfix-signature');
+const KEY = storageKey('duckfix-signatures');
+/** The single signature of earlier versions. */
+const OLD_KEY = storageKey('duckfix-signature');
 
-export function loadSignature(): SavedSignature | null {
+const valid = (v: Partial<SavedSignature> | null): v is SavedSignature =>
+  !!v && typeof v.src === 'string' && v.src.startsWith('data:image/png') && typeof v.aspect === 'number' && v.aspect > 0;
+
+function write(list: StoredSignature[]): void {
   try {
-    const v = JSON.parse(localStorage.getItem(KEY) ?? 'null') as SavedSignature | null;
-    return v && typeof v.src === 'string' && v.src.startsWith('data:image/png') && v.aspect > 0 ? v : null;
-  } catch {
-    return null;
-  }
-}
-
-export function saveSignature(s: SavedSignature): void {
-  try {
-    localStorage.setItem(KEY, JSON.stringify(s));
+    localStorage.setItem(KEY, JSON.stringify(list));
   } catch {
     // private mode / full storage: it works for this visit only
   }
 }
 
-export function clearSignature(): void {
+/** All saved signatures and initials, newest first. */
+export function loadSignatures(): StoredSignature[] {
   try {
-    localStorage.removeItem(KEY);
+    const raw = localStorage.getItem(KEY);
+    if (raw) {
+      const list = JSON.parse(raw) as Array<Partial<SavedSignature>>;
+      return Array.isArray(list)
+        ? list.filter(valid).map((s) => ({ ...s, id: s.id ?? crypto.randomUUID(), kind: s.kind === 'initials' ? 'initials' : 'signature' }))
+        : [];
+    }
+    // an earlier version kept one signature: keep it as the first of the list
+    const old = JSON.parse(localStorage.getItem(OLD_KEY) ?? 'null') as Partial<SavedSignature> | null;
+    if (valid(old)) {
+      const list: StoredSignature[] = [{ src: old.src, aspect: old.aspect, id: crypto.randomUUID(), kind: 'signature' }];
+      write(list);
+      return list;
+    }
   } catch {
-    /* ignore */
+    /* unreadable: nothing saved */
   }
+  return [];
+}
+
+export function addSignature(s: SavedSignature, kind: SignatureKind): StoredSignature {
+  const item: StoredSignature = { src: s.src, aspect: s.aspect, id: crypto.randomUUID(), kind };
+  write([item, ...loadSignatures()]);
+  return item;
+}
+
+export function removeSignature(id: string): void {
+  write(loadSignatures().filter((s) => s.id !== id));
 }
