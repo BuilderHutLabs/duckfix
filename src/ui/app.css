@@ -2968,3 +2968,50 @@ span.live-camera-side {
   white-space: nowrap;
   cursor: pointer;
 }
+
+/* crop screen follows the light / dark theme, like the preview (the photo area stays grey / black) */
+.scan-d {
+  background: var(--pv-stage);
+  color: var(--pv-text);
+}
+.scan-d .scan-top {
+  background: var(--pv-bar);
+  border-bottom: 1px solid var(--pv-line);
+  margin-top: calc(-1 * env(safe-area-inset-top));
+  padding-top: calc(8px + env(safe-area-inset-top));
+}
+.scan-d .scan-stage {
+  margin-top: 10px;
+}
+.scan-close {
+  background: var(--pv-chip);
+  color: var(--pv-text);
+}
+.scan-pill {
+  background: var(--pv-chip);
+}
+.scan-d .scan-hint {
+  color: var(--pv-text-2);
+  opacity: 1;
+}
+.scan-d .scan-filters {
+  background: var(--pv-float);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+}
+.scan-d .scan-filters button {
+  color: var(--pv-text);
+}
+.scan-d .scan-filters button[aria-pressed='true'] {
+  background: var(--pv-text);
+  color: var(--pv-bar);
+}
+.scan-bar {
+  background: var(--pv-float);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.18);
+}
+.scan-tool {
+  color: var(--pv-text);
+}
+.scan-tool:active:not(:disabled) {
+  background: var(--pv-chip);
+}
