@@ -10,7 +10,7 @@ import { StampLayer } from './StampLayer';
 import { usePageBox } from './edit/pageBox';
 import { MarkLayer, moved, type CoverColor, type EditTool } from './edit/MarkLayer';
 import { EditTools, type ToolGroup } from './edit/EditTools';
-import { MarkBubble } from './edit/MarkBubble';
+import { MarkBubble, StampBubble } from './edit/MarkBubble';
 import { CropFrame } from './edit/CropFrame';
 import { cropClip } from './edit/MarksSvg';
 import { TextSheet } from './TextSheet';
@@ -86,7 +86,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   const [reading, setReading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [tool, setTool] = useState<EditTool>(null);
-  const [group, setGroup] = useState<ToolGroup>('write');
+  const [group, setGroup] = useState<ToolGroup>('text');
   const [folded, setFolded] = useState(false);
   const swipe = useRef<{ x: number; y: number; id: number } | null>(null);
   const [zoom, setZoom] = useState<Zoom>(NO_ZOOM);
@@ -501,36 +501,14 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
               selectedId={editing ? selectedId : undefined}
               onSelect={editing ? setSelectedId : undefined}
               bubble={(s) => (
-                <div className="mark-bubble" role="group" aria-label={strings.selectedItem} onPointerDown={(e) => e.stopPropagation()}>
-                  <div className="mark-bubble-row">
-                    <button
-                      type="button"
-                      className="mark-bubble-btn"
-                      aria-label={strings.duplicate}
-                      title={strings.duplicate}
-                      onClick={() => duplicateStamp(s)}
-                    >
-                      ⧉
-                    </button>
-                    {doc.pages.length > 1 && (
-                      <button type="button" className="mark-bubble-btn wide" onClick={() => stampOnAllPages(page.id, s)}>
-                        {strings.onAllPages}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="mark-bubble-btn danger"
-                      aria-label={strings.removeSignature}
-                      title={strings.removeSignature}
-                      onClick={() => {
-                        removeStamp(page.id, s.id);
-                        setSelectedId(null);
-                      }}
-                    >
-                      🗑
-                    </button>
-                  </div>
-                </div>
+                <StampBubble
+                  onDuplicate={() => duplicateStamp(s)}
+                  onAllPages={doc.pages.length > 1 ? () => stampOnAllPages(page.id, s) : undefined}
+                  onRemove={() => {
+                    removeStamp(page.id, s.id);
+                    setSelectedId(null);
+                  }}
+                />
               )}
             />
           </div>

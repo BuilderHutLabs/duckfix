@@ -22,7 +22,7 @@ const TAP_BOX = { w: 0.3, h: 0.05 };
 const MIN = 0.02;
 const CORNERS: CropHandle[] = ['nw', 'ne', 'sw', 'se'];
 /** Rough size of the bubble over a selected item (px). */
-const BUBBLE = { w: 300, h: 104 };
+const BUBBLE = { w: 280, h: 56 };
 /**
  * Room between the item and its bubble (px), so the bubble never covers the corner dots
  * (they stick out ~25 px with their touch area, more on a small item) or a signature's turn knob.
@@ -115,7 +115,12 @@ export function BubbleAnchor({
       className="mark-bubble-anchor"
       style={{ left: at.left + (shift?.x ?? 0), top: at.top + (shift?.y ?? 0), transform: zoom !== 1 ? `scale(${1 / zoom})` : undefined }}
     >
-      <div style={{ transform: at.above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' }}>{children}</div>
+      <div
+        className={`mark-bubble-pos ${at.above ? 'above' : 'below'}`}
+        style={{ transform: at.above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' }}
+      >
+        {children}
+      </div>
     </div>
   );
   return host ? createPortal(anchor, host) : anchor;

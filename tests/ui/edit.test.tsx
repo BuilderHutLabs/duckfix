@@ -16,7 +16,15 @@ vi.mock('../../src/imaging/render', () => ({
 /** jsdom has no layout: every element is 500×700 at the origin, so the page box is the whole stage. */
 function fakeLayout() {
   vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
-    left: 0, top: 0, width: 500, height: 700, right: 500, bottom: 700, x: 0, y: 0, toJSON() {},
+    left: 0,
+    top: 0,
+    width: 500,
+    height: 700,
+    right: 500,
+    bottom: 700,
+    x: 0,
+    y: 0,
+    toJSON() {},
   } as DOMRect);
 }
 
@@ -184,10 +192,20 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     fireEvent.pointerUp(el, { clientX: x, clientY: y, pointerId: 1 });
   };
   const layer = () => document.querySelector('.mark-layer') as HTMLElement;
-  const DRAW = [strings.toolPen, strings.toolHighlight, strings.toolArrow, strings.toolRect, strings.toolEllipse];
+  // the tool row holds groups; a tool of a group is chosen in the row above it
+  const MAIN: Record<string, string> = {
+    [strings.toolTick]: strings.toolMarks,
+    [strings.toolCross]: strings.toolMarks,
+    [strings.toolDate]: strings.toolMarks,
+    [strings.toolPen]: strings.groupDraw,
+    [strings.toolEraser]: strings.groupDraw,
+    [strings.toolArrow]: strings.toolShapes,
+    [strings.toolRect]: strings.toolShapes,
+    [strings.toolEllipse]: strings.toolShapes,
+  };
   const startTool = (name: string) => {
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
-    if (DRAW.includes(name)) openGroup(strings.groupDraw);
+    if (MAIN[name]) openGroup(MAIN[name]);
     fireEvent.click(screen.getByRole('button', { name }));
   };
   const bubble = () => screen.getByRole('group', { name: strings.selectedItem });
@@ -266,8 +284,12 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
     expect(screen.queryByRole('group', { name: strings.selectedItem })).toBeNull();
     tap(document.querySelector('[data-mark="k1"]')!, 60, 80);
+    // colour and size each open a row of choices in the bubble
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.changeColor }));
     fireEvent.click(within(bubble()).getByRole('button', { name: strings.inkGreen }));
     expect(marks(store)[0]).toMatchObject({ color: 'green' });
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.changeSize }));
+    expect(within(bubble()).queryByRole('button', { name: strings.inkGreen })).toBeNull();
     fireEvent.click(within(bubble()).getByRole('button', { name: strings.sizeLarge }));
     expect((marks(store)[0] as { w: number }).w).toBeCloseTo(0.07);
     fireEvent.click(within(bubble()).getByRole('button', { name: strings.duplicate }));
@@ -286,9 +308,38 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     const store = openPreview(doc);
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
     tap(document.querySelector('[data-mark="c1"]')!, 60, 80);
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.changeColor }));
     expect(within(bubble()).queryByRole('button', { name: strings.inkRed })).toBeNull();
     fireEvent.click(within(bubble()).getByRole('button', { name: strings.coverWhite }));
     expect(marks(store)[0]).toMatchObject({ color: 'white' });
+  });
+
+  it('one row of tools; a group shows its kinds above, tapping it again puts the tool away, and it remembers the last kind', () => {
+    openPreview();
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    const row = document.querySelector('.edit-strip') as HTMLElement;
+    expect(
+      within(row)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual([
+      strings.toolWrite,
+      strings.toolMarks,
+      strings.groupDraw,
+      strings.toolHighlight,
+      strings.toolShapes,
+      strings.groupHide,
+      strings.sign,
+    ]);
+    const marksBtn = within(row).getByRole('button', { name: strings.toolMarks });
+    fireEvent.click(marksBtn);
+    expect(screen.getByRole('button', { name: strings.toolTick }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: strings.toolCross }));
+    fireEvent.click(marksBtn); // put away
+    expect(marksBtn.getAttribute('aria-pressed')).toBe('false');
+    expect(screen.queryByRole('button', { name: strings.toolCross })).toBeNull();
+    fireEvent.click(marksBtn); // back with the last kind
+    expect(screen.getByRole('button', { name: strings.toolCross }).getAttribute('aria-pressed')).toBe('true');
   });
 
   it('the tool panel folds away and comes back; the tool stays on', () => {
@@ -302,7 +353,7 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     expect(screen.getByRole('button', { name: strings.toolTick }).getAttribute('aria-pressed')).toBe('true');
   });
 
-  it('Data writes today\'s date with one tap', () => {
+  it("Data writes today's date with one tap", () => {
     const store = openPreview();
     startTool(strings.toolDate);
     tap(layer(), 100, 100);
@@ -310,7 +361,17 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
   });
 
   it('a text on the page: tap to select, tap again to change it (one undo step)', () => {
-    const doc = addMark(docWithFlags(1), 'p1', { id: 't1', kind: 'text', text: 'Jan', color: 'blue', size: 2, x: 0.1, y: 0.1, w: 0.2, h: 0.03 });
+    const doc = addMark(docWithFlags(1), 'p1', {
+      id: 't1',
+      kind: 'text',
+      text: 'Jan',
+      color: 'blue',
+      size: 2,
+      x: 0.1,
+      y: 0.1,
+      w: 0.2,
+      h: 0.03,
+    });
     const store = openPreview(doc);
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
     const item = document.querySelector('[data-mark="t1"]') as HTMLElement;
@@ -330,6 +391,7 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     const store = openPreview(doc);
     startTool(strings.toolTick);
     tap(document.querySelector('[data-mark="k1"]')!, 60, 80);
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.changeColor }));
     fireEvent.click(within(bubble()).getByRole('button', { name: strings.inkBlue }));
     expect(marks(store)[0]).toMatchObject({ color: 'blue' });
   });
@@ -345,7 +407,12 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     const store = openPreview();
     startTool(strings.toolPen);
     fireEvent.click(screen.getByRole('button', { name: strings.inkBlue }));
-    drag(layer(), [[50, 70], [100, 140], [150, 70], [200, 140]]);
+    drag(layer(), [
+      [50, 70],
+      [100, 140],
+      [150, 70],
+      [200, 140],
+    ]);
     const m = marks(store)[0] as { kind: string; color: string; points: number[] };
     expect(m).toMatchObject({ kind: 'pen', color: 'blue' });
     expect(m.points.slice(0, 2)).toEqual([0.1, 0.1]);
@@ -357,16 +424,28 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
   it('Zakreślacz is yellow until another highlighter colour is chosen', () => {
     const store = openPreview();
     startTool(strings.toolHighlight);
-    drag(layer(), [[50, 70], [300, 70]]);
+    drag(layer(), [
+      [50, 70],
+      [300, 70],
+    ]);
     fireEvent.click(screen.getByRole('button', { name: strings.hlPink }));
-    drag(layer(), [[50, 140], [300, 140]]);
-    expect(marks(store).map((m) => [m.kind, m.color])).toEqual([['highlight', 'yellow'], ['highlight', 'pink']]);
+    drag(layer(), [
+      [50, 140],
+      [300, 140],
+    ]);
+    expect(marks(store).map((m) => [m.kind, m.color])).toEqual([
+      ['highlight', 'yellow'],
+      ['highlight', 'pink'],
+    ]);
   });
 
   it('Strzałka goes from where the finger started to where it ended (even up and to the left)', () => {
     const store = openPreview();
     startTool(strings.toolArrow);
-    drag(layer(), [[300, 420], [100, 140]]);
+    drag(layer(), [
+      [300, 420],
+      [100, 140],
+    ]);
     const m = marks(store)[0] as { kind: string; x: number; y: number; w: number; h: number };
     expect(m.kind).toBe('arrow');
     expect(m.x).toBeCloseTo(0.6);
@@ -378,10 +457,16 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
   it('Prostokąt and Kółko are dragged corner to corner; a tap draws nothing', () => {
     const store = openPreview();
     startTool(strings.toolRect);
-    drag(layer(), [[300, 420], [100, 140]]);
+    drag(layer(), [
+      [300, 420],
+      [100, 140],
+    ]);
     tap(layer(), 50, 50);
     fireEvent.click(screen.getByRole('button', { name: strings.toolEllipse }));
-    drag(layer(), [[50, 70], [250, 210]]);
+    drag(layer(), [
+      [50, 70],
+      [250, 210],
+    ]);
     const [r, e] = marks(store) as Array<{ kind: string; x: number; y: number; w: number; h: number }>;
     expect(marks(store)).toHaveLength(2);
     expect(r.kind).toBe('rect');
@@ -395,7 +480,10 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     const doc = addMark(docWithFlags(1), 'p1', { id: 'k', kind: 'pen', color: 'black', points: [0.2, 0.2, 0.4, 0.3] });
     const store = openPreview(doc);
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
-    drag(document.querySelector('[data-mark="k"]')!, [[150, 175], [200, 245]]); // +0.1, +0.1
+    drag(document.querySelector('[data-mark="k"]')!, [
+      [150, 175],
+      [200, 245],
+    ]); // +0.1, +0.1
     const m = marks(store)[0] as { points: number[] };
     m.points.forEach((v, i) => expect(v).toBeCloseTo([0.3, 0.3, 0.5, 0.4][i]));
   });
@@ -405,7 +493,10 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     const store = openPreview(doc);
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
     tap(document.querySelector('[data-mark="a"]')!, 150, 140);
-    drag(document.querySelector('[data-handle="end"]')!, [[200, 140], [200, 280]]); // tip down by 0.2
+    drag(document.querySelector('[data-handle="end"]')!, [
+      [200, 140],
+      [200, 280],
+    ]); // tip down by 0.2
     expect(marks(store)[0]).toMatchObject({ x: 0.2, y: 0.2, w: 0.2 });
     expect((marks(store)[0] as { h: number }).h).toBeCloseTo(0.2);
   });
@@ -421,7 +512,17 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
 
   it('miniatures show written text', () => {
     fakeLayout();
-    const doc = addMark(docWithFlags(1), 'p1', { id: 't1', kind: 'text', text: 'Zażółć', color: 'black', size: 2, x: 0.1, y: 0.1, w: 0.2, h: 0.03 });
+    const doc = addMark(docWithFlags(1), 'p1', {
+      id: 't1',
+      kind: 'text',
+      text: 'Zażółć',
+      color: 'black',
+      size: 2,
+      x: 0.1,
+      y: 0.1,
+      w: 0.2,
+      h: 0.03,
+    });
     const store = createAppStore(fakeDeps());
     store.load(doc, [source]);
     render(<App store={store} />);
@@ -455,7 +556,12 @@ describe('Edytuj: gumka, grubość, na wszystkie strony, podpis, powiększanie',
     const store = openPreview(doc);
     draw();
     fireEvent.click(screen.getByRole('button', { name: strings.toolEraser }));
-    drag(layer(), [[250, 300], [250, 360], [250, 400], [250, 500]]); // down across y 0.5 and 0.7
+    drag(layer(), [
+      [250, 300],
+      [250, 360],
+      [250, 400],
+      [250, 500],
+    ]); // down across y 0.5 and 0.7
     expect(marks(store).map((m) => m.id)).toEqual(['c', 't']);
     act(() => store.undo());
     expect(marks(store)).toHaveLength(4);
@@ -466,19 +572,35 @@ describe('Edytuj: gumka, grubość, na wszystkie strony, podpis, powiększanie',
     draw();
     fireEvent.click(screen.getByRole('button', { name: strings.toolPen }));
     fireEvent.click(screen.getByRole('button', { name: strings.sizeLarge }));
-    drag(layer(), [[100, 100], [200, 150], [300, 120]]);
+    drag(layer(), [
+      [100, 100],
+      [200, 150],
+      [300, 120],
+    ]);
     expect(marks(store)[0]).toMatchObject({ kind: 'pen', width: 3 });
-    fireEvent.click(screen.getByRole('button', { name: strings.toolPen })); // tool off
+    fireEvent.click(screen.getByRole('button', { name: strings.groupDraw })); // tool off
     tap(document.querySelector(`[data-mark="${marks(store)[0].id}"]`)!, 200, 140);
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.changeSize }));
     fireEvent.click(within(bubble()).getByRole('button', { name: strings.sizeSmall }));
     expect(marks(store)[0]).toMatchObject({ width: 1 });
   });
 
   it('"Na wszystkie strony" copies the item to every other page in the same place, in one undo step', () => {
-    const doc = addMark(docWithFlags(3), 'p1', { id: 'd', kind: 'text', text: '21.11.2026', color: 'blue', size: 2, x: 0.6, y: 0.9, w: 0.2, h: 0.03 });
+    const doc = addMark(docWithFlags(3), 'p1', {
+      id: 'd',
+      kind: 'text',
+      text: '21.11.2026',
+      color: 'blue',
+      size: 2,
+      x: 0.6,
+      y: 0.9,
+      w: 0.2,
+      h: 0.03,
+    });
     const store = openPreview(doc);
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
     tap(document.querySelector('[data-mark="d"]')!, 350, 640);
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.moreOptions }));
     fireEvent.click(within(bubble()).getByRole('button', { name: strings.onAllPages }));
     const pages = store.getState().doc.pages;
     expect(pages.map((p) => p.marks?.length ?? 0)).toEqual([1, 1, 1]);
@@ -500,6 +622,7 @@ describe('Edytuj: gumka, grubość, na wszystkie strony, podpis, powiększanie',
     expect(document.querySelector('.stamp-rotate')).not.toBeNull();
     fireEvent.click(within(bubble()).getByRole('button', { name: strings.duplicate }));
     expect(store.getState().doc.pages[0].stamps).toHaveLength(2);
+    fireEvent.click(within(bubble()).getByRole('button', { name: strings.moreOptions }));
     fireEvent.click(within(bubble()).getByRole('button', { name: strings.onAllPages }));
     expect(store.getState().doc.pages[1].stamps).toHaveLength(1);
   });
