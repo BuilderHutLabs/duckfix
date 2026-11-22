@@ -15,7 +15,7 @@ export interface Photo {
 }
 
 /** Longest side of the copy the sheet is searched in. */
-const DETECT_SIDE = 400;
+const DETECT_SIDE = 320;
 /**
  * Working size of a camera photo (longest side). Phones shoot 12–50 MP; keeping that decoded
  * several times over (preview, detection, warp) ran Android out of memory. 2400 px is ~300 dpi on A4.
@@ -114,7 +114,8 @@ export function findSheet(photo: Photo): Quad | null {
     const ctx = c.getContext('2d', { willReadFrequently: true });
     if (!ctx) return null;
     ctx.drawImage(photo.bitmap, 0, 0, c.width, c.height);
-    const q = detectQuad(toGray(ctx.getImageData(0, 0, c.width, c.height).data, c.width, c.height));
+    const px = ctx.getImageData(0, 0, c.width, c.height).data;
+    const q = detectQuad(toGray(px, c.width, c.height), px);
     return q && (q.map((p) => ({ x: p.x / k, y: p.y / k })) as Quad);
   } finally {
     releaseCanvas(c);

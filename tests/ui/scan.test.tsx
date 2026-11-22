@@ -159,6 +159,27 @@ describe('camera scan', () => {
     await waitFor(() => expect(vi.mocked(warpPreview).mock.calls.at(-1)![2]).toBe('bw'));
   });
 
+  it('"Całe zdjęcie" puts the corners on the corners of the photo; "Wykryj kartkę" looks for the sheet again', async () => {
+    const warp = await import('../../src/scan/warp');
+    const found = [
+      { x: 500, y: 400 },
+      { x: 3500, y: 420 },
+      { x: 3480, y: 2600 },
+      { x: 520, y: 2580 },
+    ];
+    vi.mocked(warp.findSheet).mockReturnValue(found as never);
+    render(<App store={createAppStore(fakeDeps())} />);
+    await takePhoto();
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    const corner = () => screen.getAllByRole('slider')[0].getAttribute('aria-valuetext');
+    await waitFor(() => expect(corner()).toBe('500, 400'));
+    fireEvent.click(screen.getByRole('button', { name: strings.cropWhole }));
+    expect(corner()).toBe('0, 0');
+    fireEvent.click(screen.getByRole('button', { name: strings.cropDetect }));
+    expect(corner()).toBe('500, 400');
+    vi.mocked(warp.findSheet).mockReturnValue(null);
+  });
+
   it('Anuluj closes the crop screen without adding anything', async () => {
     const deps = fakeDeps();
     render(<App store={createAppStore(deps)} />);
@@ -279,20 +300,30 @@ describe('built-in camera', () => {
   it('the sheet is outlined live and taken by itself when the phone is held still (Auto)', async () => {
     frame.current = fullSheet;
     await openLive();
-    expect(screen.getByRole('button', { name: strings.cameraAuto }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: strings.modeAuto }).getAttribute('aria-pressed')).toBe('true');
     await waitFor(() => expect(document.querySelector('.live-camera-outline polygon')).not.toBeNull());
     expect(await screen.findByRole('button', { name: strings.cameraDone(1) }, { timeout: 3000 })).toBeTruthy();
   });
 
-  it('with Auto off nothing is taken by itself, and the choice is remembered', async () => {
+  it('"Ręcznie": no outline, nothing taken by itself, the crop starts from the whole photo; remembered', async () => {
+    const warp = await import('../../src/scan/warp');
+    vi.mocked(warp.findSheet).mockClear();
     frame.current = fullSheet;
     await openLive();
-    fireEvent.click(screen.getByRole('button', { name: strings.cameraAuto }));
+    fireEvent.click(screen.getByRole('button', { name: strings.modeManual }));
+    expect(screen.getByRole('button', { name: strings.modeManual }).getAttribute('aria-pressed')).toBe('true');
     await new Promise((r) => setTimeout(r, 1500));
+    expect(document.querySelector('.live-camera-outline')).toBeNull();
     expect(screen.queryByRole('button', { name: strings.cameraDone(1) })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: strings.close }));
+    await shoot();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraDone(1) })));
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    // the photo's own corners (4000 × 3000), no search for the sheet
+    await waitFor(() => expect(screen.getAllByRole('slider')[2].getAttribute('aria-valuetext')).toBe('4000, 3000'));
+    expect(warp.findSheet).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: strings.cancel }));
     fireEvent.click(screen.getByRole('button', { name: strings.homeScan }));
-    expect((await screen.findByRole('button', { name: strings.cameraAuto })).getAttribute('aria-pressed')).toBe('false');
+    expect((await screen.findByRole('button', { name: strings.modeManual })).getAttribute('aria-pressed')).toBe('true');
   });
 
   it('hints: find the sheet, come closer, too dark', async () => {

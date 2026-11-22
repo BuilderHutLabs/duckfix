@@ -4,6 +4,16 @@ export type Pt = { x: number; y: number };
 /** Sheet corners in reading order: top-left, top-right, bottom-right, bottom-left (pixels). */
 export type Quad = [Pt, Pt, Pt, Pt];
 
+/** The whole photo ("Całe zdjęcie", and photos taken in "Ręcznie"). */
+export function fullQuad(w: number, h: number): Quad {
+  return [
+    { x: 0, y: 0 },
+    { x: w, y: 0 },
+    { x: w, y: h },
+    { x: 0, y: h },
+  ];
+}
+
 /** Photo inset by 8 % on each side: the starting frame when the sheet is not found. */
 export function defaultQuad(w: number, h: number): Quad {
   const dx = Math.round(w * 0.08);

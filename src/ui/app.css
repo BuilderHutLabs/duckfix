@@ -2790,3 +2790,46 @@ span.live-camera-side {
   .live-camera-flash,
   .live-camera-thumb { animation: none; }
 }
+
+/* ---------- live camera: Auto / Ręcznie; crop: whole photo ---------- */
+.live-camera-modes {
+  position: absolute;
+  left: 50%;
+  bottom: calc(118px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 1;
+}
+.live-camera-modes button {
+  min-width: 78px;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 15px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.live-camera-modes button[aria-pressed='true'] {
+  background: #ffd60a;
+  color: #000;
+}
+.scan-whole {
+  align-self: center;
+  margin: 8px 0 0;
+  padding: 7px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}

@@ -2,8 +2,8 @@ import { toGray } from '../imaging/gray';
 import { detectQuad } from './detectQuad';
 import type { Quad } from './quad';
 
-/** Side of the small grey copy of a camera frame the sheet is looked for in (fast enough 5× a second). */
-const LIVE_SIDE = 320;
+/** Side of the small grey copy of a camera frame the sheet is looked for in (fast enough several times a second on a phone). */
+const LIVE_SIDE = 256;
 
 /**
  * One look at the live camera picture: the sheet outline (in the small copy's pixels), the copy's
@@ -24,8 +24,9 @@ export function analyzeFrame(
   const ctx = canvas.getContext('2d', { willReadFrequently: true });
   if (!ctx?.getImageData) return null;
   ctx.drawImage(video, 0, 0, w, h);
-  const gray = toGray(ctx.getImageData(0, 0, w, h).data, w, h);
+  const px = ctx.getImageData(0, 0, w, h).data;
+  const gray = toGray(px, w, h);
   let sum = 0;
   for (let i = 0; i < gray.data.length; i += 4) sum += gray.data[i];
-  return { quad: detectQuad(gray), width: w, height: h, light: sum / Math.ceil(gray.data.length / 4) };
+  return { quad: detectQuad(gray, px), width: w, height: h, light: sum / Math.ceil(gray.data.length / 4) };
 }

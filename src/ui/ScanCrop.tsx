@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { findSheet, loadPhoto, warpPreview, warpToBlob, type Photo } from '../scan/warp';
-import { defaultQuad, type Quad } from '../scan/quad';
-import { openCamera } from './camera';
+import { defaultQuad, fullQuad, type Quad } from '../scan/quad';
+import { openCamera, takenByHand } from './camera';
 import { storageKey } from '../config';
 import type { ScanFilter } from '../scan/enhance';
 
@@ -59,7 +59,8 @@ export function ScanCrop({ file }: { file: File }) {
         loaded = p;
         if (!alive) return p.close();
         setPhoto(p);
-        setQuad(findSheet(p) ?? defaultQuad(p.width, p.height));
+        // "Ręcznie": the user frames the page by hand, from the whole photo
+        setQuad(takenByHand.has(file) ? fullQuad(p.width, p.height) : (findSheet(p) ?? defaultQuad(p.width, p.height)));
       })
       .catch(() => {
         if (alive) {
@@ -175,6 +176,11 @@ export function ScanCrop({ file }: { file: File }) {
     s.setScanPhoto(null);
   };
 
+  const whole =
+    !!photo &&
+    !!quad &&
+    quad.every((p, i) => p.x === fullQuad(photo.width, photo.height)[i].x && p.y === fullQuad(photo.width, photo.height)[i].y);
+
   const round = s.scanTotal > 1;
   const waiting = s.scanQueue.length > 0;
   const position = s.scanTotal - s.scanQueue.length;
@@ -211,6 +217,17 @@ export function ScanCrop({ file }: { file: File }) {
         )}
         {preview && <img className="scan-preview" src={preview} alt={strings.cropPreview} />}
       </div>
+      {photo && (
+        <button
+          type="button"
+          className="scan-whole"
+          onClick={() =>
+            setQuad(whole ? (findSheet(photo) ?? defaultQuad(photo.width, photo.height)) : fullQuad(photo.width, photo.height))
+          }
+        >
+          {whole ? strings.cropDetect : strings.cropWhole}
+        </button>
+      )}
       <div className="segmented scan-filters" role="group">
         {FILTERS.map((f) => (
           <button

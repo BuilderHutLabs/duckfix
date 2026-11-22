@@ -1,4 +1,4 @@
-import { createSteady, quadToView, type LiveState } from '../../src/scan/liveScan';
+import { createOutline, createSteady, quadToView, type LiveState } from '../../src/scan/liveScan';
 import type { Quad } from '../../src/scan/quad';
 
 const W = 400;
@@ -98,5 +98,25 @@ describe('outline on the screen', () => {
     const v = quadToView(sheet(), W, H, 200, 400);
     expect(v[0]).toEqual({ x: 30, y: 140 });
     expect(v[2]).toEqual({ x: 170, y: 260 });
+  });
+});
+
+describe('steady outline on the screen', () => {
+  it('small jitter is smoothed, a real move is followed at once', () => {
+    const o = createOutline();
+    o.push(sheet(0), W, H);
+    const jitter = o.push(sheet(6), W, H)!;
+    expect(jitter[0].x).toBeGreaterThan(60);
+    expect(jitter[0].x).toBeLessThan(66);
+    const jump = o.push(sheet(80), W, H)!;
+    expect(jump[0].x).toBe(140);
+  });
+
+  it('one frame without the sheet keeps the outline; more frames drop it', () => {
+    const o = createOutline();
+    o.push(sheet(0), W, H);
+    expect(o.push(null, W, H)).not.toBeNull();
+    expect(o.push(null, W, H)).not.toBeNull();
+    expect(o.push(null, W, H)).toBeNull();
   });
 });

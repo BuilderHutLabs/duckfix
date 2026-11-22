@@ -73,3 +73,29 @@ export function quadToView(q: Quad, frameW: number, frameH: number, viewW: numbe
   const top = (viewH - frameH * k) / 2;
   return q.map((p) => ({ x: left + p.x * k, y: top + p.y * k }));
 }
+
+/** Corners may jitter this much (share of the longer side) and are smoothed; a bigger move is followed at once. */
+const JITTER = 0.06;
+/** Frames without a sheet before the outline disappears (a missed frame should not make it blink). */
+const KEEP_FRAMES = 2;
+
+/** The outline shown on the screen: calm when the phone shakes a little, no blinking on a missed frame. */
+export function createOutline() {
+  let shown: Quad | null = null;
+  let missed = 0;
+  return {
+    push(q: Quad | null, w: number, h: number): Quad | null {
+      if (!q) {
+        if (++missed > KEEP_FRAMES) shown = null;
+        return shown;
+      }
+      missed = 0;
+      const side = Math.max(w, h);
+      shown =
+        shown && moved(q, shown, side) < JITTER
+          ? (q.map((p, i) => ({ x: (shown![i].x + p.x) / 2, y: (shown![i].y + p.y) / 2 })) as Quad)
+          : q;
+      return shown;
+    },
+  };
+}

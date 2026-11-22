@@ -3,7 +3,7 @@ import { useAppStore } from './store';
 import { strings } from './strings';
 import { storageKey } from '../config';
 import { analyzeFrame } from '../scan/liveFrame';
-import { createSteady, quadToView, type LiveState } from '../scan/liveScan';
+import { createOutline, createSteady, quadToView, type LiveState } from '../scan/liveScan';
 import type { Pt } from '../scan/quad';
 
 /**
@@ -131,6 +131,9 @@ function hintFor(state: LiveState, light: number): string {
 
 let shotNo = 0;
 
+/** Photos taken in "Ręcznie": the crop screen starts from the whole photo, without looking for the sheet. */
+export const takenByHand = new WeakSet<File>();
+
 /**
  * Full-screen camera inside the app. The sheet is outlined live; with "Auto" the picture is taken by
  * itself once the phone is held still. Pages are collected in a row and go to the crop screen on "Gotowe".
@@ -203,6 +206,7 @@ export function LiveCamera({ onClose, onDone, onPhoneCamera }: { onClose(): void
         busy.current = false;
         if (!blob) return;
         const file = new File([blob], `zdjecie-${Date.now()}-${++shotNo}.jpg`, { type: 'image/jpeg', lastModified: Date.now() });
+        if (!autoRef.current) takenByHand.add(file);
         setShots((list) => [...list, { file, url: URL.createObjectURL(file) }]);
       },
       'image/jpeg',
@@ -214,8 +218,12 @@ export function LiveCamera({ onClose, onDone, onPhoneCamera }: { onClose(): void
 
   // look for the sheet a few times a second: outline, hint, and the picture taken by itself when still
   useEffect(() => {
-    if (state !== 'ready') return;
+    if (state !== 'ready' || !auto) {
+      setLive({ pts: null, state: 'none', progress: 0, hint: '' });
+      return;
+    }
     const steady = createSteady();
+    const outline = createOutline();
     const look = document.createElement('canvas');
     const t = setInterval(() => {
       const v = video.current;
@@ -228,13 +236,14 @@ export function LiveCamera({ onClose, onDone, onPhoneCamera }: { onClose(): void
       }
       if (!r) return;
       const st = steady.push(r.quad, r.width, r.height, performance.now());
+      const shown = outline.push(r.quad, r.width, r.height);
       setLive({
-        pts: r.quad ? quadToView(r.quad, r.width, r.height, v.clientWidth, v.clientHeight) : null,
+        pts: shown ? quadToView(shown, r.width, r.height, v.clientWidth, v.clientHeight) : null,
         state: st.state,
         progress: st.progress,
         hint: hintFor(st.state, r.light),
       });
-      if (st.state === 'ready' && autoRef.current && !busy.current) {
+      if (st.state === 'ready' && !busy.current) {
         steady.fired();
         shootRef.current(true);
       }
@@ -243,7 +252,7 @@ export function LiveCamera({ onClose, onDone, onPhoneCamera }: { onClose(): void
       clearInterval(t);
       look.width = 0;
     };
-  }, [state]);
+  }, [state, auto]);
 
   const toggleTorch = () => {
     const track = stream.current?.getVideoTracks()[0];
@@ -261,7 +270,7 @@ export function LiveCamera({ onClose, onDone, onPhoneCamera }: { onClose(): void
   };
 
   const last = shots.at(-1);
-  const counting = auto && (live.state === 'hold' || live.state === 'ready');
+  const counting = live.state === 'hold' || live.state === 'ready';
 
   return (
     <div className="live-camera" role="dialog" aria-modal="true" aria-label={strings.cameraTitle}>
@@ -299,25 +308,27 @@ export function LiveCamera({ onClose, onDone, onPhoneCamera }: { onClose(): void
           </p>
         )}
         <div className="live-camera-tools">
-          <button
-            type="button"
-            className="live-camera-btn live-camera-auto"
-            aria-label={strings.cameraAuto}
-            title={strings.cameraAuto}
-            aria-pressed={auto}
-            onClick={() => {
-              setAuto(!auto);
-              saveAuto(!auto);
-            }}
-          >
-            A
-          </button>
           {torch !== null && (
             <button type="button" className="live-camera-btn" aria-label={strings.cameraTorch} aria-pressed={torch} onClick={toggleTorch}>
               ⚡
             </button>
           )}
         </div>
+      </div>
+      <div className="live-camera-modes" role="group">
+        {([true, false] as const).map((on) => (
+          <button
+            key={String(on)}
+            type="button"
+            aria-pressed={auto === on}
+            onClick={() => {
+              setAuto(on);
+              saveAuto(on);
+            }}
+          >
+            {on ? strings.modeAuto : strings.modeManual}
+          </button>
+        ))}
       </div>
       <div className="live-camera-bottom">
         {last ? (
