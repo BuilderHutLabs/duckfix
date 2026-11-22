@@ -1,3 +1,4 @@
+import { useBackdropClose } from './backdrop';
 import { useEffect } from 'react';
 import type { ScanFilter } from '../scan/enhance';
 import { useAppStore } from './store';
@@ -5,6 +6,7 @@ import { strings } from './strings';
 
 /** "Wygląd stron": Kolor / Wybielony / Czarno-biały for the chosen pages (old grey scans too). */
 export function FilterSheet({ ids }: { ids: string[] }) {
+  const backdrop = useBackdropClose(() => s.closeFilterSheet());
   const s = useAppStore();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && s.closeFilterSheet();
@@ -17,7 +19,7 @@ export function FilterSheet({ ids }: { ids: string[] }) {
     ['color', strings.filterColor, strings.filterColorHint],
   ];
   return (
-    <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && s.closeFilterSheet()}>
+    <div className="sheet-backdrop" {...backdrop}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={strings.pageLook}>
         <div className="sheet-grabber" aria-hidden="true" />
         <h2 className="sheet-title">{strings.pageLook}</h2>

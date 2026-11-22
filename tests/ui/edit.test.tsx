@@ -1,5 +1,6 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { App } from '../../src/ui/App';
+import { BUBBLE_GAP, bubblePlace } from '../../src/ui/edit/MarkLayer';
 import { createAppStore } from '../../src/ui/store';
 import { strings } from '../../src/ui/strings';
 import { addMark, setCrop } from '../../src/model/document';
@@ -128,9 +129,37 @@ describe('Edytuj', () => {
 
   it('outside Kadruj the preview shows only the cropped part', () => {
     openPreview(setCrop(docWithFlags(1), ['p1'], { x: 0.1, y: 0.2, w: 0.5, h: 0.5 }));
-    const stage = document.querySelector('.preview-stage') as HTMLElement;
+    const page = document.querySelector('.preview-clip') as HTMLElement;
     // page box 500×700 at the origin: inset top 140, right 200, bottom 210, left 50
-    expect(stage.style.clipPath).toBe('inset(140px 200px 210px 50px)');
+    expect(page.style.clipPath).toBe('inset(140px 200px 210px 50px)');
+  });
+
+  it('on a cropped page the bubble of a selected item is drawn outside the cut, so it is never clipped', () => {
+    const doc = addMark(setCrop(docWithFlags(1), ['p1'], { x: 0.1, y: 0.2, w: 0.5, h: 0.5 }), 'p1', {
+      id: 'r1',
+      kind: 'rect',
+      color: 'green',
+      x: 0.2,
+      y: 0.3,
+      w: 0.2,
+      h: 0.2,
+    });
+    openPreview(doc);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    const item = document.querySelector('.mark-item') as HTMLElement;
+    fireEvent.pointerDown(item, { clientX: 150, clientY: 250, pointerId: 1 });
+    fireEvent.pointerUp(item, { clientX: 150, clientY: 250, pointerId: 1 });
+    const bubble = screen.getByRole('group', { name: strings.selectedItem });
+    expect(bubble.closest('.preview-bubbles')).not.toBeNull();
+    expect(bubble.closest('.preview-clip')).toBeNull();
+  });
+
+  it('the bubble keeps clear of the corner dots, and of the turn knob of a signature', () => {
+    const rect = { left: 0, top: 0, width: 500, height: 700, stageW: 500, stageH: 700 };
+    const box = { x: 0.2, y: 0.5, w: 0.4, h: 0.1 };
+    const itemTop = 0.5 * 700;
+    expect(itemTop - bubblePlace(box, rect).top).toBeGreaterThanOrEqual(40);
+    expect(itemTop - bubblePlace(box, rect, 1, BUBBLE_GAP.stamp).top).toBeGreaterThanOrEqual(64);
   });
 
   it('miniatures show covers and the crop', () => {
@@ -176,6 +205,20 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     expect(m.y).toBeCloseTo(0.2);
     // shown on the page in the preview (and on its miniature behind it)
     expect(within(screen.getByRole('dialog', { name: strings.preview(1) })).getByText('Jan Kowalski')).toBeTruthy();
+  });
+
+  it('phone: the click that follows the tap lands on the backdrop of the new sheet and does not close it', () => {
+    openPreview();
+    startTool(strings.toolWrite);
+    tap(layer(), 100, 140);
+    // the phone sends a click right after the finger lifts; the sheet is under the finger by then
+    fireEvent.click(document.querySelector('.sheet-backdrop')!);
+    expect(screen.getByRole('textbox', { name: strings.writeTitle })).toBeTruthy();
+    // a real tap outside the sheet still closes it
+    const backdrop = document.querySelector('.sheet-backdrop')!;
+    fireEvent.pointerDown(backdrop);
+    fireEvent.click(backdrop);
+    expect(screen.queryByRole('textbox', { name: strings.writeTitle })).toBeNull();
   });
 
   it('Ptaszek in red: a tap puts a red tick centred on the finger', () => {

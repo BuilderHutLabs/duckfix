@@ -3015,3 +3015,18 @@ span.live-camera-side {
 .scan-tool:active:not(:disabled) {
   background: var(--pv-chip);
 }
+
+/* the page and its items (cut by the crop), and above them the bubble of a selected item (not cut) */
+.preview-clip {
+  position: absolute;
+  inset: 0;
+}
+.preview-bubbles {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+}
+.preview-bubbles > * {
+  pointer-events: auto;
+}

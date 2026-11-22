@@ -1,3 +1,4 @@
+import { useBackdropClose } from './backdrop';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { extractInk, trimToInk } from '../signature/extract';
 import { cropRgba, inkBox, type PxRect } from '../signature/geometry';
@@ -28,6 +29,7 @@ function toSignature(data: Uint8ClampedArray, w: number, h: number): SavedSignat
 
 /** "Mój podpis": draw it with a finger or take a photo of it on paper; it is kept on this phone. */
 export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature): void; onClose(): void }) {
+  const backdrop = useBackdropClose(() => onClose());
   const [mode, setMode] = useState<'draw' | 'scan'>('draw');
   const [drawn, setDrawn] = useState(false);
   const [ink, setInk] = useState<keyof typeof INKS>('blue');
@@ -145,7 +147,7 @@ export function SignatureSheet({ onSaved, onClose }: { onSaved(s: SavedSignature
   };
 
   return (
-    <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="sheet-backdrop" {...backdrop}>
       <div className="sheet signature-sheet" role="dialog" aria-modal="true" aria-label={strings.signatureTitle}>
         <div className="sheet-grabber" aria-hidden="true" />
         <h2 className="sheet-title">{strings.signatureTitle}</h2>

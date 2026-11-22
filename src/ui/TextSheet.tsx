@@ -1,9 +1,11 @@
+import { useBackdropClose } from './backdrop';
 import { useEffect, useState } from 'react';
 import { useAppStore } from './store';
 import { strings } from './strings';
 
 /** "Kopiuj tekst": the page's text (its own, or recognized), ready to copy with a fresh tap. */
 export function TextSheet({ pageId, onClose }: { pageId: string; onClose(): void }) {
+  const backdrop = useBackdropClose(() => onClose());
   const { pageText, copyText } = useAppStore();
   const [text, setText] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
@@ -26,7 +28,7 @@ export function TextSheet({ pageId, onClose }: { pageId: string; onClose(): void
   }, [onClose]);
 
   return (
-    <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="sheet-backdrop" {...backdrop}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={strings.pageText}>
         <div className="sheet-grabber" aria-hidden="true" />
         <h2 className="sheet-title">{strings.pageText}</h2>

@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { Box, HighlightColor, InkColor, Mark, Page } from '../../model/document';
 import { dragCrop, type CropHandle } from '../../signature/geometry';
@@ -20,8 +21,13 @@ export type CoverColor = 'black' | 'white';
 const TAP_BOX = { w: 0.3, h: 0.05 };
 const MIN = 0.02;
 const CORNERS: CropHandle[] = ['nw', 'ne', 'sw', 'se'];
-/** Rough size of the bubble over a selected item (px) and its distance from the item. */
-const BUBBLE = { w: 300, h: 104, gap: 22 };
+/** Rough size of the bubble over a selected item (px). */
+const BUBBLE = { w: 300, h: 104 };
+/**
+ * Room between the item and its bubble (px), so the bubble never covers the corner dots
+ * (they stick out ~25 px with their touch area, more on a small item) or a signature's turn knob.
+ */
+export const BUBBLE_GAP = { mark: 40, small: 52, stamp: 70 };
 /** Gumka: how close (fraction of the page width) the finger must pass to a drawing to rub it out. */
 const ERASE = 0.025;
 /** An item smaller than this on screen (px) gets its corner dots further out, so they do not hide it. */
@@ -78,18 +84,33 @@ export function erases(m: Mark, x: number, y: number, aspect: number): boolean {
 }
 
 /** Where the bubble over a selected item goes: over it (under it near the top of the screen), inside the screen sideways. */
-export function bubblePlace(b: Box, rect: PageBox, zoom = 1): { left: number; top: number; above: boolean } {
+export function bubblePlace(b: Box, rect: PageBox, zoom = 1, gap = BUBBLE_GAP.mark): { left: number; top: number; above: boolean } {
   const half = Math.min(BUBBLE.w, rect.stageW - 16) / 2 / zoom;
   const cx = rect.left + (b.x + b.w / 2) * rect.width;
   const left = Math.min(Math.max(cx, half + 8), rect.stageW - half - 8) - rect.left;
-  const above = rect.top + b.y * rect.height - (BUBBLE.h + BUBBLE.gap) / zoom > 0;
-  const top = above ? b.y * rect.height - BUBBLE.gap / zoom : (b.y + b.h) * rect.height + BUBBLE.gap / zoom;
+  const above = rect.top + b.y * rect.height - (BUBBLE.h + gap) / zoom > 0;
+  const top = above ? b.y * rect.height - gap / zoom : (b.y + b.h) * rect.height + gap / zoom;
   return { left, top, above };
 }
 
-/** The bubble at a place from bubblePlace; `shift` moves it from page to stage coordinates (signatures). */
-export function BubbleAnchor({ at, zoom, shift, children }: { at: { left: number; top: number; above: boolean }; zoom: number; shift?: { x: number; y: number }; children: ReactNode }) {
-  return (
+/**
+ * The bubble at a place from bubblePlace; `shift` moves it from page to stage coordinates. With `host`
+ * it is drawn there (over the page, outside the crop clip), so a cropped page does not cut it off.
+ */
+export function BubbleAnchor({
+  at,
+  zoom,
+  shift,
+  host,
+  children,
+}: {
+  at: { left: number; top: number; above: boolean };
+  zoom: number;
+  shift?: { x: number; y: number };
+  host?: HTMLElement | null;
+  children: ReactNode;
+}) {
+  const anchor = (
     <div
       className="mark-bubble-anchor"
       style={{ left: at.left + (shift?.x ?? 0), top: at.top + (shift?.y ?? 0), transform: zoom !== 1 ? `scale(${1 / zoom})` : undefined }}
@@ -97,6 +118,7 @@ export function BubbleAnchor({ at, zoom, shift, children }: { at: { left: number
       <div style={{ transform: at.above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' }}>{children}</div>
     </div>
   );
+  return host ? createPortal(anchor, host) : anchor;
 }
 
 /** A mark moved by (dx, dy) page fractions. */
@@ -117,6 +139,7 @@ export function MarkLayer({
   highlight,
   penWidth = 1,
   zoom = 1,
+  bubbleHost,
   selectedId,
   onSelect,
   onPlace,
@@ -136,6 +159,8 @@ export function MarkLayer({
   penWidth?: 1 | 2 | 3;
   /** Pinch zoom of the page in "Edytuj" (the bubble keeps its size). */
   zoom?: number;
+  /** Where the bubble is drawn (outside the crop clip); inside the layer when missing. */
+  bubbleHost?: HTMLElement | null;
   selectedId: string | null;
   onSelect(id: string | null): void;
   /** A tap on the page with Wpisz / ✓ / ✗ / Data, at page fractions. */
@@ -269,7 +294,9 @@ export function MarkLayer({
       const x = clamp01(Math.min(a.x, b.x));
       const y = clamp01(Math.min(a.y, b.y));
       const box = { x, y, w: clamp01(Math.max(a.x, b.x)) - x, h: clamp01(Math.max(a.y, b.y)) - y };
-      return tool === 'cover' ? { id, kind: 'cover', color: coverColor, ...box } : { id, kind: tool as 'rect' | 'ellipse', color: ink, ...box };
+      return tool === 'cover'
+        ? { id, kind: 'cover', color: coverColor, ...box }
+        : { id, kind: tool as 'rect' | 'ellipse', color: ink, ...box };
     };
     follow(
       layer,
@@ -284,7 +311,15 @@ export function MarkLayer({
         if (tool === 'cover' && small) {
           // a tap: a ready-made box around the finger
           const box = { x: clamp01(a.x - TAP_BOX.w / 2), y: clamp01(a.y - TAP_BOX.h / 2), w: TAP_BOX.w, h: TAP_BOX.h };
-          addMark(page.id, { id, kind: 'cover', color: coverColor, x: Math.min(box.x, 1 - box.w), y: Math.min(box.y, 1 - box.h), w: box.w, h: box.h });
+          addMark(page.id, {
+            id,
+            kind: 'cover',
+            color: coverColor,
+            x: Math.min(box.x, 1 - box.w),
+            y: Math.min(box.y, 1 - box.h),
+            w: box.w,
+            h: box.h,
+          });
         } else if (small) {
           return; // a tap with an arrow or a shape draws nothing
         } else {
@@ -370,9 +405,7 @@ export function MarkLayer({
               {selected && (
                 <>
                   {corners &&
-                    CORNERS.map((c) => (
-                      <span key={c} className={`mark-handle ${c}`} aria-hidden="true" onPointerDown={onItemDown(m, c)} />
-                    ))}
+                    CORNERS.map((c) => <span key={c} className={`mark-handle ${c}`} aria-hidden="true" onPointerDown={onItemDown(m, c)} />)}
                   {ends &&
                     (['start', 'end'] as const).map((h) => {
                       const px = h === 'start' ? m.x : m.x + m.w;
@@ -394,7 +427,17 @@ export function MarkLayer({
           );
         })}
       {editing && bubble && chosen && !live && (
-        <BubbleAnchor at={bubblePlace(hitBox(chosen), rect, zoom)} zoom={zoom}>
+        <BubbleAnchor
+          at={bubblePlace(
+            hitBox(chosen),
+            rect,
+            zoom,
+            hitBox(chosen).w * rect.width < SMALL_PX || hitBox(chosen).h * rect.height < SMALL_PX ? BUBBLE_GAP.small : BUBBLE_GAP.mark,
+          )}
+          zoom={zoom}
+          host={bubbleHost}
+          shift={bubbleHost ? { x: rect.left, y: rect.top } : undefined}
+        >
           {bubble(chosen)}
         </BubbleAnchor>
       )}

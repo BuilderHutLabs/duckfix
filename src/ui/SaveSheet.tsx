@@ -1,3 +1,4 @@
+import { useBackdropClose } from './backdrop';
 import { useEffect, useState } from 'react';
 import { parsePageRange } from '../model/pageRange';
 import { useAppStore } from './store';
@@ -17,6 +18,7 @@ function Switch({ label, hint, on, onChange }: { label: string; hint: string; on
 
 /** Bottom sheet opened by "Zapisz PDF": smaller file / searchable text, then save. */
 export function SaveSheet() {
+  const backdrop = useBackdropClose(() => s.closeSaveSheet());
   const s = useAppStore();
   const [opts, setOpts] = useState(s.exportOptions);
   const [name, setName] = useState(() => s.defaultFileName());
@@ -53,7 +55,7 @@ export function SaveSheet() {
   }, [s]);
 
   return (
-    <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && s.closeSaveSheet()}>
+    <div className="sheet-backdrop" {...backdrop}>
       <div className="sheet" role="dialog" aria-modal="true" aria-label={strings.saveOptions}>
         <div className="sheet-grabber" aria-hidden="true" />
         <h2 className="sheet-title">{strings.saveOptions}</h2>

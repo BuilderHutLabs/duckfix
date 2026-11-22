@@ -48,9 +48,7 @@ function previewMaxSide(): number {
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', 0.92),
-  );
+  return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('toBlob failed'))), 'image/jpeg', 0.92));
 }
 
 let measureCtx: CanvasRenderingContext2D | null | undefined;
@@ -64,8 +62,26 @@ function measureText(line: string, px: number): number {
 
 /** Full-screen view of one page, rotated the way it will be saved. */
 export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
-  const { previewId, doc, sources, rotate, closePreview, openPreview, addStamp, setCrop, addMark, updateMark, removeMark, removeStamp, markOnAllPages, stampOnAllPages, undo, redo, canUndo, canRedo } =
-    useAppStore();
+  const {
+    previewId,
+    doc,
+    sources,
+    rotate,
+    closePreview,
+    openPreview,
+    addStamp,
+    setCrop,
+    addMark,
+    updateMark,
+    removeMark,
+    removeStamp,
+    markOnAllPages,
+    stampOnAllPages,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+  } = useAppStore();
   const [signing, setSigning] = useState(false);
   const [reading, setReading] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -83,6 +99,8 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [style, setStyle] = useState<EditStyle>(loadEditStyle);
   /** The "Wpisz" sheet: a new text at a tap, or changing a text already on the page. */
+  /** The layer over the page where an item's bubble is drawn (not cut by the crop). */
+  const [bubbleHost, setBubbleHost] = useState<HTMLDivElement | null>(null);
   const [writing, setWriting] = useState<{ at: { x: number; y: number } } | { id: string; text: string } | null>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -225,7 +243,14 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     if (tool === 'write') return setWriting({ at });
     if (tool === 'date') {
       const text = todayText(currentLanguage());
-      addMark(page.id, { id, kind: 'text', text, color: style.ink, size: style.size, ...newTextBox(text, style.size, at, pageW, pageH, measureText) });
+      addMark(page.id, {
+        id,
+        kind: 'text',
+        text,
+        color: style.ink,
+        size: style.size,
+        ...newTextBox(text, style.size, at, pageW, pageH, measureText),
+      });
     } else {
       addMark(page.id, { id, kind: tool === 'tick' ? 'check' : 'cross', color: style.ink, ...tickBox(style.size, at, pageW, pageH) });
     }
@@ -235,7 +260,14 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     if (!writing) return;
     if ('at' in writing) {
       const id = crypto.randomUUID();
-      addMark(page.id, { id, kind: 'text', text, color: style.ink, size: style.size, ...newTextBox(text, style.size, writing.at, pageW, pageH, measureText) });
+      addMark(page.id, {
+        id,
+        kind: 'text',
+        text,
+        color: style.ink,
+        size: style.size,
+        ...newTextBox(text, style.size, writing.at, pageW, pageH, measureText),
+      });
     } else {
       const m = page.marks?.find((x) => x.id === writing.id);
       if (m?.kind === 'text') {
@@ -404,91 +436,108 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
         onPointerMoveCapture={onFingerMove}
         onPointerUpCapture={onFingerUp}
         onPointerCancelCapture={onFingerUp}
-        style={page.crop && rect && tool !== 'crop' ? { clipPath: cropClip(page.crop, rect, rect.stageW, rect.stageH) } : undefined}
       >
-        <div className="preview-zoom" style={zoom.z !== 1 ? { transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.z})` } : undefined}>
-        {src && (
-          <img
-            ref={imgRef}
-            className={sideways ? 'preview-img sideways' : 'preview-img'}
-            src={src}
-            alt=""
-            draggable={false}
-            style={{ transform: `translate(-50%, -50%) rotate(${angle}deg)` }}
-          />
-        )}
-        {rect && (
-          <MarkLayer
-            page={page}
-            rect={rect}
-            editing={editing && tool !== 'crop'}
-            tool={tool}
-            coverColor={coverColor}
-            ink={style.ink}
-            highlight={style.highlight}
-            penWidth={style.size}
-            zoom={zoom.z}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onPlace={placeMark}
-            onEditText={(m: Extract<Mark, { kind: 'text' }>) => setWriting({ id: m.id, text: m.text })}
-            bubble={(m) => (
-              <MarkBubble
-                mark={m}
-                onInk={(ink) => changeStyle({ ink })}
-                onHighlight={(highlight) => changeStyle({ highlight })}
-                onCover={(c) => {
-                  setCoverColor(c);
-                  updateMark(page.id, m.id, { color: c });
-                }}
-                onSize={(size) => changeStyle({ size })}
-                onEditText={() => m.kind === 'text' && setWriting({ id: m.id, text: m.text })}
-                onDuplicate={() => duplicate(m)}
-                onAllPages={doc.pages.length > 1 ? () => markOnAllPages(page.id, m) : undefined}
-                onRemove={() => {
-                  removeMark(page.id, m.id);
-                  setSelectedId(null);
-                }}
+        <div
+          className="preview-zoom"
+          style={zoom.z !== 1 ? { transform: `translate(${zoom.x}px, ${zoom.y}px) scale(${zoom.z})` } : undefined}
+        >
+          {/* the crop cuts the page and what is on it, not the bubble over a selected item */}
+          <div
+            className="preview-clip"
+            style={page.crop && rect && tool !== 'crop' ? { clipPath: cropClip(page.crop, rect, rect.stageW, rect.stageH) } : undefined}
+          >
+            {src && (
+              <img
+                ref={imgRef}
+                className={sideways ? 'preview-img sideways' : 'preview-img'}
+                src={src}
+                alt=""
+                draggable={false}
+                style={{ transform: `translate(-50%, -50%) rotate(${angle}deg)` }}
               />
             )}
-          />
-        )}
-        <StampLayer
-          page={page}
-          rect={rect}
-          zoom={zoom.z}
-          selectedId={editing ? selectedId : undefined}
-          onSelect={editing ? setSelectedId : undefined}
-          bubble={(s) => (
-            <div className="mark-bubble" role="group" aria-label={strings.selectedItem} onPointerDown={(e) => e.stopPropagation()}>
-              <div className="mark-bubble-row">
-                <button type="button" className="mark-bubble-btn" aria-label={strings.duplicate} title={strings.duplicate} onClick={() => duplicateStamp(s)}>
-                  ⧉
-                </button>
-                {doc.pages.length > 1 && (
-                  <button type="button" className="mark-bubble-btn wide" onClick={() => stampOnAllPages(page.id, s)}>
-                    {strings.onAllPages}
-                  </button>
+            {rect && (
+              <MarkLayer
+                page={page}
+                rect={rect}
+                editing={editing && tool !== 'crop'}
+                tool={tool}
+                coverColor={coverColor}
+                ink={style.ink}
+                highlight={style.highlight}
+                penWidth={style.size}
+                zoom={zoom.z}
+                bubbleHost={bubbleHost}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+                onPlace={placeMark}
+                onEditText={(m: Extract<Mark, { kind: 'text' }>) => setWriting({ id: m.id, text: m.text })}
+                bubble={(m) => (
+                  <MarkBubble
+                    mark={m}
+                    onInk={(ink) => changeStyle({ ink })}
+                    onHighlight={(highlight) => changeStyle({ highlight })}
+                    onCover={(c) => {
+                      setCoverColor(c);
+                      updateMark(page.id, m.id, { color: c });
+                    }}
+                    onSize={(size) => changeStyle({ size })}
+                    onEditText={() => m.kind === 'text' && setWriting({ id: m.id, text: m.text })}
+                    onDuplicate={() => duplicate(m)}
+                    onAllPages={doc.pages.length > 1 ? () => markOnAllPages(page.id, m) : undefined}
+                    onRemove={() => {
+                      removeMark(page.id, m.id);
+                      setSelectedId(null);
+                    }}
+                  />
                 )}
-                <button
-                  type="button"
-                  className="mark-bubble-btn danger"
-                  aria-label={strings.removeSignature}
-                  title={strings.removeSignature}
-                  onClick={() => {
-                    removeStamp(page.id, s.id);
-                    setSelectedId(null);
-                  }}
-                >
-                  🗑
-                </button>
-              </div>
-            </div>
+              />
+            )}
+            <StampLayer
+              page={page}
+              rect={rect}
+              zoom={zoom.z}
+              bubbleHost={bubbleHost}
+              selectedId={editing ? selectedId : undefined}
+              onSelect={editing ? setSelectedId : undefined}
+              bubble={(s) => (
+                <div className="mark-bubble" role="group" aria-label={strings.selectedItem} onPointerDown={(e) => e.stopPropagation()}>
+                  <div className="mark-bubble-row">
+                    <button
+                      type="button"
+                      className="mark-bubble-btn"
+                      aria-label={strings.duplicate}
+                      title={strings.duplicate}
+                      onClick={() => duplicateStamp(s)}
+                    >
+                      ⧉
+                    </button>
+                    {doc.pages.length > 1 && (
+                      <button type="button" className="mark-bubble-btn wide" onClick={() => stampOnAllPages(page.id, s)}>
+                        {strings.onAllPages}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="mark-bubble-btn danger"
+                      aria-label={strings.removeSignature}
+                      title={strings.removeSignature}
+                      onClick={() => {
+                        removeStamp(page.id, s.id);
+                        setSelectedId(null);
+                      }}
+                    >
+                      🗑
+                    </button>
+                  </div>
+                </div>
+              )}
+            />
+          </div>
+          <div className="preview-bubbles" ref={setBubbleHost} />
+          {editing && tool === 'crop' && rect && (
+            <CropFrame rect={rect} zoom={zoom.z} crop={page.crop} onCommit={(b) => setCrop([page.id], b)} />
           )}
-        />
-        {editing && tool === 'crop' && rect && (
-          <CropFrame rect={rect} zoom={zoom.z} crop={page.crop} onCommit={(b) => setCrop([page.id], b)} />
-        )}
         </div>
         {editing && zoom.z > 1 && (
           <button type="button" className="preview-zoom-reset" onClick={() => setZoom(NO_ZOOM)}>
@@ -519,17 +568,16 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           highlight={style.highlight}
           onHighlight={(highlight: HighlightColor) => changeStyle({ highlight })}
           onSign={sign}
-          onCropAll={() => setCrop(doc.pages.map((p) => p.id), page.crop)}
+          onCropAll={() =>
+            setCrop(
+              doc.pages.map((p) => p.id),
+              page.crop,
+            )
+          }
           onCropNone={() => setCrop([page.id], undefined)}
         />
       )}
-      {writing && (
-        <MarkTextSheet
-          initial={'text' in writing ? writing.text : ''}
-          onDone={finishWriting}
-          onClose={() => setWriting(null)}
-        />
-      )}
+      {writing && <MarkTextSheet initial={'text' in writing ? writing.text : ''} onDone={finishWriting} onClose={() => setWriting(null)} />}
       {reading && <TextSheet pageId={page.id} onClose={() => setReading(false)} />}
       {signing && (
         <SignatureSheet

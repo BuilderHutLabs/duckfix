@@ -1,8 +1,10 @@
+import { useBackdropClose } from '../backdrop';
 import { useEffect, useRef, useState } from 'react';
 import { strings } from '../strings';
 
 /** "Wpisz": type the text for the page (new, or changing a text already on it). */
 export function MarkTextSheet({ initial, onDone, onClose }: { initial: string; onDone(text: string): void; onClose(): void }) {
+  const backdrop = useBackdropClose(() => onClose());
   const [text, setText] = useState(initial);
   const box = useRef<HTMLTextAreaElement>(null);
 
@@ -20,7 +22,7 @@ export function MarkTextSheet({ initial, onDone, onClose }: { initial: string; o
   };
 
   return (
-    <div className="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="sheet-backdrop" {...backdrop}>
       <div className="sheet write-sheet" role="dialog" aria-modal="true" aria-label={strings.writeTitle}>
         <div className="sheet-grabber" aria-hidden="true" />
         <h2 className="sheet-title">{strings.writeTitle}</h2>

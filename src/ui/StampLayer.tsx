@@ -1,6 +1,6 @@
 import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { PageBox, Rect } from './edit/pageBox';
-import { BubbleAnchor, bubblePlace } from './edit/MarkLayer';
+import { BUBBLE_GAP, BubbleAnchor, bubblePlace } from './edit/MarkLayer';
 import type { Page, Stamp } from '../model/document';
 import { useAppStore } from './store';
 import { strings } from './strings';
@@ -21,6 +21,7 @@ export function StampLayer({
   selectedId,
   onSelect,
   bubble,
+  bubbleHost,
 }: {
   page: Page;
   rect: Rect | PageBox | null;
@@ -28,6 +29,8 @@ export function StampLayer({
   selectedId?: string | null;
   onSelect?(id: string): void;
   bubble?(s: Stamp): ReactNode;
+  /** Where the bubble is drawn (outside the crop clip). */
+  bubbleHost?: HTMLElement | null;
 }) {
   const { moveStamp, removeStamp } = useAppStore();
   const [live, setLive] = useState<{ id: string; box: Box } | null>(null);
@@ -135,35 +138,40 @@ export function StampLayer({
           >
             <img src={s.src} alt={strings.signature} draggable={false} />
             {!editing && (
-            <button
-              type="button"
-              className="stamp-remove"
-              aria-label={strings.removeSignature}
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => removeStamp(page.id, s.id)}
-            >
-              ×
-            </button>
+              <button
+                type="button"
+                className="stamp-remove"
+                aria-label={strings.removeSignature}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => removeStamp(page.id, s.id)}
+              >
+                ×
+              </button>
             )}
             {handles && (
               <>
-            <span className="stamp-resize" aria-hidden="true" onPointerDown={startDrag(s, 'size')} />
-            <button
-              type="button"
-              className="stamp-rotate"
-              aria-label={strings.rotateSignature}
-              title={strings.rotateSignature}
-              onPointerDown={startRotate(s)}
-            >
-              ↻
-            </button>
+                <span className="stamp-resize" aria-hidden="true" onPointerDown={startDrag(s, 'size')} />
+                <button
+                  type="button"
+                  className="stamp-rotate"
+                  aria-label={strings.rotateSignature}
+                  title={strings.rotateSignature}
+                  onPointerDown={startRotate(s)}
+                >
+                  ↻
+                </button>
               </>
             )}
           </div>
         );
       })}
       {chosen && bubble && rect && 'stageW' in rect && !live && (
-        <BubbleAnchor at={bubblePlace(chosen, rect, zoom)} zoom={zoom} shift={{ x: rect.left, y: rect.top }}>
+        <BubbleAnchor
+          at={bubblePlace(chosen, rect, zoom, BUBBLE_GAP.stamp)}
+          zoom={zoom}
+          shift={{ x: rect.left, y: rect.top }}
+          host={bubbleHost}
+        >
           {bubble(chosen)}
         </BubbleAnchor>
       )}
