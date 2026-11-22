@@ -368,6 +368,7 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
       strings.toolShapes,
       strings.groupHide,
       strings.sign,
+      strings.stampTool,
     ]);
     const marksBtn = within(row).getByRole('button', { name: strings.toolMarks });
     fireEvent.click(marksBtn);

@@ -127,6 +127,7 @@ export function EditTools({
   highlight,
   onHighlight,
   onSign,
+  onStamp,
   onCropAll,
   onCropNone,
   onHidePersonal,
@@ -146,6 +147,8 @@ export function EditTools({
   highlight: HighlightColor;
   onHighlight(c: HighlightColor): void;
   onSign(): void;
+  /** "Pieczątka": ready-made stamps. */
+  onStamp(): void;
   onCropAll(): void;
   onCropNone(): void;
   /** "Ukryj dane osobowe": covers what it finds on the page; resolves to how many. */
@@ -265,6 +268,10 @@ export function EditTools({
         <button type="button" className="edit-tool" aria-label={strings.sign} onClick={onSign}>
           <Icon name="sign" />
           <span aria-hidden="true">{strings.sign}</span>
+        </button>
+        <button type="button" className="edit-tool" aria-label={strings.stampTool} onClick={onStamp}>
+          <Icon name="stamp" />
+          <span aria-hidden="true">{strings.stampTool}</span>
         </button>
       </div>
     </div>

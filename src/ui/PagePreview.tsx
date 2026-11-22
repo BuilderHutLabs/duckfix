@@ -18,6 +18,7 @@ import { TextSheet } from './TextSheet';
 import { SignatureSheet } from './SignatureSheet';
 import { loadSignatures, removeSignature, type SavedSignature, type SignatureKind, type StoredSignature } from '../signature/storage';
 import { SignaturePicker } from './SignaturePicker';
+import { StampPicker, type PickedStamp } from './StampPicker';
 import { MarkTextSheet } from './edit/MarkTextSheet';
 import { loadEditStyle, saveEditStyle, type EditStyle } from './edit/style';
 import { FONT_FRAC, TICK_FRAC, newTextBox, tickBox, todayText, type MarkSize } from '../edit/text';
@@ -89,6 +90,8 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   const [signing, setSigning] = useState<SignatureKind | null>(null);
   /** "Twoje podpisy" open, with the saved ones. */
   const [picking, setPicking] = useState<StoredSignature[] | null>(null);
+  /** "Pieczątki" open. */
+  const [stamping, setStamping] = useState(false);
   const [reading, setReading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [tool, setTool] = useState<EditTool>(null);
@@ -218,6 +221,18 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     addStamp(page.id, stamp);
     setSelectedId(id); // a new signature comes with its handles, ready to be moved
     return stamp;
+  };
+  /** A ready-made stamp goes into the upper right part of the page, a third of its width. */
+  const placeStamp = (s: PickedStamp, allPages: boolean) => {
+    const box = imgRef.current?.getBoundingClientRect();
+    const pageAspect = box && box.height ? box.width / box.height : 0.707;
+    const w = s.kind === 'certified' ? 0.36 : 0.3;
+    const h = Math.min(0.4, (w * pageAspect) / s.aspect);
+    const id = crypto.randomUUID();
+    const stamp = { id, src: s.src, x: 0.94 - w, y: 0.05, w, h };
+    addStamp(page.id, stamp);
+    setSelectedId(id); // ready to be moved
+    if (allPages) stampOnAllPages(page.id, stamp);
   };
   /** "Podpisz": the saved signatures to choose from; none yet: draw the first one. */
   const sign = () => {
@@ -562,6 +577,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           highlight={style.highlight}
           onHighlight={(highlight: HighlightColor) => changeStyle({ highlight })}
           onSign={sign}
+          onStamp={() => setStamping(true)}
           onHidePersonal={() => hidePersonal(page.id, coverColor)}
           onCropAll={() =>
             setCrop(
@@ -598,6 +614,16 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             setPicking(loadSignatures());
           }}
           onClose={() => setPicking(null)}
+        />
+      )}
+      {stamping && (
+        <StampPicker
+          pages={doc.pages.length}
+          onPick={(s, all) => {
+            setStamping(false);
+            placeStamp(s, all);
+          }}
+          onClose={() => setStamping(false)}
         />
       )}
       {signing && (

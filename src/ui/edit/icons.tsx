@@ -17,6 +17,7 @@ const PATHS = {
   cover: 'M3 9h18v6H3zM6 12h12',
   crop: 'M6 2v16h16M2 6h16v16',
   sign: 'M3 17c3-6 5-9 6-7s-2 7 0 7 3-5 5-5 1 4 3 4 3-2 4-2M3 21h18',
+  stamp: 'M9.5 3h5v5l-1 3h4.5a2 2 0 0 1 2 2v3H4v-3a2 2 0 0 1 2-2h4.5l-1-3zM4 20h16',
   copy: 'M8 8h12v12H8zM16 8V4H4v12h4',
   trash: 'M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3',
   edit: 'M4 20h4L19 9l-4-4L4 16zM13 7l4 4',
