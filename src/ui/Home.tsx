@@ -47,23 +47,6 @@ const IconShield = () => (
     <path d="M9 12l2 2 4-4" />
   </svg>
 );
-const IconHistory = () => (
-  <svg
-    width="22"
-    height="22"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    aria-hidden="true"
-  >
-    <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
-    <path d="M3 3v5h5" />
-    <path d="M12 7v5l3 2" />
-  </svg>
-);
 
 /** One big row of the home panel: icon, name, a short hint under it, an arrow. */
 function HomeAction({
@@ -107,7 +90,7 @@ function HomeAction({
 }
 
 export function Home() {
-  const { open, setScanPhoto, busy, restorable, restore, openDiagnostics, library, docsOpen, openDocs } = useAppStore();
+  const { open, setScanPhoto, busy, openDiagnostics, library, docsOpen, openDocs } = useAppStore();
   const input = useRef<HTMLInputElement>(null);
   const onTitleTap = useSecretTaps(openDiagnostics);
   // the duck quacks once per app start, not every time the user comes back to the home screen
@@ -166,16 +149,6 @@ export function Home() {
           disabled={busy === 'opening'}
           onClick={pickFiles}
         />
-        {restorable && library[0] && (
-          <HomeAction
-            id="restore"
-            icon={<IconHistory />}
-            label={strings.restoreSession}
-            hint={library[0].name}
-            disabled={busy === 'opening'}
-            onClick={restore}
-          />
-        )}
         <div className="home-privacy">
           <span className="home-privacy-icon">
             <IconShield />

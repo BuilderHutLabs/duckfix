@@ -109,6 +109,8 @@ button {
 
 .visually-hidden {
   position: absolute;
+  top: 0; /* not below the page: no 1 px of scrolling */
+  left: 0;
   width: 1px;
   height: 1px;
   opacity: 0;
@@ -2642,6 +2644,14 @@ span.live-camera-side {
 }
 .home-hero .home-subtitle {
   margin: 0;
+}
+/* low screens (small phones): a tighter top, so nothing needs scrolling */
+@media (max-height: 700px) {
+  .home-hero {
+    min-height: 0;
+    gap: 6px;
+    padding: 40px 0 14px;
+  }
 }
 .home-panel {
   width: calc(100% + 2 * max(16px, env(safe-area-inset-left)));

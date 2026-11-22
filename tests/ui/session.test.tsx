@@ -56,15 +56,16 @@ const kept = (id: string, name: string, at: number, s: StoredSession = stored) =
 const other: StoredSession = { doc: { pages: [page('x1')] }, sources: [{ ...source, id: 'f9', name: 'umowa.pdf' }] };
 
 describe('Moje dokumenty', () => {
-  it('Home shows "Moje (N)" and "Wróć do ostatniego dokumentu"; Wróć opens the newest where it was left', async () => {
+  it('Home keeps just Skanuj and Otwórz (no "Wróć" row); the newest document is first in "Moje" and opens where it was left', async () => {
     const { library } = memoryLibrary([kept('a', 'Faktura VAT', 200), kept('b', 'Umowa', 100, other)]);
     const deps = fakeDeps({ library });
     render(<App store={createAppStore(deps)} />);
-    expect(await screen.findByRole('button', { name: strings.docsShort(2) })).toBeTruthy();
+    fireEvent.click(await screen.findByRole('button', { name: strings.docsShort(2) }));
+    expect(screen.queryByRole('button', { name: strings.restoreSession })).toBeNull();
     expect(screen.queryByRole('button', { name: strings.startOver })).toBeNull();
-    const back = screen.getByRole('button', { name: strings.restoreSession });
-    expect(back.textContent).toContain('Faktura VAT'); // the newest one
-    fireEvent.click(back);
+    const first = screen.getByRole('dialog', { name: strings.docsTitle }).querySelector('.doc-open') as HTMLElement;
+    expect(first.textContent).toContain('Faktura VAT');
+    fireEvent.click(first);
     await waitFor(() => expect(deps.analyzePages).toHaveBeenCalledTimes(1));
     expect(vi.mocked(deps.analyzePages).mock.calls[0][0].map((p) => p.id)).toEqual(['b', 'c']);
     expect(screen.getAllByRole('button', { name: /^Strona \d+/ })).toHaveLength(3);
