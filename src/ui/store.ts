@@ -630,7 +630,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       if (existing([pageId]).length) commit(addStampTo(history.present, pageId, stamp));
     },
 
-    moveStamp(pageId: string, stampId: string, box: Partial<Pick<Stamp, 'x' | 'y' | 'w' | 'h' | 'rot'>>) {
+    moveStamp(pageId: string, stampId: string, box: Partial<Pick<Stamp, 'x' | 'y' | 'w' | 'h' | 'rot' | 'src' | 'preset'>>) {
       commit(moveStampOn(history.present, pageId, stampId, box));
     },
 

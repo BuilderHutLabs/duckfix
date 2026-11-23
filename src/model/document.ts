@@ -67,6 +67,15 @@ export interface Stamp {
   h: number;
   /** Clockwise turn in degrees around the box centre. */
   rot?: number;
+  /** A ready-made stamp ("Pieczątka"): what it says, so its date can be changed later. */
+  preset?: StampPreset;
+}
+
+export interface StampPreset {
+  kind: 'certified' | 'copy' | 'paid' | 'received' | 'filed';
+  ink: 'red' | 'blue';
+  /** YYYY-MM-DD */
+  date: string;
 }
 
 export interface Doc {
@@ -113,7 +122,12 @@ export function addStamp(doc: Doc, pageId: string, stamp: Stamp): Doc {
   return mapPages(doc, [pageId], (p) => ({ ...p, stamps: [...(p.stamps ?? []), stamp] }));
 }
 
-export function moveStamp(doc: Doc, pageId: string, stampId: string, box: Partial<Pick<Stamp, 'x' | 'y' | 'w' | 'h' | 'rot'>>): Doc {
+export function moveStamp(
+  doc: Doc,
+  pageId: string,
+  stampId: string,
+  box: Partial<Pick<Stamp, 'x' | 'y' | 'w' | 'h' | 'rot' | 'src' | 'preset'>>,
+): Doc {
   return mapPages(doc, [pageId], (p) => ({
     ...p,
     stamps: (p.stamps ?? []).map((s) => (s.id === stampId ? { ...s, ...box } : s)),

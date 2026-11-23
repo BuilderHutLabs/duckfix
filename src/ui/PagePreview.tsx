@@ -18,7 +18,9 @@ import { TextSheet } from './TextSheet';
 import { SignatureSheet } from './SignatureSheet';
 import { loadSignatures, removeSignature, type SavedSignature, type SignatureKind, type StoredSignature } from '../signature/storage';
 import { SignaturePicker } from './SignaturePicker';
-import { StampPicker, type PickedStamp } from './StampPicker';
+import { StampDateSheet, StampPicker, isDated, type PickedStamp } from './StampPicker';
+import { fromIsoDay } from '../edit/stamps';
+import { stampImage } from '../edit/stampImage';
 import { MarkTextSheet } from './edit/MarkTextSheet';
 import { loadEditStyle, saveEditStyle, type EditStyle } from './edit/style';
 import { FONT_FRAC, TICK_FRAC, newTextBox, tickBox, todayText, type MarkSize } from '../edit/text';
@@ -78,6 +80,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     updateMark,
     removeMark,
     removeStamp,
+    moveStamp,
     markOnAllPages,
     stampOnAllPages,
     hidePersonal,
@@ -90,8 +93,12 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   const [signing, setSigning] = useState<SignatureKind | null>(null);
   /** "Twoje podpisy" open, with the saved ones. */
   const [picking, setPicking] = useState<StoredSignature[] | null>(null);
-  /** "Pieczątki" open. */
-  const [stamping, setStamping] = useState(false);
+  /** "Pieczątki" open, with your own stamps. */
+  const [stamping, setStamping] = useState<StoredSignature[] | null>(null);
+  /** "Zmień datę" of a placed ready-made stamp. */
+  const [redating, setRedating] = useState<string | null>(null);
+  const ownStamps = () => loadSignatures().filter((s) => s.kind === 'stamp');
+  const openStamps = () => setStamping(ownStamps());
   const [reading, setReading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [tool, setTool] = useState<EditTool>(null);
@@ -229,14 +236,21 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
     const w = s.kind === 'certified' ? 0.36 : 0.3;
     const h = Math.min(0.4, (w * pageAspect) / s.aspect);
     const id = crypto.randomUUID();
-    const stamp = { id, src: s.src, x: 0.94 - w, y: 0.05, w, h };
+    const x = 0.94 - w;
+    // under the stamps already there, not on top of them
+    let y = 0.05;
+    const hit = (yy: number) =>
+      (page.stamps ?? []).find((o) => o.x < x + w && o.x + o.w > x && o.y < yy + h && o.y + o.h > yy);
+    for (let o = hit(y); o && y < 1 - h; o = hit(y)) y = o.y + o.h + 0.015;
+    y = Math.min(y, Math.max(0, 1 - h - 0.02));
+    const stamp = { id, src: s.src, x, y, w, h, ...(s.preset ? { preset: s.preset } : {}) };
     addStamp(page.id, stamp);
     setSelectedId(id); // ready to be moved
     if (allPages) stampOnAllPages(page.id, stamp);
   };
   /** "Podpisz": the saved signatures to choose from; none yet: draw the first one. */
   const sign = () => {
-    const saved = loadSignatures();
+    const saved = loadSignatures().filter((s) => s.kind !== 'stamp'); // own stamps are under "Pieczątka"
     if (saved.length) setPicking(saved);
     else setSigning('signature');
   };
@@ -532,6 +546,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
               onSelect={editing ? setSelectedId : undefined}
               bubble={(s) => (
                 <StampBubble
+                  onChangeDate={isDated(s.preset) ? () => setRedating(s.id) : undefined}
                   onDuplicate={() => duplicateStamp(s)}
                   onAllPages={doc.pages.length > 1 ? () => stampOnAllPages(page.id, s) : undefined}
                   onRemove={() => {
@@ -577,7 +592,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           highlight={style.highlight}
           onHighlight={(highlight: HighlightColor) => changeStyle({ highlight })}
           onSign={sign}
-          onStamp={() => setStamping(true)}
+          onStamp={openStamps}
           onHidePersonal={() => hidePersonal(page.id, coverColor)}
           onCropAll={() =>
             setCrop(
@@ -611,7 +626,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           }}
           onRemove={(id) => {
             removeSignature(id);
-            setPicking(loadSignatures());
+            setPicking(loadSignatures().filter((s) => s.kind !== 'stamp'));
           }}
           onClose={() => setPicking(null)}
         />
@@ -619,20 +634,53 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
       {stamping && (
         <StampPicker
           pages={doc.pages.length}
+          own={stamping}
           onPick={(s, all) => {
-            setStamping(false);
+            setStamping(null);
             placeStamp(s, all);
           }}
-          onClose={() => setStamping(false)}
+          onAddOwn={() => {
+            setStamping(null);
+            setSigning('stamp');
+          }}
+          onRemoveOwn={(id) => {
+            removeSignature(id);
+            setStamping(ownStamps());
+          }}
+          onClose={() => setStamping(null)}
         />
       )}
+      {redating &&
+        (() => {
+          const st = page.stamps?.find((x) => x.id === redating);
+          if (!st?.preset) return null;
+          const preset = st.preset;
+          return (
+            <StampDateSheet
+              initial={preset.date}
+              onClose={() => setRedating(null)}
+              onApply={(date) => {
+                setRedating(null);
+                const day = fromIsoDay(date);
+                if (!day || date === preset.date) return;
+                try {
+                  const img = stampImage(preset.kind, preset.ink, day);
+                  moveStamp(page.id, st.id, { src: img.src, preset: { ...preset, date } }); // same place and size
+                } catch {
+                  /* no canvas: the stamp stays as it was */
+                }
+              }}
+            />
+          );
+        })()}
       {signing && (
         <SignatureSheet
           kind={signing}
           onClose={() => setSigning(null)}
           onSaved={(sig) => {
             setSigning(null);
-            place(sig);
+            if (sig.kind === 'stamp') placeStamp({ kind: 'own', src: sig.src, aspect: sig.aspect }, false);
+            else place(sig);
           }}
         />
       )}

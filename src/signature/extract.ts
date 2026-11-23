@@ -24,13 +24,28 @@ export function extractInk(src: Uint8ClampedArray, w: number, h: number): Uint8C
   return d;
 }
 
+/**
+ * A photo of a stamp on paper: like extractInk, but the ink keeps its full colour. How far a pixel is
+ * from paper is read from its darkest channel, so red or blue ink (bright in luminance) is still
+ * fully opaque, and the colour is not darkened.
+ */
+export function extractStampInk(src: Uint8ClampedArray, w: number, h: number): Uint8ClampedArray {
+  const d = src.slice();
+  enhance(d, w, h, 'whiten');
+  for (let i = 0; i < d.length; i += 4) {
+    const low = Math.min(d[i], d[i + 1], d[i + 2]);
+    // paper (>= 215) fully transparent, ink (<= 150 in its darkest channel) fully opaque
+    d[i + 3] = Math.max(0, Math.min(255, ((215 - low) * 255) / 65));
+  }
+  return d;
+}
+
 /** Crops transparent RGBA to the ink plus a small margin; null when nothing is written. */
-export function trimToInk(
-  d: Uint8ClampedArray,
-  w: number,
-  h: number,
-): { data: Uint8ClampedArray; width: number; height: number } | null {
-  let x0 = w, y0 = h, x1 = -1, y1 = -1;
+export function trimToInk(d: Uint8ClampedArray, w: number, h: number): { data: Uint8ClampedArray; width: number; height: number } | null {
+  let x0 = w,
+    y0 = h,
+    x1 = -1,
+    y1 = -1;
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       if (d[(y * w + x) * 4 + 3] > 60) {

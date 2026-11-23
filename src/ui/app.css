@@ -3671,6 +3671,81 @@ span.live-camera-side {
 }
 
 /* ---------- "Pieczątki" ---------- */
+.stamp-controls {
+  display: flex;
+  flex-wrap: wrap; /* the date goes under the inks when the phone is narrow */
+  align-items: stretch;
+  gap: 8px;
+  margin: 2px 0 12px;
+}
+.stamp-controls .stamp-inks {
+  flex: 1 1 240px;
+  margin: 0;
+}
+.stamp-controls .stamp-date {
+  flex: 1 1 170px;
+  justify-content: space-between;
+  min-height: 44px;
+}
+.stamp-date {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 12px;
+  background: var(--fill);
+  font-size: 13px;
+  color: var(--text-2);
+}
+.stamp-date input {
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color-scheme: light dark;
+}
+.stamp-date-sheet .stamp-date {
+  justify-content: space-between;
+  min-height: 48px;
+  margin: 4px 0 8px;
+  font-size: 15px;
+}
+.stamp-section {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.stamp-own {
+  margin-bottom: 12px;
+}
+.stamp-own-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 8px 8px 2px 0;
+}
+.stamp-own-tile {
+  position: relative;
+  flex: none;
+  width: 130px;
+}
+.stamp-own-tile .stamp-pick {
+  width: 100%;
+}
+.stamp-own-tile .sig-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+}
+.stamp-own-add {
+  width: 100%;
+  margin-top: 12px;
+}
 .stamp-inks {
   display: flex;
   gap: 6px;

@@ -1,6 +1,6 @@
 import { useBackdropClose } from './backdrop';
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import { extractInk, trimToInk } from '../signature/extract';
+import { extractInk, extractStampInk, trimToInk } from '../signature/extract';
 import { cropRgba, inkBox, type PxRect } from '../signature/geometry';
 import { SignatureCrop } from './SignatureCrop';
 import { addSignature, type SavedSignature, type SignatureKind, type StoredSignature } from '../signature/storage';
@@ -38,9 +38,10 @@ export function SignatureSheet({
   onSaved(s: StoredSignature): void;
   onClose(): void;
 }) {
-  const title = kind === 'initials' ? strings.initialsTitle : strings.signatureTitle;
+  const stamp = kind === 'stamp'; // your own stamp: a photo only, the ink keeps its colour
+  const title = stamp ? strings.stampOwnTitle : kind === 'initials' ? strings.initialsTitle : strings.signatureTitle;
   const backdrop = useBackdropClose(() => onClose());
-  const [mode, setMode] = useState<'draw' | 'scan'>('draw');
+  const [mode, setMode] = useState<'draw' | 'scan'>(stamp ? 'scan' : 'draw');
   const [drawn, setDrawn] = useState(false);
   const [ink, setInk] = useState<keyof typeof INKS>('blue');
   const [scanned, setScanned] = useState<SavedSignature | null>(null);
@@ -104,7 +105,7 @@ export function SignatureSheet({
         try {
           const ctx = c.getContext('2d', { willReadFrequently: true })!;
           ctx.drawImage(loaded.bitmap, 0, 0);
-          const ink = extractInk(ctx.getImageData(0, 0, w, h).data, w, h);
+          const ink = (stamp ? extractStampInk : extractInk)(ctx.getImageData(0, 0, w, h).data, w, h);
           inkData.current = ink;
           // small copy of the photo to crop on (the frame is in full-photo pixels)
           const k = Math.min(1, 1000 / Math.max(w, h));
@@ -160,14 +161,16 @@ export function SignatureSheet({
       <div className="sheet signature-sheet" role="dialog" aria-modal="true" aria-label={title}>
         <div className="sheet-grabber" aria-hidden="true" />
         <h2 className="sheet-title">{title}</h2>
-        <div className="segmented" role="group">
-          <button type="button" aria-pressed={mode === 'draw'} onClick={() => setMode('draw')}>
-            {strings.signatureDraw}
-          </button>
-          <button type="button" aria-pressed={mode === 'scan'} onClick={() => setMode('scan')}>
-            {strings.signatureScan}
-          </button>
-        </div>
+        {!stamp && (
+          <div className="segmented" role="group">
+            <button type="button" aria-pressed={mode === 'draw'} onClick={() => setMode('draw')}>
+              {strings.signatureDraw}
+            </button>
+            <button type="button" aria-pressed={mode === 'scan'} onClick={() => setMode('scan')}>
+              {strings.signatureScan}
+            </button>
+          </div>
+        )}
         {mode === 'draw' ? (
           <>
             <canvas
@@ -199,13 +202,13 @@ export function SignatureSheet({
           <div className="signature-scan">
             {photo && frame ? (
               <>
-                <p className="sheet-option-hint">{failed ? strings.signatureNotFound : strings.signatureCropHint}</p>
+                <p className="sheet-option-hint">{failed ? strings.signatureNotFound : stamp ? strings.stampOwnCropHint : strings.signatureCropHint}</p>
                 <SignatureCrop src={photo.url} width={photo.w} height={photo.h} frame={frame} onChange={setFrame} />
               </>
             ) : scanned ? (
               <img className="signature-result" src={scanned.src} alt={strings.signature} />
             ) : (
-              <p className="sheet-option-hint">{failed ? strings.signatureNotFound : strings.signatureScanHint}</p>
+              <p className="sheet-option-hint">{failed ? strings.signatureNotFound : stamp ? strings.stampOwnHint : strings.signatureScanHint}</p>
             )}
             <div className="signature-scan-actions">
               {scanned && (
@@ -249,7 +252,7 @@ export function SignatureSheet({
             </button>
           ) : (
             <button type="button" className="btn btn-primary" disabled={mode === 'draw' ? !drawn : !scanned} onClick={save}>
-              {kind === 'initials' ? strings.initialsSave : strings.signatureSave}
+              {stamp ? strings.stampOwnSave : kind === 'initials' ? strings.initialsSave : strings.signatureSave}
             </button>
           )}
         </div>

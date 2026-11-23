@@ -1,7 +1,8 @@
 import { storageKey } from '../config';
 
-/** A full signature, or short initials (parafka) for the corner of every page. */
-export type SignatureKind = 'signature' | 'initials';
+/** A full signature, short initials (parafka) for the corner of every page, or your own stamp (photo). */
+export type SignatureKind = 'signature' | 'initials' | 'stamp';
+const KINDS: SignatureKind[] = ['signature', 'initials', 'stamp'];
 
 /** A signature kept only on this phone: transparent PNG + width/height ratio. */
 export interface SavedSignature {
@@ -34,7 +35,7 @@ export function loadSignatures(): StoredSignature[] {
     if (raw) {
       const list = JSON.parse(raw) as Array<Partial<SavedSignature>>;
       return Array.isArray(list)
-        ? list.filter(valid).map((s) => ({ ...s, id: s.id ?? crypto.randomUUID(), kind: s.kind === 'initials' ? 'initials' : 'signature' }))
+        ? list.filter(valid).map((s) => ({ ...s, id: s.id ?? crypto.randomUUID(), kind: s.kind && KINDS.includes(s.kind) ? s.kind : 'signature' }))
         : [];
     }
     // an earlier version kept one signature: keep it as the first of the list

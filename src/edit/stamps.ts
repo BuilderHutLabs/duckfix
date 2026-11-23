@@ -14,6 +14,17 @@ export interface StampLine {
   kind?: 'sign';
 }
 
+/** Kinds that carry a date (it can be changed on a placed stamp). */
+export const DATED: StampKind[] = ['certified', 'paid', 'received'];
+
+/** "2026-11-22" (a date field's value) from a day, and back (local time). */
+export const isoDay = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+export function fromIsoDay(v: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v);
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
+
 /** "22.11.2026" */
 export function stampDate(d: Date): string {
   const two = (n: number) => String(n).padStart(2, '0');

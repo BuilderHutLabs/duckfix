@@ -127,7 +127,18 @@ export function MarkBubble({
 }
 
 /** The same bar for a signature: duplicate, remove, ⋯ "Na wszystkie strony". */
-export function StampBubble({ onDuplicate, onAllPages, onRemove }: { onDuplicate(): void; onAllPages?(): void; onRemove(): void }) {
+export function StampBubble({
+  onChangeDate,
+  onDuplicate,
+  onAllPages,
+  onRemove,
+}: {
+  /** A ready-made stamp with a date: "Zmień datę". */
+  onChangeDate?(): void;
+  onDuplicate(): void;
+  onAllPages?(): void;
+  onRemove(): void;
+}) {
   const [more, setMore] = useState(false);
   return (
     <div className="mark-bubble" role="group" aria-label={strings.selectedItem} onPointerDown={(e) => e.stopPropagation()}>
@@ -140,6 +151,12 @@ export function StampBubble({ onDuplicate, onAllPages, onRemove }: { onDuplicate
         </div>
       )}
       <div className="mark-bubble-row">
+        {onChangeDate && (
+          <>
+            <BubbleButton icon="date" label={strings.stampChangeDate} onClick={onChangeDate} />
+            <span className="mark-bubble-sep" aria-hidden="true" />
+          </>
+        )}
         <BubbleButton icon="copy" label={strings.duplicate} onClick={onDuplicate} />
         <BubbleButton icon="trash" label={strings.removeSignature} danger onClick={onRemove} />
         {onAllPages && (
