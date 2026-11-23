@@ -3865,3 +3865,9 @@ span.live-camera-side {
   display: block;
   margin-top: 6px;
 }
+
+.save-customize {
+  display: block;
+  margin: 6px auto 0;
+  font-size: 14px;
+}

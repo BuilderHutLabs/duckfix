@@ -3,6 +3,8 @@ import { useEffect, useState } from 'react';
 import { parsePageRange } from '../model/pageRange';
 import { useAppStore } from './store';
 import { strings } from './strings';
+import { loadSaveFields } from './saveFields';
+import { SaveFieldsSheet } from './SaveFieldsSheet';
 
 function Switch({ label, hint, on, onChange }: { label: string; hint: string; on: boolean; onChange(v: boolean): void }) {
   return (
@@ -20,7 +22,18 @@ function Switch({ label, hint, on, onChange }: { label: string; hint: string; on
 export function SaveSheet() {
   const backdrop = useBackdropClose(() => s.closeSaveSheet());
   const s = useAppStore();
-  const [opts, setOpts] = useState(s.exportOptions);
+  /** Options shown ("Okno zapisu" in the settings); a hidden one saves the plain way. */
+  const [shown, setShown] = useState(loadSaveFields);
+  /** "Dostosuj okno zapisu" open. */
+  const [customizing, setCustomizing] = useState(false);
+  const [chosen, setOpts] = useState(s.exportOptions);
+  // a hidden option saves the plain way: PDF, full quality, no text layer
+  const opts = {
+    ...chosen,
+    format: shown.format ? chosen.format : ('pdf' as const),
+    size: shown.size ? chosen.size : ('best' as const),
+    ocr: shown.ocr && chosen.ocr,
+  };
   const [name, setName] = useState(() => s.defaultFileName());
   const ids = s.saveSheetIds;
   const all = s.doc.pages;
@@ -79,32 +92,36 @@ export function SaveSheet() {
             </span>
           </span>
         </label>
-        <div className="segmented sheet-format" role="group" aria-label={strings.format}>
-          {(['pdf', 'jpg'] as const).map((f) => (
-            <button key={f} type="button" aria-pressed={opts.format === f} onClick={() => setOpts((o) => ({ ...o, format: f }))}>
-              {f.toUpperCase()}
-            </button>
-          ))}
-        </div>
-        <div className="sheet-field">
-          <span className="sheet-option-hint">{strings.fileSize}</span>
-          <div className="size-options" role="group" aria-label={strings.fileSize}>
-            {(
-              [
-                ['best', strings.sizeBest, ''],
-                ['mail', strings.sizeMail, strings.sizeMailHint],
-                ['small', strings.sizeSmallest, strings.sizeSmallestHint],
-              ] as const
-            ).map(([v, label, hint]) => (
-              <button key={v} type="button" aria-pressed={opts.size === v} onClick={() => setOpts((o) => ({ ...o, size: v }))}>
-                <strong>{label}</strong>
-                {hint && <span>{hint}</span>}
+        {shown.format && (
+          <div className="segmented sheet-format" role="group" aria-label={strings.format}>
+            {(['pdf', 'jpg'] as const).map((f) => (
+              <button key={f} type="button" aria-pressed={opts.format === f} onClick={() => setOpts((o) => ({ ...o, format: f }))}>
+                {f.toUpperCase()}
               </button>
             ))}
           </div>
-          {opts.size !== 'best' && <span className="sheet-option-hint size-hint">{strings.sizeHint}</span>}
-        </div>
-        {!ids && all.length > 1 && (
+        )}
+        {shown.size && (
+          <div className="sheet-field">
+            <span className="sheet-option-hint">{strings.fileSize}</span>
+            <div className="size-options" role="group" aria-label={strings.fileSize}>
+              {(
+                [
+                  ['best', strings.sizeBest, ''],
+                  ['mail', strings.sizeMail, strings.sizeMailHint],
+                  ['office', strings.sizeOffice, strings.sizeOfficeHint],
+                ] as const
+              ).map(([v, label, hint]) => (
+                <button key={v} type="button" aria-pressed={opts.size === v} onClick={() => setOpts((o) => ({ ...o, size: v }))}>
+                  <strong>{label}</strong>
+                  {hint && <span>{hint}</span>}
+                </button>
+              ))}
+            </div>
+            {opts.size !== 'best' && <span className="sheet-option-hint size-hint">{strings.sizeHint}</span>}
+          </div>
+        )}
+        {shown.pages && !ids && all.length > 1 && (
           <label className="sheet-field">
             <span className="sheet-option-hint">{strings.pagesField}</span>
             <input
@@ -122,7 +139,7 @@ export function SaveSheet() {
             {rangeBad && <span className="sheet-error">{strings.pagesInvalid(all.length)}</span>}
           </label>
         )}
-        {pdf && (
+        {shown.ocr && pdf && (
           <Switch
             label={strings.searchableText}
             hint={strings.searchableTextHint}
@@ -130,8 +147,10 @@ export function SaveSheet() {
             onChange={(ocr) => setOpts((o) => ({ ...o, ocr }))}
           />
         )}
-        {pdf && count > 1 && <Switch label={strings.splitPages} hint={strings.splitPagesHint} on={split} onChange={setSplit} />}
-        <Switch label={strings.watermarkSwitch} hint={strings.watermarkHint} on={marked} onChange={setMarked} />
+        {shown.split && pdf && count > 1 && (
+          <Switch label={strings.splitPages} hint={strings.splitPagesHint} on={split} onChange={setSplit} />
+        )}
+        {shown.watermark && <Switch label={strings.watermarkSwitch} hint={strings.watermarkHint} on={marked} onChange={setMarked} />}
         {marked && (
           <input
             type="text"
@@ -145,7 +164,9 @@ export function SaveSheet() {
             autoFocus
           />
         )}
-        {pdf && <Switch label={strings.passwordSwitch} hint={strings.passwordSwitchHint} on={locked} onChange={setLocked} />}
+        {shown.password && pdf && (
+          <Switch label={strings.passwordSwitch} hint={strings.passwordSwitchHint} on={locked} onChange={setLocked} />
+        )}
         {pdf && locked && (
           <span className="sheet-name sheet-password">
             <input
@@ -169,6 +190,9 @@ export function SaveSheet() {
             </button>
           </span>
         )}
+        <button type="button" className="btn btn-plain save-customize" onClick={() => setCustomizing(true)}>
+          {strings.saveFieldsCustomize}
+        </button>
         <div className="sheet-actions">
           <button type="button" className="btn" onClick={() => s.closeSaveSheet()}>
             {strings.cancel}
@@ -183,6 +207,14 @@ export function SaveSheet() {
           </button>
         </div>
       </div>
+      {customizing && (
+        <SaveFieldsSheet
+          onClose={() => {
+            setCustomizing(false);
+            setShown(loadSaveFields());
+          }}
+        />
+      )}
     </div>
   );
 }

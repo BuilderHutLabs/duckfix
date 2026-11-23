@@ -825,10 +825,10 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       });
       try {
         // a size with a limit: saved again smaller until it fits (or the smallest is reached)
-        const limit = SIZE_LIMIT[opts.size];
-        let level = SIZE_START[opts.size];
+        const limit = SIZE_LIMIT[opts.size] ?? Infinity;
+        let level = SIZE_START[opts.size] ?? 0;
         const smaller = (bytes: number) => {
-          if (bytes <= limit || level >= MAX_LEVEL) return false;
+          if (bytes <= limit || level >= MAX_LEVEL || pass >= MAX_LEVEL) return false; // never more tries than levels
           level = Math.min(MAX_LEVEL, level + (bytes / limit > 2.5 ? 2 : 1));
           return true;
         };

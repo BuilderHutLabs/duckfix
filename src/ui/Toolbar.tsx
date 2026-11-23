@@ -2,6 +2,7 @@ import { ThemePicker } from './ThemePicker';
 import { useEffect, useRef, useState } from 'react';
 import { isFlagged, useAppStore } from './store';
 import { strings } from './strings';
+import { SaveFieldsSheet } from './SaveFieldsSheet';
 import { openTour } from './DuckTour';
 import { IconClose, IconFilter, IconGear, IconRedo, IconUndo } from './icons';
 import { MoreMenu } from './MoreMenu';
@@ -67,6 +68,8 @@ export function Toolbar() {
 export function Settings() {
   const { deskew, setDeskew } = useAppStore();
   const [open, setOpen] = useState(false);
+  /** "Okno zapisu" open. */
+  const [fieldsOpen, setFieldsOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -112,6 +115,16 @@ export function Settings() {
             className="menu-item"
             onClick={() => {
               setOpen(false);
+              setFieldsOpen(true);
+            }}
+          >
+            {strings.saveFieldsOpen}
+          </button>
+          <button
+            type="button"
+            className="menu-item"
+            onClick={() => {
+              setOpen(false);
               openTour();
             }}
           >
@@ -119,6 +132,7 @@ export function Settings() {
           </button>
         </div>
       )}
+      {fieldsOpen && <SaveFieldsSheet onClose={() => setFieldsOpen(false)} />}
     </div>
   );
 }
