@@ -1373,11 +1373,25 @@ body.splashing .home .duck {
   to { transform: translateY(0); }
 }
 .sheet-grabber {
+  position: relative;
   width: 36px;
   height: 5px;
   margin: 0 auto 10px;
   border-radius: 3px;
   background: var(--sep);
+  touch-action: none;
+}
+/* a wide strip to catch the finger that drags the sheet down */
+.sheet-grabber::before {
+  content: '';
+  position: absolute;
+  top: -12px;
+  bottom: -10px;
+  left: -90px;
+  right: -90px;
+}
+.sheet-title {
+  touch-action: none;
 }
 .sheet-title {
   margin: 0 0 8px;
