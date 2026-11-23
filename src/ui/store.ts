@@ -101,6 +101,8 @@ export interface AppState {
   /** The "Moje dokumenty" list is open. */
   docsOpen: boolean;
   diagnostics: boolean;
+  /** The text recognition is still getting ready (the first analysis waits for it). */
+  preparing: boolean;
 }
 
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
@@ -300,6 +302,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     library: [],
     docsOpen: false,
     diagnostics: false,
+    preparing: false,
   };
 
   const cancelDocSave = () => {
@@ -416,11 +419,19 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     listeners.forEach((l) => l());
   };
 
+  /** The recognition engine is loaded (no waiting before the next analysis). */
+  let detectorReady = false;
   const getDetector = (): Promise<OrientationDetector> => {
-    detector ??= deps.createDetector().catch((e) => {
-      detector = null; // allow a retry on the next document
-      throw e;
-    });
+    detector ??= deps.createDetector().then(
+      (d) => {
+        detectorReady = true;
+        return d;
+      },
+      (e) => {
+        detector = null; // allow a retry on the next document
+        throw e;
+      },
+    );
     return detector;
   };
 
@@ -442,7 +453,10 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
       progress: { done: state.progress.done, total: state.progress.total + todo.length },
     });
     try {
-      const det = await getDetector();
+      if (!detectorReady) set({ preparing: true }); // "Przygotowuję rozpoznawanie…" instead of a stuck 0/N
+      const det = await getDetector().finally(() => {
+        if (state.preparing) set({ preparing: false });
+      });
       if (!current()) return;
       await deps.analyzePages(
         todo,
@@ -1029,6 +1043,11 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     /** Writes a pending debounced doc save now (the page is being hidden / may be killed). */
     flushSession() {
       if (saveTimer !== null) saveDocNow();
+    },
+
+    /** Starts the text recognition in the background (on the home screen), so a document does not wait for it. */
+    warmUp() {
+      void getDetector().catch(() => {}); // no internet the first time: the document tries again
     },
 
     openDiagnostics() {

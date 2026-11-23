@@ -36,6 +36,7 @@ export const en: Strings = {
   startOver: 'Start over',
 
   analyzing: (done, total) => `Analyzing ${done}/${total}`,
+  preparingRecognition: 'Getting recognition ready…',
   toCheck: (n) => `${n} ${s(n, 'page', 'pages')} to check`,
   toCheckShort: (n) => `${n} to check`,
   showOnlyFlagged: 'Show only these',

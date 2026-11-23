@@ -43,6 +43,7 @@ export function App({ store }: { store?: AppStore }) {
         <CameraInput />
         <ScanHost />
         <ShortcutHost />
+        <WarmUp />
         <UpdatePrompt />
       </Fragment>
       {splash && <Splash onDone={() => setSplash(false)} />}
@@ -77,6 +78,21 @@ function ShortcutHost() {
       void restore();
     }
   }, [go, restorable, phase, restore]);
+  return null;
+}
+
+/** A moment after the app opens, when the phone is free, the text recognition is started in the background. */
+const WARM_UP_MS = 3000;
+function WarmUp() {
+  const { warmUp } = useAppStore();
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const idle = (window as { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => void }).requestIdleCallback;
+      if (idle) idle(warmUp, { timeout: 2000 });
+      else warmUp();
+    }, WARM_UP_MS);
+    return () => clearTimeout(t);
+  }, [warmUp]);
   return null;
 }
 

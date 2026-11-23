@@ -43,6 +43,7 @@ export const pl = {
   startOver: 'Zacznij od nowa',
 
   analyzing: (done: number, total: number) => `Analizuję ${done}/${total}`,
+  preparingRecognition: 'Przygotowuję rozpoznawanie…',
   toCheck: (n: number) => `${n} ${plural(n, 'strona', 'strony', 'stron')} do sprawdzenia`,
   toCheckShort: (n: number) => `${n} do sprawdzenia`,
   showOnlyFlagged: 'Pokaż tylko te',

@@ -36,6 +36,7 @@ export const de: Strings = {
   startOver: 'Neu beginnen',
 
   analyzing: (done, total) => `Analysiere ${done}/${total}`,
+  preparingRecognition: 'Erkennung wird vorbereitet…',
   toCheck: (n) => `${n} ${s(n, 'Seite', 'Seiten')} zu prüfen`,
   toCheckShort: (n) => `${n} zu prüfen`,
   showOnlyFlagged: 'Nur diese zeigen',
