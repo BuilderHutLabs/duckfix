@@ -1,4 +1,5 @@
 import { loupeAt, loupeOff } from './loupe';
+import { rafThrottle } from './device';
 import { useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import type { PageBox, Rect } from './edit/pageBox';
 import { BUBBLE_GAP, BubbleAnchor, bubblePlace } from './edit/MarkLayer';
@@ -56,7 +57,7 @@ export function StampLayer({
     const aspect = (s.w * rect.width) / (s.h * rect.height);
     let box: Box = { x: s.x, y: s.y, w: s.w, h: s.h, rot: s.rot };
     const t = ((s.rot ?? 0) * Math.PI) / 180;
-    const move = (ev: PointerEvent) => {
+    const eachMove = (ev: PointerEvent) => {
       if (onSelect) loupeAt(ev); // only while editing
       const px = (ev.clientX - x0) / zoom;
       const py = (ev.clientY - y0) / zoom;
@@ -73,7 +74,9 @@ export function StampLayer({
       }
       setLive({ id: s.id, box });
     };
+    const move = rafThrottle(eachMove); // one update per screen frame
     const up = () => {
+      move.flush();
       loupeOff();
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
@@ -101,14 +104,16 @@ export function StampLayer({
     const y0 = e.clientY;
     let moved = false;
     let rot = base;
-    const move = (ev: PointerEvent) => {
+    const eachMove = (ev: PointerEvent) => {
       if (!moved && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
       moved = true;
       const a = Math.atan2(ev.clientY - cy, ev.clientX - cx);
       rot = snapAngle(base + ((a - a0) * 180) / Math.PI);
       setLive({ id: s.id, box: { x: s.x, y: s.y, w: s.w, h: s.h, rot } });
     };
+    const move = rafThrottle(eachMove); // one update per screen frame
     const up = () => {
+      move.flush();
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', up);

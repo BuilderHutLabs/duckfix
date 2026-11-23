@@ -4010,3 +4010,19 @@ span.live-camera-side {
 .edit-tools .edit-grip {
   touch-action: none;
 }
+
+/* a weak phone (see device.ts): no blurs under bars, no drifting colours behind the home screen */
+html.weak *,
+html.weak *::before,
+html.weak *::after {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+html.weak .home-glow {
+  display: none;
+}
+html.weak .toolbar,
+html.weak .progress,
+html.weak .action-bar {
+  background: var(--bg);
+}

@@ -230,6 +230,19 @@ describe('built-in camera', () => {
     vi.restoreAllMocks();
   });
 
+  it('a weak phone asks the camera for a lighter live picture (about 2 MP); a strong one for the full one', async () => {
+    const cores = Object.getOwnPropertyDescriptor(Navigator.prototype, 'hardwareConcurrency');
+    Object.defineProperty(navigator, 'hardwareConcurrency', { configurable: true, value: 4 });
+    render(<App store={createAppStore(fakeDeps())} />);
+    fireEvent.click(screen.getByRole('button', { name: strings.homeScan }));
+    await screen.findByRole('dialog', { name: strings.cameraTitle });
+    const ask = vi.mocked(navigator.mediaDevices.getUserMedia).mock.calls[0][0] as MediaStreamConstraints;
+    expect((ask.video as { width: { ideal: number } }).width.ideal).toBeLessThanOrEqual(1920);
+    // @ts-expect-error back to the browser's own
+    delete navigator.hardwareConcurrency;
+    if (cores) Object.defineProperty(Navigator.prototype, 'hardwareConcurrency', cores);
+  });
+
   it('"Zrób zdjęcie" opens the camera inside the app (the page is not left); ✕ turns it off', async () => {
     render(<App store={createAppStore(fakeDeps())} />);
     const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(() => {});

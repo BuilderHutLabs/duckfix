@@ -12,11 +12,12 @@ const LIVE_SIDE = 256;
 export function analyzeFrame(
   video: HTMLVideoElement,
   canvas: HTMLCanvasElement,
+  side: number = LIVE_SIDE,
 ): { quad: Quad | null; width: number; height: number; light: number } | null {
   const vw = video.videoWidth;
   const vh = video.videoHeight;
   if (!vw || !vh) return null;
-  const k = Math.min(1, LIVE_SIDE / Math.max(vw, vh));
+  const k = Math.min(1, side / Math.max(vw, vh));
   const w = Math.max(1, Math.round(vw * k));
   const h = Math.max(1, Math.round(vh * k));
   if (canvas.width !== w) canvas.width = w;

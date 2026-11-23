@@ -721,7 +721,7 @@ describe('Edytuj: gumka, grubość, na wszystkie strony, podpis, powiększanie',
     expect(store.getState().doc.pages[1].stamps).toHaveLength(1);
   });
 
-  it('dragging a corner dot with a finger shows a magnifier of the page under it; a mouse does not', () => {
+  it('dragging a corner dot with a finger shows a magnifier of the page under it; a mouse does not', async () => {
     const doc = addMark(docWithFlags(1), 'p1', { id: 'r', kind: 'rect', color: 'red', x: 0.2, y: 0.4, w: 0.3, h: 0.2 });
     openPreview(doc);
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
@@ -731,6 +731,8 @@ describe('Edytuj: gumka, grubość, na wszystkie strony, podpis, powiększanie',
     const t = { pointerId: 3, pointerType: 'touch' };
     fireEvent.pointerDown(corner, { ...t, clientX: 250, clientY: 420 });
     fireEvent.pointerMove(corner, { ...t, clientX: 270, clientY: 440 });
+    // drawn on the next screen frame
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
     const loupe = document.querySelector('.loupe') as HTMLElement;
     expect(loupe).not.toBeNull();
     fireEvent.pointerUp(corner, { ...t, clientX: 270, clientY: 440 });
@@ -739,6 +741,7 @@ describe('Edytuj: gumka, grubość, na wszystkie strony, podpis, powiększanie',
     const m = { pointerId: 4, pointerType: 'mouse' };
     fireEvent.pointerDown(corner, { ...m, clientX: 270, clientY: 440 });
     fireEvent.pointerMove(corner, { ...m, clientX: 290, clientY: 460 });
+    await act(() => new Promise<void>((r) => requestAnimationFrame(() => r())));
     expect(document.querySelector('.loupe')).toBeNull();
     fireEvent.pointerUp(corner, { ...m, clientX: 290, clientY: 460 });
   });

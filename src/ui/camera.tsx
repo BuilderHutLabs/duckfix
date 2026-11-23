@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useAppStore } from './store';
 import { strings } from './strings';
 import { useBackLayer } from './backStack';
+import { isWeakDevice, nextLookDelay } from './device';
 import { storageKey } from '../config';
 import { analyzeFrame } from '../scan/liveFrame';
 import { createOutline, createSteady, quadToView, type LiveState } from '../scan/liveScan';
@@ -101,12 +102,16 @@ export function CameraInput() {
 
 /** Asked size of the camera picture: as sharp as the camera gives, for readable text. */
 const VIDEO = { facingMode: { ideal: 'environment' }, width: { ideal: 4096 }, height: { ideal: 3072 } } as const;
+/** A weak phone: a lighter live picture (about 2 MP, still sharp enough for a page). */
+const VIDEO_WEAK = { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1440 } } as const;
 
 type TorchTrack = Omit<MediaStreamTrack, 'getCapabilities'> & { getCapabilities?: () => MediaTrackCapabilities & { torch?: boolean } };
 
 const AUTO_KEY = storageKey('duckfix-auto-shot');
-/** How often the live picture is searched for the sheet. */
+/** How often the live picture is searched for the sheet (longer on a slow phone, see nextLookDelay). */
 const LOOK_MS = 200;
+/** A weak phone looks at a smaller copy of the picture. */
+const LIVE_SIDE_WEAK = 200;
 /** Below this mean brightness (0–255) the picture is too dark for a good scan. */
 const DARK = 55;
 
@@ -223,7 +228,7 @@ export function LiveCamera({
   useEffect(() => {
     let alive = true;
     void navigator.mediaDevices
-      .getUserMedia({ video: VIDEO, audio: false })
+      .getUserMedia({ video: isWeakDevice() ? VIDEO_WEAK : VIDEO, audio: false })
       .then((s) => {
         if (!alive) return s.getTracks().forEach((t) => t.stop());
         stream.current = s;
@@ -313,15 +318,24 @@ export function LiveCamera({
     const steady = createSteady();
     const outline = createOutline();
     const look = document.createElement('canvas');
-    const t = setInterval(() => {
+    const side = isWeakDevice() ? LIVE_SIDE_WEAK : undefined;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    let alive = true;
+    // one look, then a pause that grows on a slow phone (the picture stays smooth)
+    const next = (ms: number) => {
+      if (alive) t = setTimeout(tick, nextLookDelay(ms));
+    };
+    const tick = () => {
       const v = video.current;
-      if (!v) return;
+      if (!v) return next(0);
+      const t0 = performance.now();
       let r: ReturnType<typeof analyzeFrame> = null;
       try {
-        r = analyzeFrame(v, look);
+        r = analyzeFrame(v, look, side);
       } catch {
-        return;
+        return next(0);
       }
+      next(performance.now() - t0);
       if (!r) return;
       const st = steady.push(r.quad, r.width, r.height, performance.now());
       const shown = outline.push(r.quad, r.width, r.height);
@@ -336,9 +350,11 @@ export function LiveCamera({
         steady.fired();
         shootRef.current(true);
       }
-    }, LOOK_MS);
+    };
+    t = setTimeout(tick, LOOK_MS);
     return () => {
-      clearInterval(t);
+      alive = false;
+      clearTimeout(t);
       look.width = 0;
     };
   }, [state, auto]);

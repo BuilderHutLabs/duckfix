@@ -21,6 +21,7 @@ import { SignaturePicker } from './SignaturePicker';
 import { StampDateSheet, StampPicker, isDated, type PickedStamp } from './StampPicker';
 import { QrSheet } from './QrSheet';
 import { useBackLayer } from './backStack';
+import { isWeakDevice } from './device';
 import { fromIsoDay } from '../edit/stamps';
 import { stampImage } from '../edit/stampImage';
 import { MarkTextSheet } from './edit/MarkTextSheet';
@@ -51,7 +52,7 @@ const NO_ZOOM: Zoom = { z: 1, x: 0, y: 0 };
 /** Long side of the sharp render: enough for the screen at its pixel density, bounded for iOS memory. */
 function previewMaxSide(): number {
   const screenSide = Math.max(window.innerWidth, window.innerHeight) * (window.devicePixelRatio || 1);
-  return Math.round(Math.min(2400, Math.max(1600, screenSide)));
+  return Math.round(Math.min(isWeakDevice() ? 1600 : 2400, Math.max(1600, screenSide)));
 }
 
 function canvasToBlob(canvas: HTMLCanvasElement): Promise<Blob> {

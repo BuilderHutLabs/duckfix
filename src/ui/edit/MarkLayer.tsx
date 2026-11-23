@@ -6,6 +6,7 @@ import { dragCrop, type CropHandle } from '../../signature/geometry';
 import { simplify, strokeBox } from '../../edit/draw';
 import { useAppStore } from '../store';
 import type { PageBox } from './pageBox';
+import { rafThrottle } from '../device';
 import { Marks } from './MarksSvg';
 
 /** Tools that put something on the page with a tap. */
@@ -206,7 +207,21 @@ export function MarkLayer({
   const dist = (a: { x: number; y: number }, b: { x: number; y: number }) =>
     Math.hypot((b.x - a.x) * rect.width, (b.y - a.y) * rect.height);
 
-  const follow = (el: HTMLElement, pointerId: number, move: (e: PointerEvent) => void, up: (e: PointerEvent) => void) => {
+  const follow = (
+    el: HTMLElement,
+    pointerId: number,
+    eachMove: (e: PointerEvent) => void,
+    lift: (e: PointerEvent) => void,
+    /** Every finger move counts (a pen line keeps all its points; it throttles its own drawing). */
+    every = false,
+  ) => {
+    // finger moves come far more often than the screen redraws: one update per frame
+    const frame = rafThrottle(eachMove);
+    const move = (e: PointerEvent) => (every ? eachMove(e) : frame(e));
+    const up = (e: PointerEvent) => {
+      frame.flush();
+      lift(e);
+    };
     try {
       el.setPointerCapture?.(pointerId);
     } catch {
@@ -223,6 +238,7 @@ export function MarkLayer({
     };
     // a second finger (pinch zoom) or the browser took the pointer: nothing is made
     const cancel = () => {
+      frame.cancel();
       off();
       loupeOff();
       setLive(null);
@@ -273,17 +289,21 @@ export function MarkLayer({
             more = true;
           }
         }
-        if (more) setErased([...hit]);
+        if (more) showErased();
       };
+      const showErased = rafThrottle(() => setErased([...hit]));
       rub(a);
+      showErased.flush();
       follow(
         layer,
         e.pointerId,
         (ev) => rub(frac(ev, layer)),
         () => {
+          showErased.cancel();
           setErased([]);
           removeMarks(page.id, [...hit]); // one undo step for the whole rub
         },
+        true,
       );
       return;
     }
@@ -295,19 +315,23 @@ export function MarkLayer({
           ? { id, kind: 'pen', color: ink, points: [...points], ...(penWidth !== 1 ? { width: penWidth } : {}) }
           : { id, kind: 'highlight', color: highlight, points: [...points] };
       setLive(make());
+      // every point is kept; the line on the screen is redrawn once per frame
+      const show = rafThrottle(() => setLive(make()));
       follow(
         layer,
         e.pointerId,
         (ev) => {
           const b = frac(ev, layer);
           points.push(clamp01(b.x), clamp01(b.y));
-          setLive(make());
+          show();
         },
         () => {
+          show.cancel();
           setLive(null);
           const m = make() as Extract<Mark, { points: number[] }>;
           addMark(page.id, { ...m, points: simplify(m.points, 0.0015) });
         },
+        true,
       );
       return;
     }

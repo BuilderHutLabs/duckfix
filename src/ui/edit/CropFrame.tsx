@@ -1,4 +1,5 @@
 import { loupeAt, loupeOff } from '../loupe';
+import { rafThrottle } from '../device';
 import { useState, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Box } from '../../model/document';
 import { dragCrop, type CropHandle } from '../../signature/geometry';
@@ -31,12 +32,14 @@ export function CropFrame({
     const y0 = e.clientY;
     const from = crop ?? WHOLE;
     let next = from;
-    const move = (ev: PointerEvent) => {
+    const eachMove = (ev: PointerEvent) => {
       loupeAt(ev);
       next = dragCrop(from, handle, (ev.clientX - x0) / zoom / rect.width, (ev.clientY - y0) / zoom / rect.height, 1, 1, 0.1);
       setLive(next);
     };
+    const move = rafThrottle(eachMove); // one update per screen frame
     const up = () => {
+      move.flush();
       loupeOff();
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
