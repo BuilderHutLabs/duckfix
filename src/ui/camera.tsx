@@ -149,6 +149,25 @@ function hintFor(state: LiveState, light: number): string {
 }
 
 let shotNo = 0;
+
+type P = { x: number; y: number };
+/** Four corner marks of the found sheet (SVG paths): a short stroke along each edge from every corner. */
+export function cornerMarks(pts: P[]): string[] {
+  return pts.map((c, i) => {
+    const prev = pts[(i + 3) % 4];
+    const next = pts[(i + 1) % 4];
+    const along = (to: P) => {
+      const dx = to.x - c.x;
+      const dy = to.y - c.y;
+      const len = Math.hypot(dx, dy) || 1;
+      const k = Math.min(30, len * 0.22) / len;
+      return { x: c.x + dx * k, y: c.y + dy * k };
+    };
+    const a = along(prev);
+    const b = along(next);
+    return `M${a.x.toFixed(1)},${a.y.toFixed(1)} L${c.x.toFixed(1)},${c.y.toFixed(1)} L${b.x.toFixed(1)},${b.y.toFixed(1)}`;
+  });
+}
 /** Each photo of the camera row its own number (taking one out finds it by that). */
 let shotIds = 0;
 
@@ -420,14 +439,9 @@ export function LiveCamera({
       {live.pts && state === 'ready' && (
         <svg className={`live-camera-outline ${live.state}`} aria-hidden="true">
           <polygon points={live.pts.map((p) => `${p.x},${p.y}`).join(' ')} />
-          {counting && (
-            <polygon
-              className="live-camera-progress"
-              points={live.pts.map((p) => `${p.x},${p.y}`).join(' ')}
-              pathLength={100}
-              style={{ strokeDasharray: `${Math.round(live.progress * 100)} 100` }}
-            />
-          )}
+          {cornerMarks(live.pts).map((d, i) => (
+            <path key={i} className="live-camera-corner" d={d} />
+          ))}
         </svg>
       )}
       {flash > 0 && <div className="live-camera-flash" key={flash} aria-hidden="true" />}
@@ -445,7 +459,8 @@ export function LiveCamera({
           ✕
         </button>
         {state === 'ready' && live.hint && (
-          <p className="live-camera-hint" role="status">
+          <p className={`live-camera-hint${counting ? ' counting' : ''}`} role="status">
+            <span className="live-camera-hint-dot" aria-hidden="true" />
             {live.hint}
           </p>
         )}
@@ -459,21 +474,6 @@ export function LiveCamera({
       </div>
       {mode === 'card' && cardShots < 2 && <p className="live-camera-step">{cardShots === 0 ? strings.cardFront : strings.cardBack}</p>}
       {mode === 'receipt' && <p className="live-camera-step">{strings.receiptStep(receiptShots + 1)}</p>}
-      <div className="live-camera-modes" role="group">
-        {MODES.map(([m, label]) => (
-          <button
-            key={m}
-            type="button"
-            aria-pressed={mode === m}
-            onClick={() => {
-              setMode(m);
-              saveMode(m);
-            }}
-          >
-            {label()}
-          </button>
-        ))}
-      </div>
       {reviewing && (
         <div className="shots-review" role="dialog" aria-modal="true" aria-label={strings.shotsTitle(shots.length)}>
           <div className="shots-review-top">
@@ -501,37 +501,57 @@ export function LiveCamera({
           <p className="shots-hint">{strings.shotsHint}</p>
         </div>
       )}
-      <div className="live-camera-bottom">
-        {last ? (
+      <div className="live-camera-panel">
+        <div className="live-camera-modes" role="group">
+          {MODES.map(([m, label]) => (
+            <button
+              key={m}
+              type="button"
+              aria-pressed={mode === m}
+              onClick={() => {
+                setMode(m);
+                saveMode(m);
+              }}
+            >
+              {label()}
+            </button>
+          ))}
+        </div>
+        <div className="live-camera-bottom">
+          {last ? (
+            <button
+              type="button"
+              className={`live-camera-thumb${last.saved ? '' : ' saving'}`}
+              key={shots.length}
+              aria-label={strings.shotsReview(shots.length)}
+              onClick={() => setReviewing(true)}
+            >
+              {last.url ? <img src={last.url} alt="" /> : null}
+              <span className="live-camera-count">{shots.length}</span>
+            </button>
+          ) : (
+            <button type="button" className="live-camera-side" onClick={onPhoneCamera}>
+              {strings.cameraPhone}
+            </button>
+          )}
           <button
             type="button"
-            className={`live-camera-thumb${last.saved ? '' : ' saving'}`}
-            key={shots.length}
-            aria-label={strings.shotsReview(shots.length)}
-            onClick={() => setReviewing(true)}
+            className="live-camera-shutter"
+            aria-label={strings.cameraShoot}
+            disabled={state !== 'ready'}
+            onClick={() => shoot()}
           >
-            {last.url ? <img src={last.url} alt="" /> : null}
-            <span className="live-camera-count">{shots.length}</span>
+            {/* the ring fills while the sheet is held still (the picture is then taken by itself) */}
+            {counting && <span className="live-camera-progress" style={{ ['--p' as string]: live.progress }} aria-hidden="true" />}
           </button>
-        ) : (
-          <button type="button" className="live-camera-side" onClick={onPhoneCamera}>
-            {strings.cameraPhone}
-          </button>
-        )}
-        <button
-          type="button"
-          className="live-camera-shutter"
-          aria-label={strings.cameraShoot}
-          disabled={state !== 'ready'}
-          onClick={() => shoot()}
-        />
-        {shots.length ? (
-          <button type="button" className="live-camera-done" disabled={finishing} onClick={() => void finish()}>
-            {finishing ? strings.cameraSaving : strings.cameraDone(shots.length)}
-          </button>
-        ) : (
-          <span className="live-camera-side" aria-hidden="true" />
-        )}
+          {shots.length ? (
+            <button type="button" className="live-camera-done" disabled={finishing} onClick={() => void finish()}>
+              {finishing ? strings.cameraSaving : strings.cameraDone(shots.length)}
+            </button>
+          ) : (
+            <span className="live-camera-side" aria-hidden="true" />
+          )}
+        </div>
       </div>
     </div>
   );

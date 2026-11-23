@@ -4113,3 +4113,211 @@ button.live-camera-thumb {
   opacity: 0.75;
   text-align: center;
 }
+
+/* ---------- camera, look A: the app's colours (light or dark theme), a glass panel at the bottom ---------- */
+.live-camera {
+  --cam-panel: color-mix(in srgb, var(--card) 86%, transparent);
+  --cam-text: var(--text);
+  --cam-text-2: var(--text-2);
+  --cam-chip: var(--fill);
+}
+.live-camera-top {
+  align-items: flex-start;
+  gap: 8px;
+  padding: calc(10px + env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+}
+.live-camera-btn {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  background: var(--cam-panel);
+  color: var(--cam-text);
+  font-size: 17px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.live-camera-btn[aria-pressed='true'] {
+  background: var(--accent);
+  color: #fff;
+}
+.live-camera-hint {
+  position: static;
+  transform: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin: 3px auto 0;
+  max-width: calc(100% - 110px);
+  padding: 8px 13px;
+  border-radius: 18px;
+  background: var(--cam-panel);
+  color: var(--cam-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+.live-camera-hint-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--cam-text-2);
+}
+.live-camera-hint.counting .live-camera-hint-dot {
+  background: var(--accent);
+  animation: cam-pulse 0.9s ease-in-out infinite;
+}
+@keyframes cam-pulse {
+  50% {
+    transform: scale(1.5);
+    opacity: 0.6;
+  }
+}
+.live-camera-step {
+  top: calc(64px + env(safe-area-inset-top));
+  background: var(--cam-panel);
+  color: var(--cam-text);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+/* the found sheet: a faint shape and four corner marks in the app's colour */
+.live-camera-outline polygon {
+  fill: color-mix(in srgb, var(--accent) 10%, transparent);
+  stroke: color-mix(in srgb, var(--accent) 45%, transparent);
+  stroke-width: 1.5;
+}
+.live-camera-outline.hold polygon,
+.live-camera-outline.ready polygon {
+  fill: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.live-camera-outline .live-camera-corner {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.45));
+}
+/* one glass panel: the modes over the row (picture, shutter, Gotowe) */
+.live-camera-panel {
+  position: absolute;
+  left: max(10px, env(safe-area-inset-left));
+  right: max(10px, env(safe-area-inset-right));
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  padding: 8px 10px 12px;
+  border-radius: 26px;
+  background: var(--cam-panel);
+  color: var(--cam-text);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.38);
+  -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
+}
+.live-camera-panel .live-camera-modes {
+  position: static;
+  display: flex;
+  gap: 2px;
+  margin: 0 0 10px;
+  padding: 3px;
+  border-radius: 14px;
+  background: var(--cam-chip);
+  transform: none;
+}
+.live-camera-panel .live-camera-modes button {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 2px;
+  border: 0;
+  border-radius: 11px;
+  background: none;
+  color: var(--cam-text-2);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  text-shadow: none;
+  cursor: pointer;
+}
+.live-camera-panel .live-camera-modes button[aria-pressed='true'] {
+  background: var(--card);
+  color: var(--accent);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+.live-camera-panel .live-camera-bottom {
+  position: static;
+  padding: 0 4px;
+  background: none;
+}
+.live-camera-panel .live-camera-shutter {
+  position: relative;
+  width: 70px;
+  height: 70px;
+  border: 0;
+  background: var(--cam-chip);
+  box-shadow: none;
+}
+.live-camera-panel .live-camera-shutter::after {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: #fff; /* white in both themes, like a camera's shutter */
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.25);
+}
+.live-camera-panel .live-camera-shutter .live-camera-progress {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: conic-gradient(var(--accent) calc(var(--p, 0) * 1turn), transparent 0);
+}
+.live-camera-panel .live-camera-thumb {
+  width: 46px;
+  height: 58px;
+  border: 2px solid var(--card);
+  border-radius: 10px;
+  box-shadow: 4px -4px 0 -1px var(--cam-panel), 4px -4px 0 1px color-mix(in srgb, var(--text) 18%, transparent);
+}
+.live-camera-panel .live-camera-thumb img {
+  border-radius: 8px;
+}
+.live-camera-panel .live-camera-count {
+  background: var(--accent);
+  color: #fff;
+}
+.live-camera-panel .live-camera-done {
+  justify-self: end;
+  padding: 11px 14px;
+  border: 0;
+  border-radius: 15px;
+  background: var(--accent-grad);
+  color: #fff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.live-camera-panel .live-camera-side {
+  background: var(--cam-chip);
+  color: var(--cam-text);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.live-camera-panel span.live-camera-side {
+  background: none;
+}
+.live-camera-panel .live-camera-done {
+  white-space: nowrap;
+}
+@media (max-width: 350px) {
+  .live-camera-panel .live-camera-done {
+    padding: 10px 10px;
+    font-size: 13px;
+  }
+  .live-camera-panel .live-camera-shutter {
+    width: 62px;
+    height: 62px;
+  }
+}

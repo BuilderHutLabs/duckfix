@@ -385,6 +385,16 @@ describe('built-in camera', () => {
     expect(await screen.findByRole('button', { name: strings.cameraDone(1) }, { timeout: 3000 })).toBeTruthy();
   });
 
+  it('the new look: corner marks on the sheet, the modes and buttons in one panel, the shutter ring fills while held', async () => {
+    frame.current = fullSheet;
+    await openLive();
+    await waitFor(() => expect(document.querySelectorAll('.live-camera-outline .live-camera-corner')).toHaveLength(4));
+    const panel = document.querySelector('.live-camera-panel') as HTMLElement;
+    expect(panel.querySelector('[role="group"]')).not.toBeNull(); // the modes
+    expect(panel.contains(screen.getByRole('button', { name: strings.cameraShoot }))).toBe(true);
+    await waitFor(() => expect(document.querySelector('.live-camera-shutter .live-camera-progress')).not.toBeNull());
+  });
+
   it('"Ręcznie": no outline, nothing taken by itself, the crop starts from the whole photo; remembered', async () => {
     const warp = await import('../../src/scan/warp');
     vi.mocked(warp.findSheet).mockClear();
