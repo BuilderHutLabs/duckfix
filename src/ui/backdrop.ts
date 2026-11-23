@@ -1,4 +1,5 @@
 import { useCallback, useRef, type MouseEvent, type PointerEvent } from 'react';
+import { useBackLayer } from './backStack';
 
 /** A drag down of at least this much of the sheet's height closes it… */
 const CLOSE_PART = 0.25;
@@ -20,6 +21,7 @@ export function useBackdropClose(onClose: () => void) {
   const down = useRef(false);
   const close = useRef(onClose);
   close.current = onClose;
+  useBackLayer(true, () => close.current()); // the phone's Back closes the sheet
   const detach = useRef<(() => void) | null>(null);
 
   const ref = useCallback((backdrop: HTMLElement | null) => {

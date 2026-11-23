@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useAppStore } from './store';
 import { strings } from './strings';
+import { useBackLayer } from './backStack';
 import { storageKey } from '../config';
 import { analyzeFrame } from '../scan/liveFrame';
 import { createOutline, createSteady, quadToView, type LiveState } from '../scan/liveScan';
@@ -360,9 +361,11 @@ export function LiveCamera({
   };
 
   const close = () => {
-    if (shots.length && !window.confirm(strings.cameraDiscard(shots.length))) return;
+    if (shots.length && !window.confirm(strings.cameraDiscard(shots.length))) return false;
     onClose();
+    return true;
   };
+  useBackLayer(true, close); // the phone's Back closes the camera (asking first when photos would be lost)
 
   const last = shots.at(-1);
   const counting = live.state === 'hold' || live.state === 'ready';

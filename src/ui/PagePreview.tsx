@@ -20,6 +20,7 @@ import { loadSignatures, removeSignature, type SavedSignature, type SignatureKin
 import { SignaturePicker } from './SignaturePicker';
 import { StampDateSheet, StampPicker, isDated, type PickedStamp } from './StampPicker';
 import { QrSheet } from './QrSheet';
+import { useBackLayer } from './backStack';
 import { fromIsoDay } from '../edit/stamps';
 import { stampImage } from '../edit/stampImage';
 import { MarkTextSheet } from './edit/MarkTextSheet';
@@ -182,6 +183,8 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
 
   const prevId = index > 0 ? pageIds[index - 1] : null;
   const nextId = index >= 0 && index < pageIds.length - 1 ? pageIds[index + 1] : null;
+
+  useBackLayer(open, closePreview); // the phone's Back closes the preview
 
   useEffect(() => {
     if (!open) return;

@@ -16,6 +16,7 @@ import { ReviewGrid } from './ReviewGrid';
 import { Diagnostics, DIAG_HASH } from './Diagnostics';
 import { UpdatePrompt } from './UpdatePrompt';
 import { strings } from './strings';
+import { useBackLayer } from './backStack';
 import './app.css';
 
 export function App({ store }: { store?: AppStore }) {
@@ -80,7 +81,9 @@ function ShortcutHost() {
 }
 
 function Shell() {
-  const { phase, diagnostics, openDiagnostics, closeDiagnostics, flushSession } = useAppStore();
+  const { phase, diagnostics, openDiagnostics, closeDiagnostics, flushSession, goHome } = useAppStore();
+  // the phone's Back from a document: to the home screen (the document stays in "Moje dokumenty")
+  useBackLayer(phase !== 'home' && !diagnostics, goHome);
 
   // URL hash #diag opens the diagnostics screen (on load and when the hash changes)
   useEffect(() => {

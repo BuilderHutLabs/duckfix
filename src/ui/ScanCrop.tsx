@@ -28,6 +28,7 @@ import { useAppStore } from './store';
 import { LOUPE, loupeSpot } from './loupe';
 import { composeIdCard } from '../scan/card';
 import { strings } from './strings';
+import { useBackLayer } from './backStack';
 import { ScanPreview } from './ScanPreview';
 
 /** Straightening runs one page at a time, so pages land in the order they were accepted. */
@@ -227,9 +228,11 @@ export function ScanCrop({ file }: { file: File }) {
 
   const close = () => {
     const left = s.scanQueue.length + 1;
-    if (round && !window.confirm(strings.cameraDiscard(left))) return;
+    if (round && !window.confirm(strings.cameraDiscard(left))) return false;
     s.setScanPhoto(null);
+    return true;
   };
+  useBackLayer(true, close); // the phone's Back closes the crop screen
   const toggleWhole = () => {
     if (!photo) return;
     setQuad(whole ? (findSheet(photo) ?? defaultQuad(photo.width, photo.height)) : fullQuad(photo.width, photo.height));
