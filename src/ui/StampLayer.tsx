@@ -21,6 +21,7 @@ export function StampLayer({
   zoom = 1,
   selectedId,
   onSelect,
+  passive,
   bubble,
   bubbleHost,
 }: {
@@ -29,6 +30,8 @@ export function StampLayer({
   zoom?: number;
   selectedId?: string | null;
   onSelect?(id: string): void;
+  /** A tool is chosen in "Edytuj": signatures other than the selected one let the finger through. */
+  passive?: boolean;
   bubble?(s: Stamp): ReactNode;
   /** Where the bubble is drawn (outside the crop clip). */
   bubbleHost?: HTMLElement | null;
@@ -129,7 +132,7 @@ export function StampLayer({
         return (
           <div
             key={s.id}
-            className={handles ? 'stamp' : 'stamp quiet'}
+            className={handles ? 'stamp' : passive ? 'stamp quiet passive' : 'stamp quiet'}
             style={{
               left: r.left + b.x * r.width,
               top: r.top + b.y * r.height,

@@ -544,6 +544,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
               bubbleHost={bubbleHost}
               selectedId={editing ? selectedId : undefined}
               onSelect={editing ? setSelectedId : undefined}
+              passive={editing && tool !== null && tool !== 'crop'}
               bubble={(s) => (
                 <StampBubble
                   onChangeDate={isDated(s.preset) ? () => setRedating(s.id) : undefined}

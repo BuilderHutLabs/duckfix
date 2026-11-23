@@ -204,8 +204,23 @@ describe('Edytuj', () => {
     const rect = { left: 0, top: 0, width: 500, height: 700, stageW: 500, stageH: 700 };
     const box = { x: 0.2, y: 0.5, w: 0.4, h: 0.1 };
     const itemTop = 0.5 * 700;
-    expect(itemTop - bubblePlace(box, rect).top).toBeGreaterThanOrEqual(40);
+    expect(itemTop - bubblePlace(box, rect).top).toBeGreaterThanOrEqual(48); // dots reach ~25 px out with their touch area
     expect(itemTop - bubblePlace(box, rect, 1, BUBBLE_GAP.stamp).top).toBeGreaterThanOrEqual(64);
+  });
+
+  it('no room over or under an item (a square over the whole page): the bubble goes into its middle, away from the dots', () => {
+    const rect = { left: 0, top: 0, width: 500, height: 700, stageW: 500, stageH: 700 };
+    const at = bubblePlace({ x: 0.02, y: 0.02, w: 0.96, h: 0.96 }, rect);
+    expect(at.inside).toBe(true);
+    expect(at.top).toBeCloseTo(0.5 * 700);
+  });
+
+  it('no room over an item at the top: the bubble goes under it, still clear of the dots', () => {
+    const rect = { left: 0, top: 0, width: 500, height: 700, stageW: 500, stageH: 700 };
+    const at = bubblePlace({ x: 0.2, y: 0.02, w: 0.4, h: 0.1 }, rect);
+    expect(at.above).toBe(false);
+    expect(at.inside).toBeFalsy();
+    expect(at.top - 0.12 * 700).toBeGreaterThanOrEqual(48);
   });
 
   it('miniatures show covers and the crop', () => {
@@ -247,6 +262,24 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     fireEvent.click(screen.getByRole('button', { name }));
   };
   const bubble = () => screen.getByRole('group', { name: strings.selectedItem });
+
+  it('with a tool chosen, a tap inside a big square puts the new item there; the square is not selected', () => {
+    const doc = addMark(docWithFlags(1), 'p1', { id: 'sq', kind: 'rect', color: 'black', x: 0.02, y: 0.02, w: 0.96, h: 0.96 });
+    const store = openPreview(doc);
+    startTool(strings.toolTick);
+    tap(document.querySelector('.mark-item') as HTMLElement, 250, 350);
+    expect(marks(store).map((m) => m.kind)).toEqual(['rect', 'check']);
+    expect(document.querySelector('.mark-item.selected[data-mark="sq"]')).toBeNull();
+  });
+
+  it('with no tool chosen, a tap on the square selects it (as before)', () => {
+    const doc = addMark(docWithFlags(1), 'p1', { id: 'sq', kind: 'rect', color: 'black', x: 0.02, y: 0.02, w: 0.96, h: 0.96 });
+    const store = openPreview(doc);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    tap(document.querySelector('.mark-item') as HTMLElement, 250, 350);
+    expect(marks(store)).toHaveLength(1);
+    expect(document.querySelector('.mark-item.selected[data-mark="sq"]')).not.toBeNull();
+  });
 
   it('Wpisz: tap the page, type, Wstaw → the text sits where you tapped', () => {
     const store = openPreview();

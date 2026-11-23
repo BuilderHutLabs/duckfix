@@ -3871,3 +3871,9 @@ span.live-camera-side {
   margin: 6px auto 0;
   font-size: 14px;
 }
+
+/* a tool is chosen: the other items let the finger through (a tick inside a big square) */
+.mark-item.through,
+.stamp.passive {
+  pointer-events: none;
+}

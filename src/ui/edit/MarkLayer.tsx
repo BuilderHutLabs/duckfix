@@ -28,7 +28,7 @@ const BUBBLE = { w: 280, h: 56 };
  * Room between the item and its bubble (px), so the bubble never covers the corner dots
  * (they stick out ~25 px with their touch area, more on a small item) or a signature's turn knob.
  */
-export const BUBBLE_GAP = { mark: 40, small: 52, stamp: 70 };
+export const BUBBLE_GAP = { mark: 50, small: 62, stamp: 70 };
 /** Gumka: how close (fraction of the page width) the finger must pass to a drawing to rub it out. */
 const ERASE = 0.025;
 /** An item smaller than this on screen (px) gets its corner dots further out, so they do not hide it. */
@@ -37,6 +37,8 @@ const SMALL_PX = 48;
 const GRAB = 0.015;
 
 type Handle = CropHandle | 'start' | 'end';
+/** Items a chosen tool reaches through (things are put inside them); small ones stay tappable. */
+const THROUGH = new Set<Mark['kind']>(['rect', 'ellipse', 'arrow', 'cover', 'pen', 'highlight']);
 type BoxMark = Extract<Mark, Box>;
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
@@ -84,14 +86,27 @@ export function erases(m: Mark, x: number, y: number, aspect: number): boolean {
   return false;
 }
 
-/** Where the bubble over a selected item goes: over it (under it near the top of the screen), inside the screen sideways. */
-export function bubblePlace(b: Box, rect: PageBox, zoom = 1, gap = BUBBLE_GAP.mark): { left: number; top: number; above: boolean } {
+export interface BubbleAt {
+  left: number;
+  top: number;
+  above: boolean;
+  /** No room over or under the item: in its middle (the corner dots stay free). */
+  inside?: boolean;
+}
+
+/**
+ * Where the bubble over a selected item goes: over it, under it when there is no room above, or in
+ * its middle when there is room neither over nor under it (an item over the whole page); inside
+ * the screen sideways.
+ */
+export function bubblePlace(b: Box, rect: PageBox, zoom = 1, gap = BUBBLE_GAP.mark): BubbleAt {
   const half = Math.min(BUBBLE.w, rect.stageW - 16) / 2 / zoom;
   const cx = rect.left + (b.x + b.w / 2) * rect.width;
   const left = Math.min(Math.max(cx, half + 8), rect.stageW - half - 8) - rect.left;
-  const above = rect.top + b.y * rect.height - (BUBBLE.h + gap) / zoom > 0;
-  const top = above ? b.y * rect.height - gap / zoom : (b.y + b.h) * rect.height + gap / zoom;
-  return { left, top, above };
+  const need = (BUBBLE.h + gap) / zoom;
+  if (rect.top + b.y * rect.height - need > 0) return { left, top: b.y * rect.height - gap / zoom, above: true };
+  if (rect.top + (b.y + b.h) * rect.height + need < rect.stageH) return { left, top: (b.y + b.h) * rect.height + gap / zoom, above: false };
+  return { left, top: (b.y + b.h / 2) * rect.height, above: false, inside: true };
 }
 
 /**
@@ -105,7 +120,7 @@ export function BubbleAnchor({
   host,
   children,
 }: {
-  at: { left: number; top: number; above: boolean };
+  at: BubbleAt;
   zoom: number;
   shift?: { x: number; y: number };
   host?: HTMLElement | null;
@@ -117,8 +132,8 @@ export function BubbleAnchor({
       style={{ left: at.left + (shift?.x ?? 0), top: at.top + (shift?.y ?? 0), transform: zoom !== 1 ? `scale(${1 / zoom})` : undefined }}
     >
       <div
-        className={`mark-bubble-pos ${at.above ? 'above' : 'below'}`}
-        style={{ transform: at.above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' }}
+        className={`mark-bubble-pos ${at.inside ? 'inside' : at.above ? 'above' : 'below'}`}
+        style={{ transform: at.inside ? 'translate(-50%, -50%)' : at.above ? 'translate(-50%, -100%)' : 'translate(-50%, 0)' }}
       >
         {children}
       </div>
@@ -221,11 +236,14 @@ export function MarkLayer({
   /** A finger on an empty part of the page: place, draw or cover, depending on the tool. */
   const onLayerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!editing || e.target !== e.currentTarget) return;
+    begin(e, e.currentTarget);
+  };
+  /** Starts the tool's work at the finger (also over an item the tool passes through). */
+  const begin = (e: ReactPointerEvent<HTMLElement>, layer: HTMLElement) => {
     // a touch outside the selected item hides its handles; new items come without them
     onSelect(null);
     if (!tool || tool === 'crop') return;
     e.preventDefault();
-    const layer = e.currentTarget;
     const a = frac(e, layer);
     const id = crypto.randomUUID();
 
@@ -338,10 +356,18 @@ export function MarkLayer({
   };
 
   /** Moving (middle), resizing (corner) or bending an arrow (its ends): one undo step per drag. */
+  /** A shape (not a small text / tick / date) the chosen tool reaches through. */
+  const passes = (m: Mark) => !!tool && tool !== 'crop' && m.id !== selectedId && THROUGH.has(m.kind);
+
   const onItemDown = (m: Mark, handle: Handle) => (e: ReactPointerEvent<HTMLElement>) => {
     if (!editing) return;
-    e.preventDefault();
     e.stopPropagation();
+    // with a tool chosen, shapes let the finger through: a tick inside a big square, text on a cover
+    if (passes(m)) {
+      begin(e, e.currentTarget.closest('.mark-layer') as HTMLElement);
+      return;
+    }
+    e.preventDefault();
     const wasSelected = m.id === selectedId;
     onSelect(m.id);
     const layer = e.currentTarget.closest('.mark-layer') as HTMLElement;
@@ -407,7 +433,7 @@ export function MarkLayer({
             <div
               key={m.id}
               data-mark={m.id}
-              className={`mark-item${selected ? ' selected' : ''}${b.w * rect.width < SMALL_PX || b.h * rect.height < SMALL_PX ? ' small' : ''}`}
+              className={`mark-item${selected ? ' selected' : ''}${passes(m) ? ' through' : ''}${b.w * rect.width < SMALL_PX || b.h * rect.height < SMALL_PX ? ' small' : ''}`}
               style={{ left: pct(b.x), top: pct(b.y), width: pct(b.w), height: pct(b.h) }}
               onPointerDown={onItemDown(m, 'move')}
             >
