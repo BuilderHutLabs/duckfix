@@ -19,6 +19,7 @@ import { SignatureSheet } from './SignatureSheet';
 import { loadSignatures, removeSignature, type SavedSignature, type SignatureKind, type StoredSignature } from '../signature/storage';
 import { SignaturePicker } from './SignaturePicker';
 import { StampDateSheet, StampPicker, isDated, type PickedStamp } from './StampPicker';
+import { QrSheet } from './QrSheet';
 import { fromIsoDay } from '../edit/stamps';
 import { stampImage } from '../edit/stampImage';
 import { MarkTextSheet } from './edit/MarkTextSheet';
@@ -95,6 +96,8 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   const [picking, setPicking] = useState<StoredSignature[] | null>(null);
   /** "Pieczątki" open, with your own stamps. */
   const [stamping, setStamping] = useState<StoredSignature[] | null>(null);
+  /** "Kod QR" open. */
+  const [qr, setQr] = useState(false);
   /** "Zmień datę" of a placed ready-made stamp. */
   const [redating, setRedating] = useState<string | null>(null);
   const ownStamps = () => loadSignatures().filter((s) => s.kind === 'stamp');
@@ -594,6 +597,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
           onHighlight={(highlight: HighlightColor) => changeStyle({ highlight })}
           onSign={sign}
           onStamp={openStamps}
+          onQr={() => setQr(true)}
           onHidePersonal={() => hidePersonal(page.id, coverColor)}
           onCropAll={() =>
             setCrop(
@@ -649,6 +653,15 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
             setStamping(ownStamps());
           }}
           onClose={() => setStamping(null)}
+        />
+      )}
+      {qr && (
+        <QrSheet
+          onClose={() => setQr(false)}
+          onInsert={(img) => {
+            setQr(false);
+            placeStamp({ kind: 'own', src: img.src, aspect: img.aspect }, false);
+          }}
         />
       )}
       {redating &&

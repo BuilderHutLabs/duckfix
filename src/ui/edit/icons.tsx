@@ -24,6 +24,8 @@ const PATHS = {
   more: 'M5 12h.01M12 12h.01M19 12h.01',
   pages: 'M8 4h11v14H8zM5 7v13h11',
   shield: 'M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM8.5 12l2.5 2.5 4.5-5',
+  qr: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h2v2h-2zM18 14h2M14 18h2M18 18h2v2h-2zM7 7h.01M17 7h.01M7 17h.01',
+  grid: 'M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z',
 } as const;
 
 export type IconName = keyof typeof PATHS;

@@ -39,8 +39,13 @@ function openPreview(doc = docWithFlags(1)) {
 }
 
 const marks = (store: ReturnType<typeof createAppStore>) => store.getState().doc.pages[0].marks ?? [];
-/** Opens a group of tools in the edit panel (Pisz is open at first). */
-const openGroup = (name: string) => fireEvent.click(screen.getByRole('button', { name }));
+/** Groups that sit under "Więcej" on the tool row. */
+const IN_MORE = () => [strings.toolHighlight, strings.toolShapes, strings.groupHide, strings.stampTool, strings.qrTool];
+/** Opens a group of tools in the edit panel (Pisz is open at first); "Więcej" first for the rarer ones. */
+const openGroup = (name: string) => {
+  if (IN_MORE().includes(name)) fireEvent.click(screen.getByRole('button', { name: strings.toolsMore }));
+  fireEvent.click(screen.getByRole('button', { name }));
+};
 
 describe('Edytuj', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -51,6 +56,7 @@ describe('Edytuj', () => {
     expect(within(preview).queryByRole('button', { name: strings.sign })).toBeNull(); // moved into the tools
     fireEvent.click(within(preview).getByRole('button', { name: strings.edit }));
     expect(within(preview).getByRole('button', { name: strings.toolWrite })).toBeTruthy();
+    fireEvent.click(within(preview).getByRole('button', { name: strings.toolsMore }));
     fireEvent.click(within(preview).getByRole('button', { name: strings.groupHide }));
     expect(within(preview).getByRole('button', { name: strings.cover })).toBeTruthy();
     expect(within(preview).getByRole('button', { name: strings.sign })).toBeTruthy();
@@ -259,7 +265,8 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
   const startTool = (name: string) => {
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
     if (MAIN[name]) openGroup(MAIN[name]);
-    fireEvent.click(screen.getByRole('button', { name }));
+    if (IN_MORE().includes(name)) openGroup(name);
+    else fireEvent.click(screen.getByRole('button', { name }));
   };
   const bubble = () => screen.getByRole('group', { name: strings.selectedItem });
 
@@ -385,6 +392,24 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
     expect(marks(store)[0]).toMatchObject({ color: 'white' });
   });
 
+  it('"Więcej" shows the rarer tools as tiles; picking one starts it and folds the tiles; "Więcej" stays lit', () => {
+    openPreview();
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    const more = screen.getByRole('button', { name: strings.toolsMore });
+    fireEvent.click(more);
+    expect(more.getAttribute('aria-expanded')).toBe('true');
+    const tiles = screen.getByRole('group', { name: strings.toolsMore });
+    expect(
+      within(tiles)
+        .getAllByRole('button')
+        .map((b) => b.getAttribute('aria-label')),
+    ).toEqual([strings.toolHighlight, strings.toolShapes, strings.groupHide, strings.stampTool, strings.qrTool]);
+    fireEvent.click(within(tiles).getByRole('button', { name: strings.toolShapes }));
+    expect(screen.queryByRole('group', { name: strings.toolsMore })).toBeNull();
+    expect(screen.getByRole('button', { name: strings.toolArrow }).getAttribute('aria-pressed')).toBe('true');
+    expect(more.getAttribute('aria-pressed')).toBe('true');
+  });
+
   it('one row of tools; a group shows its kinds above, tapping it again puts the tool away, and it remembers the last kind', () => {
     openPreview();
     fireEvent.click(screen.getByRole('button', { name: strings.edit }));
@@ -397,11 +422,8 @@ describe('Edytuj: tekst, ✓/✗, data', () => {
       strings.toolWrite,
       strings.toolMarks,
       strings.groupDraw,
-      strings.toolHighlight,
-      strings.toolShapes,
-      strings.groupHide,
       strings.sign,
-      strings.stampTool,
+      strings.toolsMore,
     ]);
     const marksBtn = within(row).getByRole('button', { name: strings.toolMarks });
     fireEvent.click(marksBtn);

@@ -48,6 +48,8 @@ const GROUPS: Array<{ id: ToolGroup; icon: IconName; label: () => string; tools:
   { id: 'shapes', icon: 'shapes', label: () => strings.toolShapes, tools: ['arrow', 'rect', 'ellipse'] },
   { id: 'hide', icon: 'hide', label: () => strings.groupHide, tools: ['cover', 'crop'] },
 ];
+/** Groups under "Więcej" (tiles), so the row keeps five roomy buttons. */
+const MORE: ToolGroup[] = ['highlight', 'shapes', 'hide'];
 const SUB: Partial<Record<Tool, [IconName, () => string]>> = {
   tick: ['tick', () => strings.toolTick],
   cross: ['cross', () => strings.toolCross],
@@ -128,6 +130,7 @@ export function EditTools({
   onHighlight,
   onSign,
   onStamp,
+  onQr,
   onCropAll,
   onCropNone,
   onHidePersonal,
@@ -149,12 +152,16 @@ export function EditTools({
   onSign(): void;
   /** "Pieczątka": ready-made stamps. */
   onStamp(): void;
+  /** "Kod QR": a link, a transfer or a business card as a code on the page. */
+  onQr(): void;
   onCropAll(): void;
   onCropNone(): void;
   /** "Ukryj dane osobowe": covers what it finds on the page; resolves to how many. */
   onHidePersonal?(): Promise<number>;
 }) {
   const [personal, setPersonal] = useState<'busy' | 'failed' | number | null>(null);
+  /** The "Więcej" tiles are open. */
+  const [moreOpen, setMoreOpen] = useState(false);
   const hidePersonal = () => {
     if (!onHidePersonal || personal === 'busy') return;
     setPersonal('busy');
@@ -168,6 +175,7 @@ export function EditTools({
 
   const pickGroup = (g: (typeof GROUPS)[number]) => {
     onFold(false);
+    setMoreOpen(false);
     if (active?.id === g.id) return onTool(null); // tapping the chosen tool puts it away
     onGroup(g.id);
     onTool(last.current[g.id] ?? g.tools[0]);
@@ -184,7 +192,48 @@ export function EditTools({
       >
         <span aria-hidden="true" />
       </button>
-      {!folded && tool && active && (
+      {!folded && moreOpen && (
+        <div className="edit-more" role="group" aria-label={strings.toolsMore}>
+          {GROUPS.filter((g) => MORE.includes(g.id)).map((g) => (
+            <button
+              key={g.id}
+              type="button"
+              className="edit-tile"
+              aria-pressed={active?.id === g.id}
+              aria-label={g.label()}
+              onClick={() => pickGroup(g)}
+            >
+              <Icon name={g.icon} />
+              <span aria-hidden="true">{g.label()}</span>
+            </button>
+          ))}
+          <button
+            type="button"
+            className="edit-tile"
+            aria-label={strings.stampTool}
+            onClick={() => {
+              setMoreOpen(false);
+              onStamp();
+            }}
+          >
+            <Icon name="stamp" />
+            <span aria-hidden="true">{strings.stampTool}</span>
+          </button>
+          <button
+            type="button"
+            className="edit-tile"
+            aria-label={strings.qrTool}
+            onClick={() => {
+              setMoreOpen(false);
+              onQr();
+            }}
+          >
+            <Icon name="qr" />
+            <span aria-hidden="true">{strings.qrTool}</span>
+          </button>
+        </div>
+      )}
+      {!folded && !moreOpen && tool && active && (
         <div className="edit-options">
           {active.tools.length > 1 && (
             <div className="edit-kinds" role="group">
@@ -251,7 +300,7 @@ export function EditTools({
         </div>
       )}
       <div className="edit-strip">
-        {GROUPS.map((g) => (
+        {GROUPS.filter((g) => !MORE.includes(g.id)).map((g) => (
           <button
             key={g.id}
             type="button"
@@ -269,9 +318,19 @@ export function EditTools({
           <Icon name="sign" />
           <span aria-hidden="true">{strings.sign}</span>
         </button>
-        <button type="button" className="edit-tool" aria-label={strings.stampTool} onClick={onStamp}>
-          <Icon name="stamp" />
-          <span aria-hidden="true">{strings.stampTool}</span>
+        <button
+          type="button"
+          className="edit-tool"
+          aria-label={strings.toolsMore}
+          aria-expanded={moreOpen}
+          aria-pressed={moreOpen || (!!active && MORE.includes(active.id))}
+          onClick={() => {
+            onFold(false);
+            setMoreOpen(!moreOpen);
+          }}
+        >
+          <Icon name="grid" />
+          <span aria-hidden="true">{strings.toolsMoreShort}</span>
         </button>
       </div>
     </div>

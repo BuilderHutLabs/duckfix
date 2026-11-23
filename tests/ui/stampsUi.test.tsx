@@ -19,6 +19,12 @@ vi.mock('../../src/edit/stampImage', () => ({
   })),
 }));
 
+/** "Pieczątka" sits under "Więcej" on the tool row. */
+const openStampTool = () => {
+  fireEvent.click(screen.getByRole('button', { name: strings.toolsMore }));
+  fireEvent.click(screen.getByRole('button', { name: strings.stampTool }));
+};
+
 function openStamps(pages = 1) {
   const store = createAppStore(fakeDeps());
   store.load(docWithFlags(pages), [source]);
@@ -26,7 +32,7 @@ function openStamps(pages = 1) {
   act(() => store.openPreview('p1'));
   vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000); // past the preview's ghost-click guard
   fireEvent.click(screen.getByRole('button', { name: strings.edit }));
-  fireEvent.click(screen.getByRole('button', { name: strings.stampTool }));
+  openStampTool();
   return store;
 }
 
@@ -53,7 +59,7 @@ describe('Pieczątka', () => {
     fireEvent.click(screen.getByRole('button', { name: strings.stampInkBlue }));
     fireEvent.click(screen.getByRole('button', { name: strings.stampCopy }));
     expect(store.getState().doc.pages[0].stamps![0].src).toContain('copy-blue');
-    fireEvent.click(screen.getByRole('button', { name: strings.stampTool }));
+    openStampTool();
     expect(screen.getByRole('button', { name: strings.stampInkBlue }).getAttribute('aria-pressed')).toBe('true');
   });
 
@@ -121,7 +127,7 @@ describe('Pieczątka', () => {
     expect(sigs.querySelectorAll('.sig-tile')).toHaveLength(1);
     fireEvent.keyDown(window, { key: 'Escape' });
     // removed from the phone after asking
-    fireEvent.click(screen.getByRole('button', { name: strings.stampTool }));
+    openStampTool();
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(within(screen.getByRole('group', { name: strings.stampOwn })).getByRole('button', { name: strings.signatureRemove }));
     expect(loadSignatures().map((x) => x.kind)).toEqual(['signature']);
@@ -131,7 +137,7 @@ describe('Pieczątka', () => {
   it('a second stamp goes under the first one instead of on top of it', () => {
     const store = openStamps();
     fireEvent.click(screen.getByRole('button', { name: strings.stampCopy }));
-    fireEvent.click(screen.getByRole('button', { name: strings.stampTool }));
+    openStampTool();
     fireEvent.click(screen.getByRole('button', { name: strings.stampFiled }));
     const [a, b] = store.getState().doc.pages[0].stamps!;
     expect(b.y).toBeGreaterThanOrEqual(a.y + a.h);
