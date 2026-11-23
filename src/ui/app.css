@@ -3910,3 +3910,26 @@ span.live-camera-side {
     transform: translateY(-4px);
   }
 }
+
+/* "Strony" → Zakres: od [ ] do [ ]; Wpisz: numbers */
+.pages-span {
+  display: flex;
+  gap: 10px;
+  margin-top: 8px;
+}
+.pages-span label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-2);
+}
+.pages-span input {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
+.pages-typed {
+  margin-top: 8px;
+}

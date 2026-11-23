@@ -206,17 +206,41 @@ describe('save sheet: name, chosen pages, JPG', () => {
 });
 
 describe('save sheet: pages, one file per page, password, send', () => {
-  it('"Strony": only the typed pages are saved; a wrong range blocks saving', async () => {
+  it('"Strony" → Wpisz: only the typed pages are saved; a wrong range blocks saving', async () => {
     const { deps } = setup();
     fireEvent.click(saveButton());
+    expect(screen.getByRole('button', { name: strings.pagesAll }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: strings.pagesType }));
     const pages = screen.getByRole('textbox', { name: strings.pagesField });
     fireEvent.change(pages, { target: { value: '9' } });
     expect(screen.getByText(strings.pagesInvalid(2))).toBeTruthy();
     expect((screen.getByRole('button', { name: strings.saveConfirm }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(pages, { target: { value: '2' } });
-    fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm }));
+    fireEvent.click(screen.getByRole('button', { name: strings.saveCount(1) }));
     await waitFor(() => expect(deps.exportPdf).toHaveBeenCalled());
     expect(vi.mocked(deps.exportPdf).mock.calls[0][0].pages.map((p) => p.id)).toEqual(['p2']);
+  });
+
+  it('"Strony" → Zakres: od 3 do 5 of 10 saves pages 3–5, the button says how many; a wrong range blocks saving', async () => {
+    const deps = fakeDeps({ shareFirst: false, storage: memoryStorage() });
+    const store = createAppStore(deps);
+    store.load(docWithFlags(10), [source]);
+    render(<App store={store} />);
+    fireEvent.click(saveButton());
+    fireEvent.click(screen.getByRole('button', { name: strings.pagesRange }));
+    const from = screen.getByRole('spinbutton', { name: strings.pagesFrom });
+    const to = screen.getByRole('spinbutton', { name: strings.pagesTo });
+    expect((from as HTMLInputElement).value).toBe('1');
+    expect((to as HTMLInputElement).value).toBe('10');
+    fireEvent.change(from, { target: { value: '6' } });
+    fireEvent.change(to, { target: { value: '3' } });
+    expect(screen.getByText(strings.pagesRangeInvalid(10))).toBeTruthy();
+    expect((screen.getByRole('button', { name: strings.saveConfirm }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(from, { target: { value: '3' } });
+    fireEvent.change(to, { target: { value: '5' } });
+    fireEvent.click(screen.getByRole('button', { name: strings.saveCount(3) }));
+    await waitFor(() => expect(deps.exportPdf).toHaveBeenCalled());
+    expect(vi.mocked(deps.exportPdf).mock.calls[0][0].pages.map((p) => p.id)).toEqual(['p3', 'p4', 'p5']);
   });
 
   it('"Każda strona osobno": one PDF per page, numbered', async () => {
@@ -303,7 +327,7 @@ describe('Więcej opcji', () => {
     expect(more.getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('switch', { name: strings.passwordSwitch })).toBeNull();
     fireEvent.click(more);
-    expect(screen.getByRole('textbox', { name: strings.pagesField })).toBeTruthy();
+    expect(screen.getByRole('group', { name: strings.pagesField })).toBeTruthy();
     expect(screen.getByRole('switch', { name: strings.searchableText })).toBeTruthy();
     expect(screen.getByRole('switch', { name: strings.splitPages })).toBeTruthy();
     expect(screen.getByRole('switch', { name: strings.watermarkSwitch })).toBeTruthy();

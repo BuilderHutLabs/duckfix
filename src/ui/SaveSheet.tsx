@@ -43,11 +43,27 @@ export function SaveSheet() {
   const [name, setName] = useState(() => s.defaultFileName());
   const ids = s.saveSheetIds;
   const all = s.doc.pages;
-  // "Strony" (whole document only; in select mode the chosen pages are saved)
+  // "Strony" (whole document only; in select mode the chosen pages are saved):
+  // all of them, a range "od – do", or typed numbers ("2-4, 7")
+  const [pagesMode, setPagesMode] = useState<'all' | 'range' | 'type'>('all');
   const [range, setRange] = useState('');
-  const picked = ids ? null : parsePageRange(range, all.length);
+  const [from, setFrom] = useState('1');
+  const [to, setTo] = useState(() => String(all.length));
+  const fromN = Number(from);
+  const toN = Number(to);
+  const spanOk = Number.isInteger(fromN) && Number.isInteger(toN) && fromN >= 1 && toN <= all.length && fromN <= toN;
+  const picked: number[] | null = ids
+    ? null
+    : pagesMode === 'type'
+      ? parsePageRange(range, all.length)
+      : pagesMode === 'range'
+        ? spanOk
+          ? Array.from({ length: toN - fromN + 1 }, (_, i) => fromN - 1 + i)
+          : null
+        : [];
   const rangeBad = !ids && picked === null;
-  const count = ids ? ids.length : (picked?.length ?? all.length);
+  const some = !ids && pagesMode !== 'all' && !!picked?.length;
+  const count = ids ? ids.length : some ? picked!.length : all.length;
   const [split, setSplit] = useState(false);
   const [locked, setLocked] = useState(false);
   const [password, setPassword] = useState('');
@@ -59,7 +75,7 @@ export function SaveSheet() {
 
   const go = (send: boolean) => {
     if (blocked) return;
-    const chosen = ids ?? (range.trim() && picked ? picked.map((i) => all[i].id) : null);
+    const chosen = ids ?? (some ? picked!.map((i) => all[i].id) : null);
     void s.export(opts, {
       name,
       ids: chosen,
@@ -144,22 +160,71 @@ export function SaveSheet() {
         {more && (
           <div className="save-more-body">
             {!ids && all.length > 1 && (
-              <label className="sheet-field">
+              <div className="sheet-field">
                 <span className="sheet-option-hint">{strings.pagesField}</span>
-                <input
-                  type="text"
-                  className="sheet-input"
-                  aria-label={strings.pagesField}
-                  aria-invalid={rangeBad}
-                  placeholder={strings.pagesPlaceholder}
-                  value={range}
-                  onChange={(e) => setRange(e.target.value)}
-                  inputMode="numeric"
-                  autoComplete="off"
-                  enterKeyHint="done"
-                />
-                {rangeBad && <span className="sheet-error">{strings.pagesInvalid(all.length)}</span>}
-              </label>
+                <div className="segmented" role="group" aria-label={strings.pagesField}>
+                  {(
+                    [
+                      ['all', strings.pagesAll],
+                      ['range', strings.pagesRange],
+                      ['type', strings.pagesType],
+                    ] as const
+                  ).map(([v, label]) => (
+                    <button key={v} type="button" aria-pressed={pagesMode === v} onClick={() => setPagesMode(v)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {pagesMode === 'range' && (
+                  <div className="pages-span">
+                    <label>
+                      <span>{strings.pagesFrom}</span>
+                      <input
+                        type="number"
+                        className="sheet-input"
+                        aria-label={strings.pagesFrom}
+                        aria-invalid={rangeBad}
+                        min={1}
+                        max={all.length}
+                        inputMode="numeric"
+                        value={from}
+                        onChange={(e) => setFrom(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <span>{strings.pagesTo}</span>
+                      <input
+                        type="number"
+                        className="sheet-input"
+                        aria-label={strings.pagesTo}
+                        aria-invalid={rangeBad}
+                        min={1}
+                        max={all.length}
+                        inputMode="numeric"
+                        value={to}
+                        onChange={(e) => setTo(e.target.value)}
+                      />
+                    </label>
+                  </div>
+                )}
+                {pagesMode === 'range' && rangeBad && <span className="sheet-error">{strings.pagesRangeInvalid(all.length)}</span>}
+                {pagesMode === 'type' && (
+                  <input
+                    type="text"
+                    className="sheet-input pages-typed"
+                    aria-label={strings.pagesField}
+                    aria-invalid={rangeBad}
+                    placeholder={strings.pagesTypePlaceholder}
+                    value={range}
+                    onChange={(e) => setRange(e.target.value)}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    enterKeyHint="done"
+                    autoFocus
+                  />
+                )}
+                {pagesMode === 'type' && rangeBad && <span className="sheet-error">{strings.pagesInvalid(all.length)}</span>}
+              </div>
             )}
             {pdf && (
               <Switch
@@ -220,7 +285,7 @@ export function SaveSheet() {
             </button>
           )}
           <button type="button" className="btn btn-primary" disabled={blocked} onClick={() => go(false)}>
-            {strings.saveConfirm}
+            {some ? strings.saveCount(count) : strings.saveConfirm}
           </button>
         </div>
       </div>
