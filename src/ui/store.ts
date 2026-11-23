@@ -84,6 +84,8 @@ export interface AppState {
   scanTotal: number;
   /** Photos of the round that are the front and back of a card ("Dowód"): together they become one page. */
   scanCardFiles: File[];
+  /** Photos of the round that are parts of one long receipt ("Paragon"), top first. */
+  scanReceiptFiles: File[];
   /** Pages the "Wygląd stron" sheet applies to (open while set). */
   filterSheetIds: string[] | null;
   /** Where the cropped photo goes: a page index, or null for the end / a new document. */
@@ -292,6 +294,7 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     scanQueue: [],
     scanTotal: 0,
     scanCardFiles: [],
+    scanReceiptFiles: [],
     filterSheetIds: null,
     scanIndex: null,
     exportOptions: loadExportOptions(deps.storage),
@@ -595,13 +598,20 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
     },
 
     setScanPhoto(file: File | null, index: number | null = null) {
-      set({ scanPhoto: file, scanIndex: file ? index : null, scanQueue: [], scanTotal: file ? 1 : 0, scanCardFiles: [] });
+      set({ scanPhoto: file, scanIndex: file ? index : null, scanQueue: [], scanTotal: file ? 1 : 0, scanCardFiles: [], scanReceiptFiles: [] });
     },
 
     /** Several camera photos go through the crop screen one after another. */
-    setScanPhotos(files: File[], index: number | null = null, cardFiles: File[] = []) {
+    setScanPhotos(files: File[], index: number | null = null, cardFiles: File[] = [], receiptFiles: File[] = []) {
       if (!files.length) return actions.setScanPhoto(null);
-      set({ scanPhoto: files[0], scanQueue: files.slice(1), scanTotal: files.length, scanIndex: index, scanCardFiles: cardFiles });
+      set({
+        scanPhoto: files[0],
+        scanQueue: files.slice(1),
+        scanTotal: files.length,
+        scanIndex: index,
+        scanCardFiles: cardFiles,
+        scanReceiptFiles: receiptFiles,
+      });
     },
 
     /** Next photo of the round; `added`: the current one became a page (the place moves on by one). */

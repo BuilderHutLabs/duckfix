@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { App } from '../../src/ui/App';
 import { createAppStore } from '../../src/ui/store';
 import { strings } from '../../src/ui/strings';
@@ -33,6 +33,11 @@ const fullSheet = {
   height: 300,
   light: 150,
 };
+
+vi.mock('../../src/scan/receipt', async (orig) => ({
+  ...(await orig<typeof import('../../src/scan/receipt')>()),
+  composeReceipt: vi.fn(async () => new Blob(['long'], { type: 'image/jpeg' })),
+}));
 
 vi.mock('../../src/scan/card', async (orig) => ({
   ...(await orig<typeof import('../../src/scan/card')>()),
@@ -135,14 +140,14 @@ describe('camera scan', () => {
     await waitFor(() => expect(store.getState().doc.pages.map((p) => p.id)).toEqual(['p1', 'n1', 'p2']));
   });
 
-  it('the crop screen offers Kolor / Wybielony / Czarno-biały (Wybielony first time); the choice is used and remembered', async () => {
+  it('the crop screen offers Auto / Kolor / Wybielony / Czarno-biały (Auto first time); the choice is used and remembered', async () => {
     const { warpToBlob } = await import('../../src/scan/warp');
     localStorage.clear();
     render(<App store={createAppStore(fakeDeps())} />);
     await takePhoto();
     await screen.findByRole('dialog', { name: strings.cropTitle });
     const opt = (name: string) => screen.getByRole('button', { name });
-    expect(opt(strings.filterWhiten).getAttribute('aria-pressed')).toBe('true');
+    expect(opt(strings.filterAuto).getAttribute('aria-pressed')).toBe('true');
     fireEvent.click(opt(strings.filterBw));
     await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropDone })));
     expect(vi.mocked(warpToBlob).mock.calls.at(-1)![2]).toBe('bw');
@@ -159,7 +164,7 @@ describe('camera scan', () => {
     await screen.findByRole('dialog', { name: strings.cropTitle });
     const img = await screen.findByRole('img', { name: strings.cropPreview });
     expect(img.getAttribute('src')).toBe('blob:preview');
-    expect(vi.mocked(warpPreview).mock.calls.at(-1)![2]).toBe('whiten');
+    expect(vi.mocked(warpPreview).mock.calls.at(-1)![2]).toBe('auto');
     fireEvent.click(screen.getByRole('button', { name: strings.filterBw }));
     await waitFor(() => expect(vi.mocked(warpPreview).mock.calls.at(-1)![2]).toBe('bw'));
   });
@@ -297,6 +302,33 @@ describe('built-in camera', () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: strings.cropTitle })).toBeNull());
   });
 
+  it('a tap on the counter shows the photos of the series; a bad one is taken out there, the rest go on', async () => {
+    const deps = await openLive();
+    await shoot();
+    await shoot();
+    await shoot();
+    fireEvent.click(screen.getByRole('button', { name: strings.shotsReview(3) }));
+    const review = screen.getByRole('dialog', { name: strings.shotsTitle(3) });
+    expect(review.querySelectorAll('.shot-tile')).toHaveLength(3);
+    fireEvent.click(within(review).getByRole('button', { name: strings.shotRemove(2) }));
+    expect(screen.getByRole('dialog', { name: strings.shotsTitle(2) }).querySelectorAll('.shot-tile')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: strings.shotsBack }));
+    expect(screen.queryByRole('dialog', { name: strings.shotsTitle(2) })).toBeNull();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraDone(2) })));
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    expect(screen.getByText(strings.cropPageOf(1, 2))).toBeTruthy();
+    void deps;
+  });
+
+  it('taking out every photo closes the review; the camera has none left', async () => {
+    await openLive();
+    await shoot();
+    fireEvent.click(screen.getByRole('button', { name: strings.shotsReview(1) }));
+    fireEvent.click(screen.getByRole('button', { name: strings.shotRemove(1) }));
+    expect(screen.queryByRole('dialog', { name: strings.shotsTitle(0) })).toBeNull();
+    expect(screen.queryByRole('button', { name: strings.cameraDone(1) })).toBeNull();
+  });
+
   it('"Dodaj wszystkie" adds the rest with the found outline, without asking page by page', async () => {
     const deps = await openLive();
     await shoot();
@@ -392,6 +424,53 @@ describe('built-in camera', () => {
     await waitFor(() => expect(deps.importFiles).toHaveBeenCalledTimes(1));
     expect(vi.mocked(card.composeIdCard).mock.calls[0][0]).toHaveLength(2);
     expect(vi.mocked(deps.importFiles).mock.calls[0][0]).toHaveLength(1);
+  });
+
+  it('"Auto" straightens a card side in colour (a card is never whitened)', async () => {
+    const warp = await import('../../src/scan/warp');
+    await openLive();
+    fireEvent.click(screen.getByRole('button', { name: strings.modeCard }));
+    await shoot();
+    await shoot();
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropNextQueued })));
+    await waitFor(() => expect(vi.mocked(warp.warpToBlob).mock.calls.at(-1)![2]).toBe('auto-card'));
+  });
+
+  it('"Paragon": the parts are cropped one by one and become ONE long page', async () => {
+    const receipt = await import('../../src/scan/receipt');
+    vi.mocked(receipt.composeReceipt).mockClear();
+    const deps = await openLive();
+    fireEvent.click(screen.getByRole('button', { name: strings.modeReceipt }));
+    expect(screen.getByText(strings.receiptStep(1))).toBeTruthy();
+    await shoot();
+    expect(screen.getByText(strings.receiptStep(2))).toBeTruthy();
+    await shoot();
+    await shoot();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraDone(3) })));
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    expect(screen.getByText(strings.cropReceiptPart(1, 3))).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropNextQueued })));
+    expect(await screen.findByText(strings.cropReceiptPart(2, 3))).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropNextQueued })));
+    expect(await screen.findByText(strings.cropReceiptPart(3, 3))).toBeTruthy();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropDone })));
+    await waitFor(() => expect(deps.importFiles).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(receipt.composeReceipt).mock.calls[0][0]).toHaveLength(3);
+  });
+
+  it('"Paragon" with "Dodaj wszystkie": all parts at once, still one page', async () => {
+    const receipt = await import('../../src/scan/receipt');
+    vi.mocked(receipt.composeReceipt).mockClear();
+    const deps = await openLive();
+    fireEvent.click(screen.getByRole('button', { name: strings.modeReceipt }));
+    await shoot();
+    await shoot();
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cameraDone(2) })));
+    await screen.findByRole('dialog', { name: strings.cropTitle });
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: strings.cropAddAll })));
+    await waitFor(() => expect(deps.importFiles).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(receipt.composeReceipt).mock.calls[0][0]).toHaveLength(2);
   });
 
   it('a normal photo first, then "Dowód": the card still needs its own front and back; the photo stays its own page', async () => {

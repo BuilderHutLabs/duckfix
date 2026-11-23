@@ -3,21 +3,26 @@ import { findSheet, loadPhoto, warpPreview, warpToBlob, type Photo } from '../sc
 import { defaultQuad, fullQuad, type Quad } from '../scan/quad';
 import { openCamera, takenByHand } from './camera';
 import { storageKey } from '../config';
-import type { ScanFilter } from '../scan/enhance';
+import type { ScanFilter, ScanLook } from '../scan/enhance';
 
+/** "Auto" (the page decides: Wybielony for writing, colour for pictures and cards) or a fixed look. */
+type CropFilter = ScanFilter | 'auto';
 const FILTER_KEY = storageKey('duckfix-scan-filter');
-const FILTERS: ScanFilter[] = ['color', 'whiten', 'bw'];
+const FILTERS: CropFilter[] = ['auto', 'color', 'whiten', 'bw'];
 
-function loadFilter(): ScanFilter {
+function loadFilter(): CropFilter {
   try {
-    const v = localStorage.getItem(FILTER_KEY) as ScanFilter | null;
-    return v && FILTERS.includes(v) ? v : 'whiten';
+    const v = localStorage.getItem(FILTER_KEY) as CropFilter | null;
+    return v && FILTERS.includes(v) ? v : 'auto';
   } catch {
-    return 'whiten';
+    return 'auto';
   }
 }
 
-function saveFilter(f: ScanFilter): void {
+/** The look a photo is straightened with: "Auto" on a card side is always colour. */
+const lookFor = (f: CropFilter, card: boolean): ScanLook => (f === 'auto' && card ? 'auto-card' : f);
+
+function saveFilter(f: CropFilter): void {
   try {
     localStorage.setItem(FILTER_KEY, f);
   } catch {
@@ -27,6 +32,7 @@ function saveFilter(f: ScanFilter): void {
 import { useAppStore } from './store';
 import { LOUPE, loupeSpot } from './loupe';
 import { composeIdCard } from '../scan/card';
+import { composeReceipt } from '../scan/receipt';
 import { strings } from './strings';
 import { useBackLayer } from './backStack';
 import { ScanPreview } from './ScanPreview';
@@ -35,6 +41,8 @@ import { ScanPreview } from './ScanPreview';
 let warpChain: Promise<unknown> = Promise.resolve();
 /** "Dowód": the straightened sides of the card collected in this round, for one page at the end. */
 const cardSides: Blob[] = [];
+/** Straightened parts of the receipt of this round ("Paragon"), top first. */
+const receiptParts: Blob[] = [];
 function queueWarp(job: () => Promise<unknown>): void {
   warpChain = warpChain.then(job, job);
 }
@@ -47,7 +55,7 @@ export function ScanCrop({ file }: { file: File }) {
   const s = useAppStore();
   const [photo, setPhoto] = useState<Photo | null>(null);
   const [quad, setQuad] = useState<Quad | null>(null);
-  const [filter, setFilter] = useState<ScanFilter>(loadFilter);
+  const [filter, setFilter] = useState<CropFilter>(loadFilter);
   const [preview, setPreview] = useState<string | null>(null);
   /** corners while a finger is dragging; the preview waits for the drop */
   const [dragging, setDragging] = useState(false);
@@ -59,7 +67,10 @@ export function ScanCrop({ file }: { file: File }) {
   const handedOff = useRef(false);
 
   useEffect(() => {
-    if (s.scanTotal - s.scanQueue.length === 1) cardSides.length = 0; // a new round: no sides from before
+    if (s.scanTotal - s.scanQueue.length === 1) {
+      cardSides.length = 0; // a new round: no sides or parts from before
+      receiptParts.length = 0;
+    }
     let alive = true;
     let loaded: Photo | null = null;
     handedOff.current = false;
@@ -90,7 +101,7 @@ export function ScanCrop({ file }: { file: File }) {
     let alive = true;
     let made: string | null = null;
     const t = setTimeout(() => {
-      void warpPreview(photo, quad, filter)
+      void warpPreview(photo, quad, lookFor(filter, s.scanCardFiles.includes(file)))
         .then((url) => {
           made = url;
           if (alive) setPreview(url);
@@ -150,6 +161,10 @@ export function ScanCrop({ file }: { file: File }) {
   const isCard = s.scanCardFiles.includes(file);
   const cardLater = s.scanQueue.some((f) => s.scanCardFiles.includes(f));
   const cardSide = s.scanCardFiles.indexOf(file);
+  /** This photo is a part of a long receipt ("Paragon"), and whether more parts are still waiting. */
+  const isReceipt = s.scanReceiptFiles.includes(file);
+  const receiptLater = s.scanQueue.some((f) => s.scanReceiptFiles.includes(f));
+  const receiptPart = s.scanReceiptFiles.indexOf(file);
 
   /** Straightens this photo with the corners as set and adds it (in turn with the others). */
   const addThis = (at: number | null) => {
@@ -158,9 +173,10 @@ export function ScanCrop({ file }: { file: File }) {
     const p = photo;
     const q = quad;
     const card = isCard;
+    const part = isReceipt;
     queueWarp(() =>
-      warpToBlob(p, q, filter)
-        .then((blob) => (card ? void cardSides.push(blob) : s.addScan(blob, at)))
+      warpToBlob(p, q, lookFor(filter, card))
+        .then((blob) => (card ? void cardSides.push(blob) : part ? void receiptParts.push(blob) : s.addScan(blob, at)))
         .catch(() => s.showError(strings.genericError))
         .finally(() => p.close()),
     );
@@ -173,18 +189,27 @@ export function ScanCrop({ file }: { file: File }) {
       if (sides.length) await s.addScan(await composeIdCard(sides), at).catch(() => s.showError(strings.genericError));
     });
 
+  /** "Paragon": the parts become one long page (after the warps queued before it). */
+  const finishReceipt = (at: number | null) =>
+    queueWarp(async () => {
+      const parts = receiptParts.splice(0);
+      if (parts.length) await s.addScan(await composeReceipt(parts), at).catch(() => s.showError(strings.genericError));
+    });
+
   /** Straightens the page and adds it; `next` opens the camera again for the following sheet. */
   const accept = (next: boolean) => {
     if (!photo || !quad) return;
     if (next) openCamera(); // straight from the tap: the browser needs the user gesture
     addThis(s.scanIndex);
     if (isCard && !cardLater) finishCard(s.scanIndex);
-    s.nextScan(!isCard); // the next photo of the round, or the end (the card's sides make one page: the place stays)
+    if (isReceipt && !receiptLater) finishReceipt(s.scanIndex);
+    s.nextScan(!isCard && !isReceipt); // the next photo, or the end (card sides and receipt parts make one page: the place stays)
   };
 
   /** "Pomiń": this photo is left out (a card round still makes its page from the other side). */
   const skip = () => {
     if (isCard && !cardLater && cardSides.length) finishCard(s.scanIndex);
+    if (isReceipt && !receiptLater && receiptParts.length) finishReceipt(s.scanIndex);
     s.nextScan(false);
   };
 
@@ -194,24 +219,29 @@ export function ScanCrop({ file }: { file: File }) {
     const start = s.scanIndex;
     addThis(start);
     const cards = s.scanCardFiles;
-    // ordinary pages take places one after another; the card page comes after them
-    let pages = isCard ? 0 : 1;
+    const parts = s.scanReceiptFiles;
+    // ordinary pages take places one after another; the card page and the receipt come after them
+    let pages = isCard || isReceipt ? 0 : 1;
     s.scanQueue.forEach((f) => {
       const card = cards.includes(f);
-      const at = start === null || card ? null : start + pages;
-      if (!card) pages++;
+      const part = parts.includes(f);
+      const at = start === null || card || part ? null : start + pages;
+      if (!card && !part) pages++;
       queueWarp(async () => {
         const p = await loadPhoto(f);
         try {
-          const blob = await warpToBlob(p, findSheet(p) ?? defaultQuad(p.width, p.height), filter);
+          const blob = await warpToBlob(p, findSheet(p) ?? defaultQuad(p.width, p.height), lookFor(filter, card));
           if (card) cardSides.push(blob);
+          else if (part) receiptParts.push(blob);
           else await s.addScan(blob, at);
         } finally {
           p.close();
         }
       });
     });
-    if (isCard || s.scanQueue.some((f) => cards.includes(f))) finishCard(start === null ? null : start + pages);
+    const cardPage = isCard || s.scanQueue.some((f) => cards.includes(f));
+    if (cardPage) finishCard(start === null ? null : start + pages);
+    if (isReceipt || s.scanQueue.some((f) => parts.includes(f))) finishReceipt(start === null ? null : start + pages + (cardPage ? 1 : 0));
     s.setScanPhoto(null);
   };
 
@@ -247,6 +277,8 @@ export function ScanCrop({ file }: { file: File }) {
         <div className="scan-pill">
           {isCard ? (
             <strong className="scan-count">{cardSide === 0 ? strings.cropCardFront : strings.cropCardBack}</strong>
+          ) : isReceipt ? (
+            <strong className="scan-count">{strings.cropReceiptPart(receiptPart + 1, s.scanReceiptFiles.length)}</strong>
           ) : (
             round && <strong className="scan-count">{strings.cropPageOf(position, s.scanTotal)}</strong>
           )}
@@ -303,7 +335,7 @@ export function ScanCrop({ file }: { file: File }) {
                 saveFilter(f);
               }}
             >
-              {{ color: strings.filterColor, whiten: strings.filterWhiten, bw: strings.filterBw }[f]}
+              {{ auto: strings.filterAuto, color: strings.filterColor, whiten: strings.filterWhiten, bw: strings.filterBw }[f]}
             </button>
           ))}
         </div>

@@ -86,9 +86,9 @@ export function CameraInput() {
       {open && (
         <LiveCamera
           onClose={() => setLiveOpen(false)}
-          onDone={(files, cardFiles) => {
+          onDone={(files, cardFiles, receiptFiles) => {
             setLiveOpen(false);
-            setScanPhotos(files, null, cardFiles);
+            setScanPhotos(files, null, cardFiles, receiptFiles);
           }}
           onPhoneCamera={() => {
             setLiveOpen(false);
@@ -116,11 +116,12 @@ const LIVE_SIDE_WEAK = 200;
 const DARK = 55;
 
 /** Auto: outline + picture by itself; Ręcznie: just the shutter; Dowód: front and back of a card, one page. */
-type CameraMode = 'auto' | 'manual' | 'card';
+type CameraMode = 'auto' | 'manual' | 'card' | 'receipt';
 const MODES: Array<[CameraMode, () => string]> = [
   ['auto', () => strings.modeAuto],
   ['manual', () => strings.modeManual],
   ['card', () => strings.modeCard],
+  ['receipt', () => strings.modeReceipt],
 ];
 
 function loadMode(): CameraMode {
@@ -132,7 +133,7 @@ function loadMode(): CameraMode {
   }
 }
 function saveMode(m: CameraMode): void {
-  if (m === 'card') return; // "Dowód" is for this once; the next scan starts as before
+  if (m === 'card' || m === 'receipt') return; // "Dowód" and "Paragon" are for this once; the next scan starts as before
   try {
     localStorage.setItem(AUTO_KEY, m === 'manual' ? '0' : '1');
   } catch {
@@ -148,11 +149,16 @@ function hintFor(state: LiveState, light: number): string {
 }
 
 let shotNo = 0;
+/** Each photo of the camera row its own number (taking one out finds it by that). */
+let shotIds = 0;
 
 /** A photo of the camera row: its small picture now, its full-size file when written. */
 interface Shot {
+  id: number;
   url: string;
   card: boolean;
+  /** A part of a long receipt ("Paragon"). */
+  receipt: boolean;
   file: Promise<File | null>;
   saved: boolean;
 }
@@ -189,7 +195,7 @@ export function LiveCamera({
 }: {
   onClose(): void;
   /** `cardFiles`: the photos that are the front and back of a card (one page together). */
-  onDone(files: File[], cardFiles?: File[]): void;
+  onDone(files: File[], cardFiles?: File[], receiptFiles?: File[]): void;
   onPhoneCamera(): void;
 }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -201,6 +207,17 @@ export function LiveCamera({
    * in the background ("Gotowe" waits for it).
    */
   const [shots, setShots] = useState<Shot[]>([]);
+  /** The photos of the series are shown (a tap on the counter); a bad one can be taken out. */
+  const [reviewing, setReviewing] = useState(false);
+  useBackLayer(reviewing, () => setReviewing(false));
+  const removeShot = (id: number) => {
+    taken.current = taken.current.filter((x) => x.id !== id);
+    setShots((list) => {
+      const rest = list.filter((x) => x.id !== id);
+      if (!rest.length) setReviewing(false);
+      return rest;
+    });
+  };
   /** "Gotowe" pressed: waiting for the last photos to be written. */
   const [finishing, setFinishing] = useState(false);
   const finishingRef = useRef(false);
@@ -208,6 +225,8 @@ export function LiveCamera({
   const taken = useRef<Shot[]>([]);
   /** Photos taken in "Dowód" (the card's sides); earlier ordinary photos are not counted. */
   const cardShots = shots.filter((s) => s.card).length;
+  /** Parts of the receipt taken so far ("Paragon"). */
+  const receiptShots = shots.filter((s) => s.receipt).length;
   const modeRef = useRef<CameraMode>('auto');
   const [mode, setMode] = useState(loadMode);
   const auto = mode !== 'manual';
@@ -249,7 +268,6 @@ export function LiveCamera({
     };
   }, []);
 
-
   const shoot = (byItself = false) => {
     const v = video.current;
     if (!v || busy.current || !v.videoWidth) return;
@@ -281,9 +299,16 @@ export function LiveCamera({
         0.92,
       ),
     );
-    const shot: Shot = { url: thumbnail(canvas), card: modeRef.current === 'card', file, saved: false };
+    const shot: Shot = {
+      id: ++shotIds,
+      url: thumbnail(canvas),
+      card: modeRef.current === 'card',
+      receipt: modeRef.current === 'receipt',
+      file,
+      saved: false,
+    };
     taken.current = [...taken.current, shot];
-    void file.then(() => setShots((list) => list.map((x) => (x === shot ? { ...x, saved: true } : x))));
+    void file.then(() => setShots((list) => list.map((x) => (x.id === shot.id ? { ...x, saved: true } : x))));
     setShots((list) => [...list, shot]);
   };
 
@@ -298,10 +323,13 @@ export function LiveCamera({
     if (autoRef.current && liveRef.current === 'hold' && !busy.current) shootRef.current();
     const list = taken.current;
     const files = await Promise.all(list.map((x) => x.file));
-    const kept = list.map((x, i) => ({ card: x.card, file: files[i] })).filter((x): x is { card: boolean; file: File } => !!x.file);
+    const kept = list
+      .map((x, i) => ({ card: x.card, receipt: x.receipt, file: files[i] }))
+      .filter((x): x is { card: boolean; receipt: boolean; file: File } => !!x.file);
     onDone(
       kept.map((x) => x.file),
       kept.filter((x) => x.card).map((x) => x.file),
+      kept.filter((x) => x.receipt).map((x) => x.file),
     );
   };
   const finishRef = useRef(finish);
@@ -430,6 +458,7 @@ export function LiveCamera({
         </div>
       </div>
       {mode === 'card' && cardShots < 2 && <p className="live-camera-step">{cardShots === 0 ? strings.cardFront : strings.cardBack}</p>}
+      {mode === 'receipt' && <p className="live-camera-step">{strings.receiptStep(receiptShots + 1)}</p>}
       <div className="live-camera-modes" role="group">
         {MODES.map(([m, label]) => (
           <button
@@ -445,12 +474,45 @@ export function LiveCamera({
           </button>
         ))}
       </div>
+      {reviewing && (
+        <div className="shots-review" role="dialog" aria-modal="true" aria-label={strings.shotsTitle(shots.length)}>
+          <div className="shots-review-top">
+            <button
+              type="button"
+              className="live-camera-btn shots-review-back"
+              aria-label={strings.shotsBack}
+              onClick={() => setReviewing(false)}
+            >
+              ‹
+            </button>
+            <h2>{strings.shotsTitle(shots.length)}</h2>
+          </div>
+          <div className="shots-grid">
+            {shots.map((x, i) => (
+              <div key={x.id} className={`shot-tile${x.saved ? '' : ' saving'}`}>
+                {x.url ? <img src={x.url} alt="" /> : <span className="shot-blank" />}
+                <span className="shot-no">{i + 1}</span>
+                <button type="button" className="shot-remove" aria-label={strings.shotRemove(i + 1)} onClick={() => removeShot(x.id)}>
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          <p className="shots-hint">{strings.shotsHint}</p>
+        </div>
+      )}
       <div className="live-camera-bottom">
         {last ? (
-          <span className={`live-camera-thumb${last.saved ? '' : ' saving'}`} key={shots.length}>
+          <button
+            type="button"
+            className={`live-camera-thumb${last.saved ? '' : ' saving'}`}
+            key={shots.length}
+            aria-label={strings.shotsReview(shots.length)}
+            onClick={() => setReviewing(true)}
+          >
             {last.url ? <img src={last.url} alt="" /> : null}
             <span className="live-camera-count">{shots.length}</span>
-          </span>
+          </button>
         ) : (
           <button type="button" className="live-camera-side" onClick={onPhoneCamera}>
             {strings.cameraPhone}

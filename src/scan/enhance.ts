@@ -1,14 +1,31 @@
 /** Look of a scanned page: the photo as is, whitened paper, or pure black and white. */
 export type ScanFilter = 'color' | 'whiten' | 'bw';
+/**
+ * How a scan is straightened: a look, 'soft' (the colours kept, a shadow lifted), or 'auto' — the
+ * page decides (chooseLook); 'auto-card' is a card, always in colour.
+ */
+export type ScanLook = ScanFilter | 'soft' | 'auto' | 'auto-card';
 
 /**
  * Evens out the lighting of a page photo in place (RGBA). The paper brightness is estimated per
  * block (the brightest pixels of each block are paper), smoothed, and every pixel is divided by it,
  * so shadows and a grey cast disappear while the ink keeps its contrast.
  */
-export function enhance(d: Uint8ClampedArray, w: number, h: number, mode: ScanFilter): void {
+export function enhance(d: Uint8ClampedArray, w: number, h: number, look: ScanLook): void {
+  const mode = look === 'auto' ? chooseLook(d, w, h) : look === 'auto-card' ? 'color' : look;
   if (mode === 'color' || w === 0 || h === 0) return;
   const bg = paperLevel(d, w, h);
+  if (mode === 'soft') {
+    // the colours as they are, a shadow lifted most of the way (a photo is not flattened to white)
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const i = (y * w + x) * 4;
+        const k = 1 + (255 / Math.max(48, bg(x, y)) - 1) * SOFT;
+        for (let c = 0; c < 3; c++) d[i + c] = Math.min(255, d[i + c] * k);
+      }
+    }
+    return;
+  }
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
@@ -22,6 +39,39 @@ export function enhance(d: Uint8ClampedArray, w: number, h: number, mode: ScanFi
       }
     }
   }
+}
+
+/** How much of a shadow 'soft' lifts. */
+const SOFT = 0.75;
+
+/**
+ * "Auto": an ordinary written page becomes Wybielony; a page with colour or pictures keeps its
+ * colour with the shadow lifted ('soft'). The lighting is evened out first, so a hand's shadow on a
+ * text page does not look like a picture.
+ */
+export function chooseLook(d: Uint8ClampedArray, w: number, h: number): 'whiten' | 'soft' {
+  if (w === 0 || h === 0) return 'whiten';
+  const bg = paperLevel(d, w, h);
+  const step = Math.max(1, Math.round(Math.sqrt((w * h) / 40000))); // about 40 000 samples
+  let n = 0;
+  let colour = 0;
+  let middle = 0;
+  for (let y = 0; y < h; y += step) {
+    for (let x = 0; x < w; x += step) {
+      const i = (y * w + x) * 4;
+      const k = 255 / Math.max(24, bg(x, y));
+      const r = d[i] * k;
+      const g = d[i + 1] * k;
+      const b = d[i + 2] * k;
+      const hi = Math.max(r, g, b);
+      const lo = Math.min(r, g, b);
+      const l = (r + g + b) / 3;
+      n++;
+      if (hi - lo > 45 && hi > 60) colour++;
+      if (l > 70 && l < 190) middle++;
+    }
+  }
+  return colour / n > 0.08 || middle / n > 0.25 ? 'soft' : 'whiten';
 }
 
 /** Near-white goes fully white, the darks get a little deeper (crisper print). */

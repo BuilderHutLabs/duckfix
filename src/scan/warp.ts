@@ -2,7 +2,7 @@ import { releaseCanvas } from '../imaging/render';
 import { toGray } from '../imaging/gray';
 import { MAX_CANVAS_PIXELS } from '../export/rasterize';
 import { detectQuad } from './detectQuad';
-import { enhance, type ScanFilter } from './enhance';
+import { enhance, type ScanLook } from './enhance';
 import { applyHomography, homography, warpSize, type Quad } from './quad';
 
 /** A decoded camera photo: upright (EXIF applied) bitmap plus an object URL for display. */
@@ -123,7 +123,7 @@ export function findSheet(photo: Photo): Quad | null {
 }
 
 /** Straightens the sheet inside `q` (photo pixels) into an upright JPEG. */
-export async function warpToBlob(photo: Photo, q: Quad, filter: ScanFilter = 'whiten', maxSide = 2400): Promise<Blob> {
+export async function warpToBlob(photo: Photo, q: Quad, filter: ScanLook = 'whiten', maxSide = 2400): Promise<Blob> {
   const { w, h } = warpSize(q, maxSide);
   // sample from a copy no larger than needed (and within the canvas budget)
   const k = Math.min(1, SOURCE_SIDE / Math.max(photo.width, photo.height), Math.sqrt(MAX_CANVAS_PIXELS / 2 / (photo.width * photo.height)));
@@ -181,6 +181,6 @@ export async function warpToBlob(photo: Photo, q: Quad, filter: ScanFilter = 'wh
 }
 
 /** Small straightened copy with the chosen look, for the crop screen preview (object URL). */
-export async function warpPreview(photo: Photo, q: Quad, filter: ScanFilter): Promise<string> {
+export async function warpPreview(photo: Photo, q: Quad, filter: ScanLook): Promise<string> {
   return URL.createObjectURL(await warpToBlob(photo, q, filter, 520));
 }

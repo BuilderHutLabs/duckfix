@@ -1,4 +1,4 @@
-import { enhance } from '../../src/scan/enhance';
+import { chooseLook, enhance } from '../../src/scan/enhance';
 
 /** RGBA page lit from the left: paper goes from grey 120 (shadow) to 240; text rows are 45 % darker */
 function shadowedPage(w = 300, h = 200) {
@@ -51,5 +51,44 @@ describe('lighting correction', () => {
     const before = d.slice();
     enhance(d, w, h, 'color');
     expect(d).toEqual(before);
+  });
+});
+
+/** A colourful page: a red and a blue picture on paper, under the same shadow from the left. */
+function colourPage(w = 300, h = 200) {
+  const d = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++)
+    for (let x = 0; x < w; x++) {
+      const light = 0.5 + (0.5 * x) / (w - 1);
+      const red = x > 20 && x < 140 && y > 20 && y < 180;
+      const blue = x > 160 && x < 280 && y > 20 && y < 180;
+      const [r, g, b] = red ? [210, 40, 40] : blue ? [40, 70, 200] : [240, 240, 230];
+      const i = (y * w + x) * 4;
+      d[i] = r * light;
+      d[i + 1] = g * light;
+      d[i + 2] = b * light;
+      d[i + 3] = 255;
+    }
+  return { d, w, h };
+}
+
+describe('Auto look', () => {
+  it('a text page (even in a hand shadow) gets Wybielony', () => {
+    const { d, w, h } = shadowedPage();
+    expect(chooseLook(d, w, h)).toBe('whiten');
+  });
+
+  it('a page with colour pictures keeps its colour, with the shadow softened', () => {
+    const { d, w, h } = colourPage();
+    expect(chooseLook(d, w, h)).toBe('soft');
+  });
+
+  it('soft: the shadowed side gets lighter, the colours stay what they were (red stays red)', () => {
+    const { d, w, h } = colourPage();
+    const before = lum(d, (100 * w + 5) * 4); // paper in the shadow
+    enhance(d, w, h, 'soft');
+    expect(lum(d, (100 * w + 5) * 4)).toBeGreaterThan(before + 40);
+    const i = (100 * w + 30) * 4; // red, in the shadow
+    expect(d[i]).toBeGreaterThan(d[i + 1] * 2);
   });
 });
