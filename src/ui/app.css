@@ -4005,3 +4005,8 @@ span.live-camera-side {
   image-rendering: pixelated;
   border-radius: 6px;
 }
+
+/* the tool panel is swiped down (put away) or up (unfold) with a finger */
+.edit-tools .edit-grip {
+  touch-action: none;
+}

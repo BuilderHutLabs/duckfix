@@ -1,4 +1,5 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useBackLayer } from '../backStack';
 import { HIGHLIGHT_COLORS, INK_COLORS, type HighlightColor, type InkColor } from '../../model/document';
 import { HIGHLIGHT } from '../../edit/draw';
 import { INK, type MarkSize } from '../../edit/text';
@@ -48,6 +49,9 @@ const GROUPS: Array<{ id: ToolGroup; icon: IconName; label: () => string; tools:
   { id: 'shapes', icon: 'shapes', label: () => strings.toolShapes, tools: ['arrow', 'rect', 'ellipse'] },
   { id: 'hide', icon: 'hide', label: () => strings.groupHide, tools: ['cover', 'crop'] },
 ];
+/** Where a swipe on the tool panel never starts: colours, sizes and kinds are tapped. */
+const SWIPE_NO = '.ink-swatch, .size-steps, .edit-kinds, input, textarea, [role="slider"]';
+const SWIPE_SLOP = 10;
 /** Groups under "Więcej" (tiles), so the row keeps five roomy buttons. */
 const MORE: ToolGroup[] = ['highlight', 'shapes', 'hide'];
 const SUB: Partial<Record<Tool, [IconName, () => string]>> = {
@@ -162,6 +166,81 @@ export function EditTools({
   const [personal, setPersonal] = useState<'busy' | 'failed' | number | null>(null);
   /** The "Więcej" tiles are open. */
   const [moreOpen, setMoreOpen] = useState(false);
+  // the phone's Back: first the tiles, then the chosen tool (then the preview, one layer below)
+  useBackLayer(!!tool, () => onTool(null));
+  useBackLayer(moreOpen, () => setMoreOpen(false));
+  const root = useRef<HTMLDivElement>(null);
+  /** Swipe down puts the top layer away (tiles → tool → the whole panel folds); swipe up unfolds. */
+  const swipe = useRef({ down: () => {}, up: () => {} });
+  swipe.current = {
+    down: () => {
+      if (moreOpen) setMoreOpen(false);
+      else if (tool) onTool(null);
+      else onFold(true);
+    },
+    up: () => onFold(false),
+  };
+  useEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    let start: { y: number; x: number; t: number } | null = null;
+    let moving = false;
+    let dy = 0;
+    const settle = () => {
+      el.style.transition = 'transform 0.18s ease';
+      el.style.transform = '';
+      window.setTimeout(() => (el.style.transition = ''), 200);
+    };
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      const target = e.target as Element | null;
+      start = null;
+      moving = false;
+      // colours, sizes and kinds are tapped, never dragged
+      if (!t || !target || target.closest(SWIPE_NO)) return;
+      start = { y: t.clientY, x: t.clientX, t: Date.now() };
+    };
+    const onMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!start || !t) return;
+      dy = t.clientY - start.y;
+      const dx = t.clientX - start.x;
+      if (!moving) {
+        if (Math.abs(dx) > SWIPE_SLOP && Math.abs(dx) >= Math.abs(dy)) return void (start = null);
+        if (Math.abs(dy) <= SWIPE_SLOP) return;
+        moving = true;
+        el.style.transition = 'none';
+      }
+      e.preventDefault();
+      if (dy > 0) el.style.transform = `translateY(${dy}px)`;
+    };
+    const onEnd = () => {
+      const s = start;
+      start = null;
+      if (!s || !moving) return;
+      moving = false;
+      settle();
+      const speed = Math.abs(dy) / Math.max(1, Date.now() - s.t);
+      const far = Math.abs(dy) > Math.min(120, el.offsetHeight * 0.25) || speed > 0.6;
+      if (!far) return;
+      // the click that may follow the finger must not tap a tool
+      const swallow = (ev: Event) => ev.stopPropagation();
+      el.addEventListener('click', swallow, { capture: true, once: true });
+      window.setTimeout(() => el.removeEventListener('click', swallow, { capture: true }), 400);
+      if (dy > 0) swipe.current.down();
+      else swipe.current.up();
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd);
+    el.addEventListener('touchcancel', onEnd);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onEnd);
+    };
+  }, []);
   const hidePersonal = () => {
     if (!onHidePersonal || personal === 'busy') return;
     setPersonal('busy');
@@ -182,7 +261,7 @@ export function EditTools({
   };
 
   return (
-    <div className={folded ? 'edit-tools folded' : 'edit-tools'} role="toolbar" aria-label={strings.edit}>
+    <div ref={root} className={folded ? 'edit-tools folded' : 'edit-tools'} role="toolbar" aria-label={strings.edit}>
       <button
         type="button"
         className="edit-grip"
