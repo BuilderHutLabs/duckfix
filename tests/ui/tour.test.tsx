@@ -1,4 +1,5 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { DuckTour, openTour } from '../../src/ui/DuckTour';
 import { App } from '../../src/ui/App';
 import { createAppStore } from '../../src/ui/store';
 import { strings } from '../../src/ui/strings';
@@ -44,5 +45,13 @@ describe('duck helper on first start', () => {
     fireEvent.click(screen.getByRole('button', { name: strings.tourAgain }));
     expect(screen.getByRole('dialog', { name: strings.tourTitle })).toBeTruthy();
     expect(screen.getByText(strings.tourSteps[0])).toBeTruthy();
+  });
+
+  it('waits for the launch splash only on the first start; asked from the settings it comes up at once', () => {
+    render(<DuckTour delayed />);
+    expect(document.querySelector('.tour')!.classList.contains('tour-delayed')).toBe(true); // first start, after the splash
+    fireEvent.click(screen.getByRole('button', { name: strings.tourSkip }));
+    act(() => openTour());
+    expect(document.querySelector('.tour')!.classList.contains('tour-delayed')).toBe(false);
   });
 });

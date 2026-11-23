@@ -89,6 +89,8 @@ export function DuckTour({ delayed = false }: { delayed?: boolean }) {
   const [step, setStep] = useState(0);
   const open = shownFor !== asked;
   if (!open) return null;
+  // only the first, automatic show waits for the launch splash; asked from the settings it comes at once
+  const wait = delayed && shownFor === -1;
 
   const close = () => {
     markSeen();
@@ -98,7 +100,7 @@ export function DuckTour({ delayed = false }: { delayed?: boolean }) {
   const last = step === strings.tourSteps.length - 1;
 
   return (
-    <div className={delayed ? 'tour tour-delayed' : 'tour'} role="dialog" aria-modal="true" aria-label={strings.tourTitle}>
+    <div className={wait ? 'tour tour-delayed' : 'tour'} role="dialog" aria-modal="true" aria-label={strings.tourTitle}>
       <div className="tour-card">
         <div className="tour-duck" aria-hidden="true">
           <DuckArt size={64} />
