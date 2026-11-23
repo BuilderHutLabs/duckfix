@@ -3877,3 +3877,41 @@ span.live-camera-side {
 .stamp.passive {
   pointer-events: none;
 }
+
+/* "Więcej opcji" in the save window */
+.save-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 46px;
+  margin-top: 4px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--fill);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.save-more-chev {
+  color: var(--text-2);
+  transition: transform 0.2s ease;
+}
+.save-more[aria-expanded='true'] .save-more-chev {
+  transform: rotate(180deg);
+}
+.save-more-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  animation: save-more-in 0.18s ease-out;
+}
+@keyframes save-more-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}

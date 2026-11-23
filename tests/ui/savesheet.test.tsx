@@ -26,6 +26,7 @@ const showAll = () =>
 beforeEach(() => {
   localStorage.clear();
   showAll();
+  localStorage.setItem('duckfix-save-more', '1'); // "Więcej opcji" open for the tests of what is inside
 });
 
 function setup(over = {}) {
@@ -300,16 +301,29 @@ describe('Okno zapisu (Ustawienia)', () => {
   beforeEach(() => localStorage.clear());
   const openSave = () => fireEvent.click(screen.getByRole('button', { name: strings.save }));
 
-  it('by default the save window is short: format, size, pages and searchable text; no split, watermark or password', () => {
+  it('by default: name, PDF/JPG and size on top; the rest under "Więcej opcji", folded; opening it is remembered', () => {
     setup();
     openSave();
     expect(screen.getByRole('group', { name: strings.format })).toBeTruthy();
     expect(screen.getByRole('group', { name: strings.fileSize })).toBeTruthy();
+    const more = screen.getByRole('button', { name: strings.moreSaveOptions });
+    expect(more.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('switch', { name: strings.passwordSwitch })).toBeNull();
+    fireEvent.click(more);
     expect(screen.getByRole('textbox', { name: strings.pagesField })).toBeTruthy();
     expect(screen.getByRole('switch', { name: strings.searchableText })).toBeTruthy();
-    expect(screen.queryByRole('switch', { name: strings.splitPages })).toBeNull();
-    expect(screen.queryByRole('switch', { name: strings.watermarkSwitch })).toBeNull();
-    expect(screen.queryByRole('switch', { name: strings.passwordSwitch })).toBeNull();
+    expect(screen.getByRole('switch', { name: strings.splitPages })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: strings.watermarkSwitch })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: strings.passwordSwitch })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: strings.cancel }));
+    openSave();
+    expect(screen.getByRole('button', { name: strings.moreSaveOptions }).getAttribute('aria-expanded')).toBe('true');
+  });
+
+  it('something on inside (the remembered searchable text): "Więcej opcji" opens by itself', () => {
+    setup({ storage: { getItem: () => JSON.stringify({ size: 'best', ocr: true, format: 'pdf' }), setItem: () => {} } });
+    openSave();
+    expect(screen.getByRole('switch', { name: strings.searchableText }).getAttribute('aria-checked')).toBe('true');
   });
 
   it('"Dostosuj okno zapisu": options can be shown or hidden; the save window follows at once and it is remembered', async () => {
@@ -317,14 +331,15 @@ describe('Okno zapisu (Ustawienia)', () => {
       storage: { getItem: () => JSON.stringify({ size: 'office', ocr: false, format: 'jpg' }), setItem: () => {} },
     });
     openSave();
+    fireEvent.click(screen.getByRole('button', { name: strings.moreSaveOptions }));
     fireEvent.click(screen.getByRole('button', { name: strings.saveFieldsCustomize }));
     const sheet = screen.getByRole('dialog', { name: strings.saveFieldsTitle });
-    fireEvent.click(within(sheet).getByRole('switch', { name: strings.passwordSwitch }));
+    fireEvent.click(within(sheet).getByRole('switch', { name: strings.watermarkSwitch }));
     fireEvent.click(within(sheet).getByRole('switch', { name: strings.fileSize }));
     fireEvent.click(within(sheet).getByRole('switch', { name: strings.format }));
     fireEvent.click(within(sheet).getByRole('button', { name: strings.close }));
-    expect(screen.getByRole('switch', { name: strings.passwordSwitch })).toBeTruthy();
-    expect(localStorage.getItem('duckfix-save-fields')).toContain('"password":true');
+    expect(screen.queryByRole('switch', { name: strings.watermarkSwitch })).toBeNull();
+    expect(localStorage.getItem('duckfix-save-fields')).toContain('"watermark":false');
     expect(screen.queryByRole('group', { name: strings.fileSize })).toBeNull();
     expect(screen.queryByRole('group', { name: strings.format })).toBeNull();
     // hidden options save the plain way: PDF, full quality (not the remembered JPG / "Do urzędu")

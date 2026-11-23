@@ -69,6 +69,7 @@ export const de: Strings = {
   saveFieldsTitle: 'Speicherfenster',
   saveFieldsHint: 'Wähle, was beim Speichern zu sehen ist. Ausgeblendete Optionen sind aus.',
   saveFieldsCustomize: '⚙ Speicherfenster anpassen',
+  moreSaveOptions: 'Weitere Optionen',
   sizeTooBig: (limit: string, size: string) => `${limit} wurde nicht erreicht, die Datei hat ${size}.`,
   shrinkProgress: (done: number, total: number) => `Verkleinere ${done}/${total}`,
   searchableText: 'Durchsuchbarer Text',

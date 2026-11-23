@@ -6,15 +6,15 @@ export type SaveField = (typeof SAVE_FIELDS)[number];
 export type SaveFields = Record<SaveField, boolean>;
 
 const KEY = storageKey('duckfix-save-fields');
-/** A short window by default: the rarer options are hidden until wanted. */
+/** Every option shown at first; each can be hidden in "Okno zapisu". */
 export const DEFAULT_SAVE_FIELDS: SaveFields = {
   format: true,
   size: true,
   pages: true,
   ocr: true,
-  split: false,
-  watermark: false,
-  password: false,
+  split: true,
+  watermark: true,
+  password: true,
 };
 
 export function loadSaveFields(): SaveFields {

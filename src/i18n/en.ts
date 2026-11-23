@@ -69,6 +69,7 @@ export const en: Strings = {
   saveFieldsTitle: 'Save window',
   saveFieldsHint: 'Choose what the save window shows. Hidden options are off.',
   saveFieldsCustomize: '⚙ Customise the save window',
+  moreSaveOptions: 'More options',
   sizeTooBig: (limit: string, size: string) => `Could not get down to ${limit}; the file is ${size}.`,
   shrinkProgress: (done: number, total: number) => `Making it smaller ${done}/${total}`,
   searchableText: 'Searchable text',

@@ -69,6 +69,7 @@ export const es: Strings = {
   saveFieldsTitle: 'Ventana de guardado',
   saveFieldsHint: 'Elige qué se ve al guardar. Las opciones ocultas quedan desactivadas.',
   saveFieldsCustomize: '⚙ Personalizar la ventana',
+  moreSaveOptions: 'Más opciones',
   sizeTooBig: (limit: string, size: string) => `No se pudo bajar a ${limit}; el archivo tiene ${size}.`,
   shrinkProgress: (done: number, total: number) => `Reduciendo ${done}/${total}`,
   searchableText: 'Texto con búsqueda',

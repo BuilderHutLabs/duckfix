@@ -76,6 +76,7 @@ export const pl = {
   saveFieldsTitle: 'Okno zapisu',
   saveFieldsHint: 'Wybierz, co ma być widać przy zapisie. Ukryte opcje są wyłączone.',
   saveFieldsCustomize: '⚙ Dostosuj okno zapisu',
+  moreSaveOptions: 'Więcej opcji',
   sizeTooBig: (limit: string, size: string) => `Nie udało się zejść do ${limit}, plik ma ${size}.`,
   shrinkProgress: (done: number, total: number) => `Zmniejszam plik ${done}/${total}`,
   searchableText: 'Tekst do wyszukiwania',

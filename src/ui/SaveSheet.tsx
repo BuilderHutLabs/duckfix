@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { parsePageRange } from '../model/pageRange';
 import { useAppStore } from './store';
 import { strings } from './strings';
+import { storageKey } from '../config';
 import { loadSaveFields } from './saveFields';
 import { SaveFieldsSheet } from './SaveFieldsSheet';
 
@@ -18,12 +19,30 @@ function Switch({ label, hint, on, onChange }: { label: string; hint: string; on
   );
 }
 
+const MORE_KEY = storageKey('duckfix-save-more');
+function loadMore(): boolean {
+  try {
+    return localStorage.getItem(MORE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function rememberMore(open: boolean): void {
+  try {
+    localStorage.setItem(MORE_KEY, open ? '1' : '0');
+  } catch {
+    /* private mode */
+  }
+}
+
 /** Bottom sheet opened by "Zapisz PDF": smaller file / searchable text, then save. */
 export function SaveSheet() {
   const backdrop = useBackdropClose(() => s.closeSaveSheet());
   const s = useAppStore();
   /** Options shown ("Okno zapisu" in the settings); a hidden one saves the plain way. */
   const [shown, setShown] = useState(loadSaveFields);
+  /** "Więcej opcji" unfolded: remembered, and always when something inside is on (the searchable text). */
+  const [more, setMore] = useState(() => loadMore() || (shown.ocr && s.exportOptions.ocr && s.exportOptions.format === 'pdf'));
   /** "Dostosuj okno zapisu" open. */
   const [customizing, setCustomizing] = useState(false);
   const [chosen, setOpts] = useState(s.exportOptions);
@@ -121,78 +140,96 @@ export function SaveSheet() {
             {opts.size !== 'best' && <span className="sheet-option-hint size-hint">{strings.sizeHint}</span>}
           </div>
         )}
-        {shown.pages && !ids && all.length > 1 && (
-          <label className="sheet-field">
-            <span className="sheet-option-hint">{strings.pagesField}</span>
-            <input
-              type="text"
-              className="sheet-input"
-              aria-label={strings.pagesField}
-              aria-invalid={rangeBad}
-              placeholder={strings.pagesPlaceholder}
-              value={range}
-              onChange={(e) => setRange(e.target.value)}
-              inputMode="numeric"
-              autoComplete="off"
-              enterKeyHint="done"
-            />
-            {rangeBad && <span className="sheet-error">{strings.pagesInvalid(all.length)}</span>}
-          </label>
-        )}
-        {shown.ocr && pdf && (
-          <Switch
-            label={strings.searchableText}
-            hint={strings.searchableTextHint}
-            on={opts.ocr}
-            onChange={(ocr) => setOpts((o) => ({ ...o, ocr }))}
-          />
-        )}
-        {shown.split && pdf && count > 1 && (
-          <Switch label={strings.splitPages} hint={strings.splitPagesHint} on={split} onChange={setSplit} />
-        )}
-        {shown.watermark && <Switch label={strings.watermarkSwitch} hint={strings.watermarkHint} on={marked} onChange={setMarked} />}
-        {marked && (
-          <input
-            type="text"
-            className="sheet-input sheet-mark"
-            aria-label={strings.watermarkField}
-            placeholder={strings.watermarkPlaceholder}
-            value={markText}
-            onChange={(e) => setMarkText(e.target.value)}
-            autoComplete="off"
-            enterKeyHint="done"
-            autoFocus
-          />
-        )}
-        {shown.password && pdf && (
-          <Switch label={strings.passwordSwitch} hint={strings.passwordSwitchHint} on={locked} onChange={setLocked} />
-        )}
-        {pdf && locked && (
-          <span className="sheet-name sheet-password">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              aria-label={strings.passwordField}
-              placeholder={strings.passwordField}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              autoComplete="new-password"
-              enterKeyHint="done"
-              autoFocus
-            />
-            <button
-              type="button"
-              className="sheet-eye"
-              aria-label={showPassword ? strings.passwordHide : strings.passwordShow}
-              aria-pressed={showPassword}
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? '🙈' : '👁'}
-            </button>
+        <button
+          type="button"
+          className="save-more"
+          aria-expanded={more}
+          onClick={() => {
+            setMore(!more);
+            rememberMore(!more);
+          }}
+        >
+          <span>{strings.moreSaveOptions}</span>
+          <span className="save-more-chev" aria-hidden="true">
+            ▾
           </span>
-        )}
-        <button type="button" className="btn btn-plain save-customize" onClick={() => setCustomizing(true)}>
-          {strings.saveFieldsCustomize}
         </button>
+        {more && (
+          <div className="save-more-body">
+            {shown.pages && !ids && all.length > 1 && (
+              <label className="sheet-field">
+                <span className="sheet-option-hint">{strings.pagesField}</span>
+                <input
+                  type="text"
+                  className="sheet-input"
+                  aria-label={strings.pagesField}
+                  aria-invalid={rangeBad}
+                  placeholder={strings.pagesPlaceholder}
+                  value={range}
+                  onChange={(e) => setRange(e.target.value)}
+                  inputMode="numeric"
+                  autoComplete="off"
+                  enterKeyHint="done"
+                />
+                {rangeBad && <span className="sheet-error">{strings.pagesInvalid(all.length)}</span>}
+              </label>
+            )}
+            {shown.ocr && pdf && (
+              <Switch
+                label={strings.searchableText}
+                hint={strings.searchableTextHint}
+                on={opts.ocr}
+                onChange={(ocr) => setOpts((o) => ({ ...o, ocr }))}
+              />
+            )}
+            {shown.split && pdf && count > 1 && (
+              <Switch label={strings.splitPages} hint={strings.splitPagesHint} on={split} onChange={setSplit} />
+            )}
+            {shown.watermark && <Switch label={strings.watermarkSwitch} hint={strings.watermarkHint} on={marked} onChange={setMarked} />}
+            {marked && (
+              <input
+                type="text"
+                className="sheet-input sheet-mark"
+                aria-label={strings.watermarkField}
+                placeholder={strings.watermarkPlaceholder}
+                value={markText}
+                onChange={(e) => setMarkText(e.target.value)}
+                autoComplete="off"
+                enterKeyHint="done"
+                autoFocus
+              />
+            )}
+            {shown.password && pdf && (
+              <Switch label={strings.passwordSwitch} hint={strings.passwordSwitchHint} on={locked} onChange={setLocked} />
+            )}
+            {pdf && locked && (
+              <span className="sheet-name sheet-password">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  aria-label={strings.passwordField}
+                  placeholder={strings.passwordField}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  autoComplete="new-password"
+                  enterKeyHint="done"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  className="sheet-eye"
+                  aria-label={showPassword ? strings.passwordHide : strings.passwordShow}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? '🙈' : '👁'}
+                </button>
+              </span>
+            )}
+            <button type="button" className="btn btn-plain save-customize" onClick={() => setCustomizing(true)}>
+              {strings.saveFieldsCustomize}
+            </button>
+          </div>
+        )}
         <div className="sheet-actions">
           <button type="button" className="btn" onClick={() => s.closeSaveSheet()}>
             {strings.cancel}
