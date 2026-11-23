@@ -4321,3 +4321,18 @@ button.live-camera-thumb {
     height: 62px;
   }
 }
+
+/* the home panel follows a pulling finger and springs back (useSpringPull) */
+.home-panel {
+  translate: 0 var(--pull, 0px);
+  transition: translate 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  touch-action: pan-x;
+}
+.home-panel.pulling {
+  transition: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-panel {
+    transition: translate 0.2s ease-out;
+  }
+}

@@ -89,6 +89,72 @@ function HomeAction({
   );
 }
 
+/** How far the panel can be pulled (px) and how much it gives (harder and harder). */
+const PULL_MAX = 120;
+const pullOf = (dy: number) => PULL_MAX * (1 - Math.exp(-dy / 220));
+
+/**
+ * The panel can be pulled down with a finger, ever harder, and springs back when let go (just for
+ * the feel of it). A pull that starts on a button does not press it.
+ */
+function useSpringPull(ref: React.RefObject<HTMLElement | null>) {
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let start: { y: number; x: number } | null = null;
+    let pulling = false;
+    const set = (v: number | null) => {
+      if (v === null) el.style.removeProperty('--pull');
+      else el.style.setProperty('--pull', `${v.toFixed(1)}px`);
+    };
+    const onStart = (e: TouchEvent) => {
+      const t = e.touches[0];
+      start = t ? { y: t.clientY, x: t.clientX } : null;
+      pulling = false;
+    };
+    const onMove = (e: TouchEvent) => {
+      const t = e.touches[0];
+      if (!start || !t) return;
+      const dy = t.clientY - start.y;
+      const dx = t.clientX - start.x;
+      if (!pulling) {
+        if (dy <= 8 || Math.abs(dx) > dy) {
+          if (dy < -8 || Math.abs(dx) > 8) start = null; // up or sideways: not a pull
+          return;
+        }
+        pulling = true;
+        el.classList.add('pulling');
+      }
+      e.preventDefault();
+      set(pullOf(dy));
+    };
+    const onEnd = () => {
+      start = null;
+      if (!pulling) return;
+      pulling = false;
+      el.classList.remove('pulling');
+      set(null); // back up with a little bounce (CSS)
+      // the click that follows the finger must not press a button
+      const swallow = (ev: Event) => {
+        ev.stopPropagation();
+        ev.preventDefault();
+      };
+      el.addEventListener('click', swallow, { capture: true, once: true });
+      window.setTimeout(() => el.removeEventListener('click', swallow, { capture: true }), 400);
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd);
+    el.addEventListener('touchcancel', onEnd);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onEnd);
+    };
+  }, [ref]);
+}
+
 export function Home() {
   const { open, setScanPhoto, busy, openDiagnostics, library, docsOpen, openDocs } = useAppStore();
   const input = useRef<HTMLInputElement>(null);
@@ -103,6 +169,8 @@ export function Home() {
   // the panel slides up from the bottom once the duck has said "Kwa kwa!" (first start), else at once
   const panelDelay = intro ? (isStandaloneLaunch() ? SPLASH_TOTAL_MS : 0) + PANEL_AFTER_QUACK_MS : 80;
   const pickFiles = () => input.current?.click();
+  const panel = useRef<HTMLElement>(null);
+  useSpringPull(panel);
 
   return (
     <main className="home">
@@ -130,7 +198,7 @@ export function Home() {
         </h1>
         <p className="home-subtitle">{strings.homeTagline}</p>
       </div>
-      <section className="home-panel" style={{ animationDelay: `${panelDelay}ms` }}>
+      <section ref={panel} className="home-panel" style={{ animationDelay: `${panelDelay}ms` }}>
         <span className="home-panel-grip" aria-hidden="true" />
         <HomeAction
           id="scan"
