@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App } from '../../src/ui/App';
 import { createAppStore } from '../../src/ui/store';
 import { strings } from '../../src/ui/strings';
@@ -17,15 +17,8 @@ function memoryStorage() {
   return { getItem: (k: string) => m.get(k) ?? null, setItem: (k: string, v: string) => void m.set(k, v) };
 }
 
-/** Every save option shown (the defaults hide some; see "Okno zapisu"). */
-const showAll = () =>
-  localStorage.setItem(
-    'duckfix-save-fields',
-    JSON.stringify({ format: true, size: true, pages: true, ocr: true, split: true, watermark: true, password: true }),
-  );
 beforeEach(() => {
   localStorage.clear();
-  showAll();
   localStorage.setItem('duckfix-save-more', '1'); // "Więcej opcji" open for the tests of what is inside
 });
 
@@ -297,7 +290,7 @@ describe('save sheet: watermark', () => {
   });
 });
 
-describe('Okno zapisu (Ustawienia)', () => {
+describe('Więcej opcji', () => {
   beforeEach(() => localStorage.clear());
   const openSave = () => fireEvent.click(screen.getByRole('button', { name: strings.save }));
 
@@ -326,33 +319,4 @@ describe('Okno zapisu (Ustawienia)', () => {
     expect(screen.getByRole('switch', { name: strings.searchableText }).getAttribute('aria-checked')).toBe('true');
   });
 
-  it('"Dostosuj okno zapisu": options can be shown or hidden; the save window follows at once and it is remembered', async () => {
-    const { deps } = setup({
-      storage: { getItem: () => JSON.stringify({ size: 'office', ocr: false, format: 'jpg' }), setItem: () => {} },
-    });
-    openSave();
-    fireEvent.click(screen.getByRole('button', { name: strings.moreSaveOptions }));
-    fireEvent.click(screen.getByRole('button', { name: strings.saveFieldsCustomize }));
-    const sheet = screen.getByRole('dialog', { name: strings.saveFieldsTitle });
-    fireEvent.click(within(sheet).getByRole('switch', { name: strings.watermarkSwitch }));
-    fireEvent.click(within(sheet).getByRole('switch', { name: strings.fileSize }));
-    fireEvent.click(within(sheet).getByRole('switch', { name: strings.format }));
-    fireEvent.click(within(sheet).getByRole('button', { name: strings.close }));
-    expect(screen.queryByRole('switch', { name: strings.watermarkSwitch })).toBeNull();
-    expect(localStorage.getItem('duckfix-save-fields')).toContain('"watermark":false');
-    expect(screen.queryByRole('group', { name: strings.fileSize })).toBeNull();
-    expect(screen.queryByRole('group', { name: strings.format })).toBeNull();
-    // hidden options save the plain way: PDF, full quality (not the remembered JPG / "Do urzędu")
-    fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm }));
-    await waitFor(() => expect(deps.exportPdf).toHaveBeenCalled());
-    expect(deps.exportImages).not.toHaveBeenCalled();
-    expect(vi.mocked(deps.exportPdf).mock.calls[0][3]).toMatchObject({ compress: 0 });
-  });
-
-  it('"Okno zapisu" is also in Ustawienia on the home screen', () => {
-    render(<App store={createAppStore(fakeDeps())} />);
-    fireEvent.click(screen.getByRole('button', { name: strings.settings }));
-    fireEvent.click(screen.getByRole('button', { name: strings.saveFieldsOpen }));
-    expect(screen.getByRole('dialog', { name: strings.saveFieldsTitle })).toBeTruthy();
-  });
 });

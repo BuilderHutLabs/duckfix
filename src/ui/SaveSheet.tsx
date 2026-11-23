@@ -4,8 +4,6 @@ import { parsePageRange } from '../model/pageRange';
 import { useAppStore } from './store';
 import { strings } from './strings';
 import { storageKey } from '../config';
-import { loadSaveFields } from './saveFields';
-import { SaveFieldsSheet } from './SaveFieldsSheet';
 
 function Switch({ label, hint, on, onChange }: { label: string; hint: string; on: boolean; onChange(v: boolean): void }) {
   return (
@@ -39,20 +37,9 @@ function rememberMore(open: boolean): void {
 export function SaveSheet() {
   const backdrop = useBackdropClose(() => s.closeSaveSheet());
   const s = useAppStore();
-  /** Options shown ("Okno zapisu" in the settings); a hidden one saves the plain way. */
-  const [shown, setShown] = useState(loadSaveFields);
   /** "Więcej opcji" unfolded: remembered, and always when something inside is on (the searchable text). */
-  const [more, setMore] = useState(() => loadMore() || (shown.ocr && s.exportOptions.ocr && s.exportOptions.format === 'pdf'));
-  /** "Dostosuj okno zapisu" open. */
-  const [customizing, setCustomizing] = useState(false);
-  const [chosen, setOpts] = useState(s.exportOptions);
-  // a hidden option saves the plain way: PDF, full quality, no text layer
-  const opts = {
-    ...chosen,
-    format: shown.format ? chosen.format : ('pdf' as const),
-    size: shown.size ? chosen.size : ('best' as const),
-    ocr: shown.ocr && chosen.ocr,
-  };
+  const [more, setMore] = useState(() => loadMore() || (s.exportOptions.ocr && s.exportOptions.format === 'pdf'));
+  const [opts, setOpts] = useState(s.exportOptions);
   const [name, setName] = useState(() => s.defaultFileName());
   const ids = s.saveSheetIds;
   const all = s.doc.pages;
@@ -111,7 +98,7 @@ export function SaveSheet() {
             </span>
           </span>
         </label>
-        {shown.format && (
+        {
           <div className="segmented sheet-format" role="group" aria-label={strings.format}>
             {(['pdf', 'jpg'] as const).map((f) => (
               <button key={f} type="button" aria-pressed={opts.format === f} onClick={() => setOpts((o) => ({ ...o, format: f }))}>
@@ -119,8 +106,8 @@ export function SaveSheet() {
               </button>
             ))}
           </div>
-        )}
-        {shown.size && (
+        }
+        {
           <div className="sheet-field">
             <span className="sheet-option-hint">{strings.fileSize}</span>
             <div className="size-options" role="group" aria-label={strings.fileSize}>
@@ -139,7 +126,7 @@ export function SaveSheet() {
             </div>
             {opts.size !== 'best' && <span className="sheet-option-hint size-hint">{strings.sizeHint}</span>}
           </div>
-        )}
+        }
         <button
           type="button"
           className="save-more"
@@ -156,7 +143,7 @@ export function SaveSheet() {
         </button>
         {more && (
           <div className="save-more-body">
-            {shown.pages && !ids && all.length > 1 && (
+            {!ids && all.length > 1 && (
               <label className="sheet-field">
                 <span className="sheet-option-hint">{strings.pagesField}</span>
                 <input
@@ -174,7 +161,7 @@ export function SaveSheet() {
                 {rangeBad && <span className="sheet-error">{strings.pagesInvalid(all.length)}</span>}
               </label>
             )}
-            {shown.ocr && pdf && (
+            {pdf && (
               <Switch
                 label={strings.searchableText}
                 hint={strings.searchableTextHint}
@@ -182,10 +169,8 @@ export function SaveSheet() {
                 onChange={(ocr) => setOpts((o) => ({ ...o, ocr }))}
               />
             )}
-            {shown.split && pdf && count > 1 && (
-              <Switch label={strings.splitPages} hint={strings.splitPagesHint} on={split} onChange={setSplit} />
-            )}
-            {shown.watermark && <Switch label={strings.watermarkSwitch} hint={strings.watermarkHint} on={marked} onChange={setMarked} />}
+            {pdf && count > 1 && <Switch label={strings.splitPages} hint={strings.splitPagesHint} on={split} onChange={setSplit} />}
+            {<Switch label={strings.watermarkSwitch} hint={strings.watermarkHint} on={marked} onChange={setMarked} />}
             {marked && (
               <input
                 type="text"
@@ -199,9 +184,7 @@ export function SaveSheet() {
                 autoFocus
               />
             )}
-            {shown.password && pdf && (
-              <Switch label={strings.passwordSwitch} hint={strings.passwordSwitchHint} on={locked} onChange={setLocked} />
-            )}
+            {pdf && <Switch label={strings.passwordSwitch} hint={strings.passwordSwitchHint} on={locked} onChange={setLocked} />}
             {pdf && locked && (
               <span className="sheet-name sheet-password">
                 <input
@@ -225,9 +208,6 @@ export function SaveSheet() {
                 </button>
               </span>
             )}
-            <button type="button" className="btn btn-plain save-customize" onClick={() => setCustomizing(true)}>
-              {strings.saveFieldsCustomize}
-            </button>
           </div>
         )}
         <div className="sheet-actions">
@@ -244,14 +224,6 @@ export function SaveSheet() {
           </button>
         </div>
       </div>
-      {customizing && (
-        <SaveFieldsSheet
-          onClose={() => {
-            setCustomizing(false);
-            setShown(loadSaveFields());
-          }}
-        />
-      )}
     </div>
   );
 }

@@ -3866,11 +3866,6 @@ span.live-camera-side {
   margin-top: 6px;
 }
 
-.save-customize {
-  display: block;
-  margin: 6px auto 0;
-  font-size: 14px;
-}
 
 /* a tool is chosen: the other items let the finger through (a tick inside a big square) */
 .mark-item.through,
