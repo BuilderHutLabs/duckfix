@@ -344,3 +344,26 @@ describe('Więcej opcji', () => {
   });
 
 });
+
+describe('saving the same file twice', () => {
+  beforeEach(() => localStorage.clear());
+
+  it('the second download gets " (2)" in its name, so the phone does not ask "Download again?" and silently drop it', async () => {
+    const storage = memoryStorage();
+    const deps = fakeDeps({ shareFirst: false, storage });
+    const store = createAppStore(deps);
+    store.load(docWithFlags(2), [source]);
+    await act(() => store.export({ size: 'best', ocr: false, format: 'pdf' }, { name: 'Faktura' }));
+    await act(() => store.export({ size: 'best', ocr: false, format: 'pdf' }, { name: 'Faktura' }));
+    await act(() => store.export({ size: 'best', ocr: false, format: 'pdf' }, { name: 'Faktura' }));
+    expect(vi.mocked(deps.download).mock.calls.map(([f]) => f.name)).toEqual(['Faktura.pdf', 'Faktura (2).pdf', 'Faktura (3).pdf']);
+    expect(store.getState().notice).toContain('Faktura (3).pdf');
+    // remembered after the app is opened again
+    const again = createAppStore(fakeDeps({ shareFirst: false, storage, download: deps.download }));
+    again.load(docWithFlags(1), [source]);
+    await act(() => again.export({ size: 'best', ocr: false, format: 'jpg' }, { name: 'Faktura' }));
+    await act(() => again.export({ size: 'best', ocr: false, format: 'jpg' }, { name: 'Faktura' }));
+    expect(vi.mocked(deps.download).mock.calls.at(-1)![0].name).toBe('Faktura (2).jpg');
+  });
+});
+

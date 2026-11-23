@@ -191,6 +191,8 @@ function browserDeps(): StoreDeps {
 const DESKEW_KEY = storageKey('wduck.deskew');
 const ANALYZE = { concurrency: 2, maxSide: ANALYSIS_MAX_SIDE } as const;
 const SAVE_DOC_DELAY_MS = 500;
+/** Names of the files downloaded so far (so a repeat gets " (2)" instead of the phone's question). */
+const DOWNLOADED_KEY = storageKey('duckfix-downloaded');
 /** While changes keep coming (analysis progress), the doc is still saved at least this often. */
 const SAVE_DOC_MAX_WAIT_MS = 2500;
 
@@ -407,6 +409,39 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
   };
   /** The open document's name in the list. */
   let docName: string | null = null;
+
+  /**
+   * Downloads the files under names not downloaded before: a phone asks "Download again?" for a
+   * name already in Pobrane and drops the file unless the user says yes. The names used are
+   * remembered; a repeat gets " (2)", " (3)"… like the phone itself would after asking.
+   */
+  const downloadAll = (files: File[]): File[] => {
+    let used: string[] = [];
+    try {
+      used = JSON.parse(deps.storage?.getItem(DOWNLOADED_KEY) ?? '[]') as string[];
+      if (!Array.isArray(used)) used = [];
+    } catch {
+      used = [];
+    }
+    const taken = new Set(used.map((n) => n.toLowerCase()));
+    const out = files.map((f) => {
+      const dot = f.name.lastIndexOf('.');
+      const stem = dot > 0 ? f.name.slice(0, dot) : f.name;
+      const ext = dot > 0 ? f.name.slice(dot) : '';
+      let name = f.name;
+      for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${stem} (${n})${ext}`;
+      taken.add(name.toLowerCase());
+      used.push(name);
+      return name === f.name ? f : new File([f], name, { type: f.type, lastModified: f.lastModified });
+    });
+    try {
+      deps.storage?.setItem(DOWNLOADED_KEY, JSON.stringify(used.slice(-300)));
+    } catch {
+      /* private mode: names are not remembered */
+    }
+    out.forEach((f) => deps.download(f));
+    return out;
+  };
 
   /** Publishes a new snapshot; doc/canUndo/canRedo always come from the history. */
   const set = (patch: Partial<AppState>) => {
@@ -881,12 +916,12 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
             const over = tooBig(files.reduce((s, f) => s + f.size, 0)).trim();
             set({ busy: null, exportProgress: null, exportReady: files, exportSend: send, notice: over || null });
           } else {
-            files.forEach((f) => deps.download(f));
+            const saved = downloadAll(files);
             const bytes = files.reduce((s, f) => s + f.size, 0);
             set({
               busy: null,
               exportProgress: null,
-              notice: strings.savedNotice(files.length === 1 ? files[0].name : `${base} (${files.length})`, formatSize(bytes)) + tooBig(bytes),
+              notice: strings.savedNotice(saved.length === 1 ? saved[0].name : `${base} (${saved.length})`, formatSize(bytes)) + tooBig(bytes),
             });
           }
           return;
@@ -930,9 +965,9 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
           const note = [over, ocrFailed ? strings.ocrUnavailable : ''].filter(Boolean).join(' ');
           set({ busy: null, exportProgress: null, exportReady: out, exportSend: send, notice: note || null });
         } else {
-          files.forEach((f) => deps.download(f));
+          const done = downloadAll(files);
           const size = formatSize(files.reduce((n, f) => n + f.size, 0));
-          const saved = strings.savedNotice(files.length === 1 ? files[0].name : `${base} (${files.length})`, size);
+          const saved = strings.savedNotice(done.length === 1 ? done[0].name : `${base} (${done.length})`, size);
           set({ busy: null, exportProgress: null, notice: [saved, over, ocrFailed ? strings.ocrUnavailable : ''].filter(Boolean).join(' ') });
         }
       } catch (e) {
