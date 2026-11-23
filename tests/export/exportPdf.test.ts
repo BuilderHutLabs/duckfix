@@ -115,16 +115,16 @@ describe('exportPdf', () => {
     expect(imageCount(out)).toBeGreaterThan(0); // PNG alpha adds an SMask image too
   });
 
-  it('smaller file: every page is rasterized, untouched PDF pages too, with compress on', async () => {
+  it('a smaller size level: every page is rasterized, untouched PDF pages too, at that level', async () => {
     const src = await makePdf([
       [100, 100],
       [100, 100],
     ]);
     const r = fakeRaster();
     const doc: Doc = { pages: [pdfPage(0), pdfPage(1, { skewDeg: 2 })] };
-    const out = await load(await exportPdf(doc, new Map([['f1', src]]), r, undefined, { compress: true }));
+    const out = await load(await exportPdf(doc, new Map([['f1', src]]), r, undefined, { compress: 2 }));
     expect(r).toHaveBeenCalledTimes(2);
-    expect(r.mock.calls.map((c) => c[2])).toEqual([{ compress: true }, { compress: true }]);
+    expect(r.mock.calls.map((c) => c[2])).toEqual([{ compress: 2 }, { compress: 2 }]);
     expect(out.getPageCount()).toBe(2);
   });
 

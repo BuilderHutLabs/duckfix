@@ -6,7 +6,7 @@ import { exportImages } from '../export/images';
 import { pageLines, pageText } from '../export/pageText';
 import { watermarkLine, watermarkPng } from '../export/watermark';
 import { findPersonal, type OcrLine } from '../edit/personal';
-import { loadExportOptions, saveExportOptions, type ExportOptions } from '../export/options';
+import { SIZE_LIMIT, SIZE_START, loadExportOptions, saveExportOptions, type ExportOptions } from '../export/options';
 import { createContext, createElement, useContext, useMemo, useSyncExternalStore, type ReactNode } from 'react';
 import {
   applyAnalysis,
@@ -41,7 +41,7 @@ import { createTesseractDetector, tesseractPaths } from '../orientation/tesserac
 import type { OrientationDetector } from '../orientation/detector';
 import { DEFAULT_THRESHOLDS } from '../orientation/policy';
 import { exportFileName, exportPdf } from '../export/exportPdf';
-import { browserRasterizer } from '../export/rasterize';
+import { MAX_LEVEL, browserRasterizer } from '../export/rasterize';
 import { canShareFiles, downloadFile, pdfFile, prefersShareSheet, shareOrDownload } from '../export/share';
 import { createMetrics } from '../diagnostics/metrics';
 import { docNameFrom, indexedDbLibrary, sizeOf, type DocLibrary, type DocMeta } from '../storage/library';
@@ -64,7 +64,8 @@ export interface AppState {
   canRedo: boolean;
   busy: 'opening' | 'exporting' | null;
   /** Pages written so far while exporting. */
-  exportProgress: { done: number; total: number; ocr: boolean } | null;
+  /** `shrink`: the file came out too big and is being saved again smaller. */
+  exportProgress: { done: number; total: number; ocr: boolean; shrink?: boolean } | null;
   /** Exported PDF waiting for the user's tap on "Udostępnij / Zapisz". */
   exportReady: File | File[] | null;
   /** The ready file came from "Wyślij" (the button says so); else from saving on iPhone/iPad. */
@@ -112,14 +113,15 @@ export interface StoreDeps {
     doc: Doc,
     sources: Map<string, SourceFile>,
     onProgress: (done: number, total: number) => void,
-    opts: { compress: boolean; ocr: OcrEngine | null; signal: AbortSignal; watermark?: string },
+    /** `compress`: quality level, 0 = full quality. */
+    opts: { compress: number; ocr: OcrEngine | null; signal: AbortSignal; watermark?: string },
   ): Promise<Uint8Array>;
   /** "JPG": every page as a JPEG picture. */
   exportImages(
     doc: Doc,
     sources: Map<string, SourceFile>,
     onProgress: (done: number, total: number) => void,
-    opts: { compress: boolean; signal: AbortSignal; watermark?: string },
+    opts: { compress: number; signal: AbortSignal; watermark?: string },
   ): Promise<Blob[]>;
   /** Text of one page (own text layer or OCR). */
   pageText(page: Page, source: SourceFile, ocr: () => Promise<OcrEngine>): Promise<string>;
@@ -822,29 +824,45 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         exportOptions: opts,
       });
       try {
+        // a size with a limit: saved again smaller until it fits (or the smallest is reached)
+        const limit = SIZE_LIMIT[opts.size];
+        let level = SIZE_START[opts.size];
+        const smaller = (bytes: number) => {
+          if (bytes <= limit || level >= MAX_LEVEL) return false;
+          level = Math.min(MAX_LEVEL, level + (bytes / limit > 2.5 ? 2 : 1));
+          return true;
+        };
+        let pass = 0;
+        const progress = (p: { done: number; total: number; ocr: boolean }) =>
+          own === session && set({ exportProgress: pass > 0 ? { ...p, shrink: true } : p });
+        /** "Nie udało się zejść do 1 MB…" when even the smallest is too big. */
+        const tooBig = (bytes: number) => (bytes > limit ? ` ${strings.sizeTooBig(formatSize(limit), formatSize(bytes))}` : '');
         if (opts.format === 'jpg') {
-          const blobs = await deps.exportImages(
-            doc,
-            state.sources,
-            (done, total) => {
-              if (own === session) set({ exportProgress: { done, total, ocr: false } });
-            },
-            { compress: opts.compress, signal: ctrl.signal, watermark },
-          );
-          if (own !== session) return;
+          let blobs: Blob[];
+          for (;;) {
+            blobs = await deps.exportImages(doc, state.sources, (done, total) => progress({ done, total, ocr: false }), {
+              compress: level,
+              signal: ctrl.signal,
+              watermark,
+            });
+            if (own !== session) return;
+            if (!smaller(blobs.reduce((n, b) => n + b.size, 0))) break;
+            pass++;
+          }
           const files = blobs.map(
             (b, i) => new File([b], blobs.length === 1 ? `${base}.jpg` : `${base} ${i + 1}.jpg`, { type: 'image/jpeg' }),
           );
           if (ready) {
             exportedDoc = history.present;
-            set({ busy: null, exportProgress: null, exportReady: files, exportSend: send });
+            const over = tooBig(files.reduce((s, f) => s + f.size, 0)).trim();
+            set({ busy: null, exportProgress: null, exportReady: files, exportSend: send, notice: over || null });
           } else {
             files.forEach((f) => deps.download(f));
-            const size = formatSize(files.reduce((s, f) => s + f.size, 0));
+            const bytes = files.reduce((s, f) => s + f.size, 0);
             set({
               busy: null,
               exportProgress: null,
-              notice: strings.savedNotice(files.length === 1 ? files[0].name : `${base} (${files.length})`, size),
+              notice: strings.savedNotice(files.length === 1 ? files[0].name : `${base} (${files.length})`, formatSize(bytes)) + tooBig(bytes),
             });
           }
           return;
@@ -861,32 +879,37 @@ export function createAppStore(overrides: Partial<StoreDeps> = {}) {
         // one file, or one per page ("Każda strona osobno")
         const parts = extra.split && doc.pages.length > 1 ? doc.pages.map((p) => ({ pages: [p] })) : [doc];
         const total = doc.pages.length;
-        let before = 0;
-        const files: File[] = [];
-        for (const [i, part] of parts.entries()) {
-          let bytes = await deps.exportPdf(
-            part,
-            state.sources,
-            (done) => {
-              if (own === session) set({ exportProgress: { done: before + done, total, ocr: engine !== null } });
-            },
-            { compress: opts.compress, ocr: engine, signal: ctrl.signal, watermark },
-          );
-          if (own !== session) return;
-          if (extra.password) bytes = await deps.encryptPdf(bytes, extra.password);
-          if (own !== session) return;
-          before += part.pages.length;
-          files.push(pdfFile(bytes, parts.length === 1 ? `${base}.pdf` : `${base} ${i + 1}.pdf`));
+        let files: File[];
+        for (;;) {
+          let before = 0;
+          files = [];
+          for (const [i, part] of parts.entries()) {
+            let bytes = await deps.exportPdf(
+              part,
+              state.sources,
+              (done) => progress({ done: before + done, total, ocr: engine !== null }),
+              { compress: level, ocr: engine, signal: ctrl.signal, watermark },
+            );
+            if (own !== session) return;
+            if (extra.password) bytes = await deps.encryptPdf(bytes, extra.password);
+            if (own !== session) return;
+            before += part.pages.length;
+            files.push(pdfFile(bytes, parts.length === 1 ? `${base}.pdf` : `${base} ${i + 1}.pdf`));
+          }
+          if (!smaller(files.reduce((n, f) => n + f.size, 0))) break;
+          pass++;
         }
+        const over = tooBig(files.reduce((n, f) => n + f.size, 0)).trim();
         const out = files.length === 1 ? files[0] : files;
         if (ready) {
           exportedDoc = history.present;
-          set({ busy: null, exportProgress: null, exportReady: out, exportSend: send, notice: ocrFailed ? strings.ocrUnavailable : null });
+          const note = [over, ocrFailed ? strings.ocrUnavailable : ''].filter(Boolean).join(' ');
+          set({ busy: null, exportProgress: null, exportReady: out, exportSend: send, notice: note || null });
         } else {
           files.forEach((f) => deps.download(f));
           const size = formatSize(files.reduce((n, f) => n + f.size, 0));
           const saved = strings.savedNotice(files.length === 1 ? files[0].name : `${base} (${files.length})`, size);
-          set({ busy: null, exportProgress: null, notice: ocrFailed ? `${saved} ${strings.ocrUnavailable}` : saved });
+          set({ busy: null, exportProgress: null, notice: [saved, over, ocrFailed ? strings.ocrUnavailable : ''].filter(Boolean).join(' ') });
         }
       } catch (e) {
         if (own !== session) return;

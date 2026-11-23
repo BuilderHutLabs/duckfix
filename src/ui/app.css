@@ -3820,3 +3820,48 @@ span.live-camera-side {
   height: 20px;
   accent-color: var(--accent);
 }
+
+/* ---------- "Rozmiar pliku" ---------- */
+.size-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--fill);
+}
+.size-options button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  min-height: 48px;
+  padding: 6px 4px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.size-options button strong {
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.15;
+}
+.size-options button span {
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.size-options button[aria-pressed='true'] {
+  background: var(--card);
+  box-shadow: var(--shadow);
+}
+.size-options button[aria-pressed='true'] strong {
+  color: var(--accent);
+}
+.size-hint {
+  display: block;
+  margin-top: 6px;
+}

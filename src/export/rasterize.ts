@@ -5,10 +5,20 @@ import type { Rasterizer } from './exportPdf';
 import { applyCanvasFilter } from '../imaging/filter';
 import { cropRect, paintMarks, paintStamps } from '../edit/paint';
 
-const DPI = 300;
-const IMAGE_MAX_SIDE = 3508; // A4 @ 300 DPI
-/** "Mniejszy plik": 150 DPI, JPEG 0.7 for every page. */
-const SMALL = { dpi: 150, imageMaxSide: 1754, quality: 0.7 };
+/**
+ * Quality levels, from full quality (0: 300 DPI, near-bitonal pages as PNG) to the smallest file.
+ * A smaller file size tries them in turn until the file fits its limit.
+ */
+export const LEVELS = [
+  { dpi: 300, imageMaxSide: 3508, quality: 0.9 }, // A4 @ 300 DPI
+  { dpi: 200, imageMaxSide: 2339, quality: 0.8 },
+  { dpi: 150, imageMaxSide: 1754, quality: 0.7 },
+  { dpi: 120, imageMaxSide: 1403, quality: 0.6 },
+  { dpi: 100, imageMaxSide: 1170, quality: 0.5 },
+  { dpi: 80, imageMaxSide: 936, quality: 0.45 },
+] as const;
+export const MAX_LEVEL = LEVELS.length - 1;
+const level = (n: number | undefined) => LEVELS[Math.max(0, Math.min(MAX_LEVEL, Math.round(n ?? 0)))];
 const A4 = { w: 595.28, h: 841.89 };
 
 function toBlob(c: HTMLCanvasElement, type: string, quality?: number): Promise<Blob> {
@@ -56,10 +66,9 @@ export function budgetedMaxSide(
 async function rawDimensions(
   page: Parameters<Rasterizer>[0],
   source: Parameters<Rasterizer>[1],
-  compress: boolean,
+  compress: number,
 ): Promise<{ w: number; h: number; desiredMaxSide: number }> {
-  const dpi = compress ? SMALL.dpi : DPI;
-  const imageMax = compress ? SMALL.imageMaxSide : IMAGE_MAX_SIDE;
+  const { dpi, imageMaxSide: imageMax } = level(compress);
   if (page.source.kind === 'image') {
     const bmp = await createImageBitmap(source.blob, { imageOrientation: 'from-image' });
     try {
@@ -77,7 +86,7 @@ async function rawDimensions(
 }
 
 export const browserRasterizer: Rasterizer = async (page, source, opts) => {
-  const compress = opts?.compress === true;
+  const compress = opts?.compress ?? 0;
   const dims = await rawDimensions(page, source, compress);
   const deg = effectiveRotation(page) + page.skewDeg;
   const maxSide = budgetedMaxSide(dims.w, dims.h, deg, dims.desiredMaxSide);
@@ -95,7 +104,7 @@ async function finish(
   page: Parameters<Rasterizer>[0],
   deg: number,
   dims: { w: number; h: number },
-  compress: boolean,
+  compress: number,
 ) {
   const angle = (deg * Math.PI) / 180;
   const full = rotatedSize(raw.width, raw.height, deg);
@@ -130,8 +139,8 @@ async function finish(
     const h = c.h;
 
     // a smaller file is always JPEG; otherwise near-bitonal pages stay crisp as PNG
-    const png = !compress && isNearBitonal(toGray(ctx.getImageData(0, 0, w, h).data, w, h));
-    const blob = png ? await toBlob(out, 'image/png') : await toBlob(out, 'image/jpeg', compress ? SMALL.quality : 0.9);
+    const png = compress === 0 && isNearBitonal(toGray(ctx.getImageData(0, 0, w, h).data, w, h));
+    const blob = png ? await toBlob(out, 'image/png') : await toBlob(out, 'image/jpeg', level(compress).quality);
     const bytes = new Uint8Array(await blob.arrayBuffer());
 
     let widthPt: number;

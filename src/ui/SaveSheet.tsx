@@ -86,12 +86,24 @@ export function SaveSheet() {
             </button>
           ))}
         </div>
-        <Switch
-          label={strings.smallerFile}
-          hint={strings.smallerFileHint}
-          on={opts.compress}
-          onChange={(compress) => setOpts((o) => ({ ...o, compress }))}
-        />
+        <div className="sheet-field">
+          <span className="sheet-option-hint">{strings.fileSize}</span>
+          <div className="size-options" role="group" aria-label={strings.fileSize}>
+            {(
+              [
+                ['best', strings.sizeBest, ''],
+                ['mail', strings.sizeMail, strings.sizeMailHint],
+                ['small', strings.sizeSmallest, strings.sizeSmallestHint],
+              ] as const
+            ).map(([v, label, hint]) => (
+              <button key={v} type="button" aria-pressed={opts.size === v} onClick={() => setOpts((o) => ({ ...o, size: v }))}>
+                <strong>{label}</strong>
+                {hint && <span>{hint}</span>}
+              </button>
+            ))}
+          </div>
+          {opts.size !== 'best' && <span className="sheet-option-hint size-hint">{strings.sizeHint}</span>}
+        </div>
         {!ids && all.length > 1 && (
           <label className="sheet-field">
             <span className="sheet-option-hint">{strings.pagesField}</span>

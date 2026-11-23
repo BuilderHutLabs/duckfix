@@ -99,7 +99,7 @@ describe('camera scan', () => {
     render(<App store={store} />);
     const tile = () => screen.getAllByRole('button', { name: strings.takePhoto })[0] as HTMLButtonElement;
     expect(tile().disabled).toBe(false);
-    act(() => void store.export({ compress: false, ocr: false, format: 'pdf' }));
+    act(() => void store.export({ size: 'best', ocr: false, format: 'pdf' }));
     expect(tile().disabled).toBe(true);
   });
 

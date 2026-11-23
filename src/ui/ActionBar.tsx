@@ -43,7 +43,9 @@ export function ActionBar() {
           <button type="button" className="btn btn-primary" disabled>
             {!s.exportProgress
               ? strings.saving
-              : s.exportProgress.ocr
+              : s.exportProgress.shrink
+                ? strings.shrinkProgress(s.exportProgress.done, s.exportProgress.total)
+                : s.exportProgress.ocr
                 ? strings.ocrProgress(s.exportProgress.done, s.exportProgress.total)
                 : strings.savingProgress(s.exportProgress.done, s.exportProgress.total)}
           </button>

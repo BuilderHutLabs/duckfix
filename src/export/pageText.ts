@@ -10,7 +10,7 @@ import type { OcrEngine } from './ocr';
  * Boxes are fractions of that picture (0…1), for "Ukryj dane osobowe".
  */
 export async function pageLines(page: Page, source: SourceFile, rasterize: Rasterizer, ocr: () => Promise<OcrEngine>): Promise<OcrLine[]> {
-  const r = await rasterize(page, source, { compress: false });
+  const r = await rasterize(page, source, { compress: 0 });
   const engine = await ocr();
   if (!engine.lines) return [];
   const blob = new Blob([r.bytes as BlobPart], { type: r.format === 'png' ? 'image/png' : 'image/jpeg' });
@@ -50,7 +50,7 @@ export async function pageText(page: Page, source: SourceFile, rasterize: Raster
     }
     return out.replace(/[ \t]+\n/g, '\n');
   }
-  const r = await rasterize(page, source, { compress: false });
+  const r = await rasterize(page, source, { compress: 0 });
   const engine = await ocr();
   return engine.text(new Blob([r.bytes as BlobPart], { type: r.format === 'png' ? 'image/png' : 'image/jpeg' }));
 }

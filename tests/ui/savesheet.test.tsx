@@ -28,26 +28,62 @@ function setup(over = {}) {
 const saveButton = () => screen.getByRole('button', { name: strings.save });
 
 describe('save sheet', () => {
-  it('Zapisz opens the options; Mniejszy plik is passed to the export and remembered', async () => {
+  it('Zapisz opens the options; the file size (Najlepsza / Do maila / Małe) is passed to the export and remembered', async () => {
     const { deps } = setup();
     fireEvent.click(saveButton());
-    const smaller = screen.getByRole('switch', { name: strings.smallerFile });
+    const size = (name: string) => screen.getByRole('button', { name: new RegExp(`^${name}`) });
     expect(screen.getByRole('switch', { name: strings.searchableText })).toBeTruthy();
-    expect(smaller.getAttribute('aria-checked')).toBe('false');
-    fireEvent.click(smaller);
+    expect(size(strings.sizeBest).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(size(strings.sizeMail));
     fireEvent.click(screen.getByRole('button', { name: strings.saveConfirm }));
     await waitFor(() => expect(deps.download).toHaveBeenCalled());
-    expect(vi.mocked(deps.exportPdf).mock.calls[0][3]).toMatchObject({ compress: true });
+    expect(vi.mocked(deps.exportPdf).mock.calls[0][3]).toMatchObject({ compress: 1 });
 
     fireEvent.click(saveButton());
-    expect(screen.getByRole('switch', { name: strings.smallerFile }).getAttribute('aria-checked')).toBe('true');
+    expect(size(strings.sizeMail).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('"Najlepsza jakość" saves once at full quality', async () => {
+    const { deps, store } = setup();
+    await act(() => store.export({ size: 'best', ocr: false, format: 'pdf' }));
+    expect(vi.mocked(deps.exportPdf).mock.calls.map((c) => c[3].compress)).toEqual([0]);
+  });
+
+  it('"Do maila (do 5 MB)": too big at first, it is saved again smaller until it fits; the last one is saved', async () => {
+    const bySize: Record<number, number> = { 1: 9_000_000, 2: 6_000_000, 3: 3_000_000 };
+    const exportPdf = vi.fn(async (_d: unknown, _s: unknown, _p: unknown, o: { compress: number }) => new Uint8Array(bySize[o.compress] ?? 10));
+    const { deps, store } = setup({ exportPdf });
+    await act(() => store.export({ size: 'mail', ocr: false, format: 'pdf' }));
+    expect(exportPdf.mock.calls.map((c) => c[3].compress)).toEqual([1, 2, 3]);
+    expect(vi.mocked(deps.download)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(deps.download).mock.calls[0][0].size).toBe(3_000_000);
+    expect(store.getState().notice).toContain(formatSize(3_000_000));
+  });
+
+  it('"Małe (do 1 MB)" that cannot fit: the smallest possible file is saved and the app says how big it is', async () => {
+    const exportPdf = vi.fn(async () => new Uint8Array(5_000_000));
+    const { deps, store } = setup({ exportPdf });
+    await act(() => store.export({ size: 'small', ocr: false, format: 'pdf' }));
+    expect(exportPdf.mock.calls.map((c) => (c as unknown as [unknown, unknown, unknown, { compress: number }])[3].compress)).toEqual([2, 4, 5]);
+    expect(vi.mocked(deps.download)).toHaveBeenCalledTimes(1);
+    expect(store.getState().notice).toContain(strings.sizeTooBig(formatSize(1_000_000), formatSize(5_000_000)));
+  });
+
+  it('JPG with "Do maila": the pictures together fit the limit', async () => {
+    const exportImages = vi.fn(async (_d: unknown, _s: unknown, _p: unknown, o: { compress: number }) =>
+      o.compress < 2 ? [new Blob([new Uint8Array(4_000_000)]), new Blob([new Uint8Array(4_000_000)])] : [new Blob([new Uint8Array(1_000)])],
+    );
+    const { deps, store } = setup({ exportImages });
+    await act(() => store.export({ size: 'mail', ocr: false, format: 'jpg' }));
+    expect(exportImages.mock.calls.map((c) => c[3].compress)).toEqual([1, 2]);
+    expect(vi.mocked(deps.download)).toHaveBeenCalledTimes(1);
   });
 
   it('the sheet closes without saving', () => {
     const { deps } = setup();
     fireEvent.click(saveButton());
     fireEvent.click(screen.getByRole('button', { name: strings.cancel }));
-    expect(screen.queryByRole('switch', { name: strings.smallerFile })).toBeNull();
+    expect(screen.queryByRole('group', { name: strings.fileSize })).toBeNull();
     expect(deps.exportPdf).not.toHaveBeenCalled();
   });
 
@@ -105,7 +141,7 @@ describe('searchable text', () => {
         throw new Error('offline');
       }),
     });
-    await act(() => store.export({ compress: false, ocr: true, format: 'pdf' }));
+    await act(() => store.export({ size: 'best', ocr: true, format: 'pdf' }));
     expect(deps.download).toHaveBeenCalledTimes(1);
     expect(vi.mocked(deps.exportPdf).mock.calls[0][3]).toMatchObject({ ocr: null });
     expect(store.getState().notice).toContain(strings.ocrUnavailable);

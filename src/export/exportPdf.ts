@@ -7,7 +7,8 @@ import type { OcrEngine } from './ocr';
 export type Rasterizer = (
   page: Page,
   source: SourceFile,
-  opts?: { compress: boolean },
+  /** Quality level (0 = full quality). */
+  opts?: { compress: number },
 ) => Promise<{ bytes: Uint8Array; format: 'png' | 'jpg'; widthPt: number; heightPt: number }>;
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -85,9 +86,9 @@ export async function exportPdf(
   rasterize: Rasterizer,
   /** Called after each page with (pages done, total pages). */
   onProgress?: (done: number, total: number) => void,
-  opts: { compress?: boolean; ocr?: OcrEngine; signal?: AbortSignal; watermark?: WatermarkImage } = {},
+  opts: { compress?: number; ocr?: OcrEngine; signal?: AbortSignal; watermark?: WatermarkImage } = {},
 ): Promise<Uint8Array> {
-  const compress = opts.compress === true;
+  const compress = opts.compress ?? 0;
   opts.signal?.throwIfAborted();
   const out = await PDFDocument.create();
   const mark = opts.watermark;
@@ -110,7 +111,7 @@ export async function exportPdf(
 
     // with OCR, a scanned PDF page without text is rasterized too, so it can be recognized
     const ocrThis = opts.ocr && !hasOwnText(page);
-    if (compress || needsRaster(page) || ocrThis) {
+    if (compress > 0 || needsRaster(page) || ocrThis) {
       const r = await rasterize(page, source, { compress });
       const image = r.format === 'png' ? await out.embedPng(r.bytes) : await out.embedJpg(r.bytes);
       const outPage = out.addPage([r.widthPt, r.heightPt]);
