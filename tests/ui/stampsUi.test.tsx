@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { App } from '../../src/ui/App';
-import { createAppStore } from '../../src/ui/store';
+import { AppStoreProvider, createAppStore } from '../../src/ui/store';
+import { PagePreview } from '../../src/ui/PagePreview';
 import { strings } from '../../src/ui/strings';
 import { docWithFlags, fakeDeps, source } from './fixtures';
 import { addSignature, loadSignatures } from '../../src/signature/storage';
@@ -141,5 +142,38 @@ describe('Pieczątka', () => {
     fireEvent.click(screen.getByRole('button', { name: strings.stampFiled }));
     const [a, b] = store.getState().doc.pages[0].stamps!;
     expect(b.y).toBeGreaterThanOrEqual(a.y + a.h);
+  });
+});
+
+describe('a stamp keeps its shape on a wide screen (laptop)', () => {
+  beforeEach(() => localStorage.clear());
+  afterEach(() => vi.restoreAllMocks());
+
+  it('the page is a narrow A4 in the middle of a wide stage: the stamp is as tall as its picture says, not stretched', () => {
+    // the preview image fills the whole wide stage; the A4 picture sits in its middle (object-fit: contain)
+    const box = { left: 0, top: 0, x: 0, y: 0, right: 1800, bottom: 700, width: 1800, height: 700, toJSON: () => ({}) };
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue(box as DOMRect);
+    vi.spyOn(HTMLImageElement.prototype, 'naturalWidth', 'get').mockReturnValue(1000);
+    vi.spyOn(HTMLImageElement.prototype, 'naturalHeight', 'get').mockReturnValue(1414);
+    vi.spyOn(HTMLElement.prototype, 'offsetWidth', 'get').mockReturnValue(1800);
+    vi.spyOn(HTMLElement.prototype, 'offsetHeight', 'get').mockReturnValue(700);
+    const store = createAppStore(fakeDeps());
+    store.load(docWithFlags(1), [source]);
+    const ready = { status: 'ready', url: 'blob:page' };
+    const cache = { get: () => ready, subscribe: () => () => {} } as never;
+    render(
+      <AppStoreProvider store={store}>
+        <PagePreview pageIds={['p1']} render={() => new Promise(() => {})} cache={cache} />
+      </AppStoreProvider>,
+    );
+    act(() => store.openPreview('p1'));
+    expect(screen.getByRole('presentation')).toBeTruthy(); // the page picture is there
+    vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 1000);
+    fireEvent.click(screen.getByRole('button', { name: strings.edit }));
+    openStampTool();
+    fireEvent.click(screen.getByRole('button', { name: strings.stampCopy }));
+    const st = store.getState().doc.pages[0].stamps![0];
+    // on the page (1000 x 1414) the stamp is 2.5 times as wide as tall, like its picture
+    expect((st.w * 1000) / (st.h * 1414)).toBeCloseTo(2.5, 1);
   });
 });

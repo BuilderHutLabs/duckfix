@@ -219,12 +219,16 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   if (!open) return null;
 
   /**
+   * Width / height of the page as shown: the page box, not the image element (that fills the whole
+   * stage and draws the page inside it, so on a wide laptop screen it is far wider than the page).
+   */
+  const pageAspectNow = () => (rect && rect.height ? rect.width / rect.height : 0.707);
+  /**
    * Puts a signature in the lower right part of the page (35 % of its width), initials small in the
    * lower right corner. Returns what was placed.
    */
   const place = (sig: SavedSignature) => {
-    const box = imgRef.current?.getBoundingClientRect();
-    const pageAspect = box && box.height ? box.width / box.height : 0.707;
+    const pageAspect = pageAspectNow();
     const initials = sig.kind === 'initials';
     const w = initials ? 0.12 : 0.35;
     const h = Math.min(0.5, (w * pageAspect) / sig.aspect);
@@ -238,8 +242,7 @@ export function PagePreview({ pageIds, render = renderPage, cache }: Props) {
   };
   /** A ready-made stamp goes into the upper right part of the page, a third of its width. */
   const placeStamp = (s: PickedStamp, allPages: boolean) => {
-    const box = imgRef.current?.getBoundingClientRect();
-    const pageAspect = box && box.height ? box.width / box.height : 0.707;
+    const pageAspect = pageAspectNow();
     const w = s.kind === 'certified' ? 0.36 : 0.3;
     const h = Math.min(0.4, (w * pageAspect) / s.aspect);
     const id = crypto.randomUUID();
