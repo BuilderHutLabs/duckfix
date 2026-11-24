@@ -28,7 +28,7 @@ export const pl = {
   restoreSession: 'Wróć do ostatniego dokumentu',
   docsShort: (n: number) => `Moje (${n})`,
   docsTitle: 'Moje dokumenty',
-  docsSummary: (n: number, size: string) => `${n} ${plural(n, 'dokument', 'dokumenty', 'dokumentów')} · ${size} · tylko w tym telefonie`,
+  docsSummary: (n: number, size: string) => `${n} ${plural(n, 'dokument', 'dokumenty', 'dokumentów')} · ${size}`,
   docsEmpty: 'Nie masz jeszcze zapisanych dokumentów.',
   docPages: (n: number) => `${n} ${plural(n, 'strona', 'strony', 'stron')}`,
   docToday: 'dziś',

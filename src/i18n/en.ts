@@ -21,7 +21,7 @@ export const en: Strings = {
   restoreSession: 'Back to the last document',
   docsShort: (n: number) => `Mine (${n})`,
   docsTitle: 'My documents',
-  docsSummary: (n: number, size: string) => `${n} ${s(n, 'document', 'documents')} · ${size} · only on this phone`,
+  docsSummary: (n: number, size: string) => `${n} ${s(n, 'document', 'documents')} · ${size}`,
   docsEmpty: 'No saved documents yet.',
   docPages: (n: number) => `${n} ${s(n, 'page', 'pages')}`,
   docToday: 'today',
